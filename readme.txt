@@ -6,7 +6,7 @@ Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 1.7.7
+Stable tag: 1.8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,10 @@ No — one WooCommerce site connects to one Shopify Pulse store (one OAuth app =
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 1.8.0 =
+* Redesigned admin UI to match the platform ("Bazaar Console"): both the Settings and Abandoned carts screens now share one design system — petrol-teal primary + marigold highlights on a warm off-white surface, softly elevated 12px cards, pill-shaped status badges, tabular figures in the KPIs and table, teal primary buttons, and clear teal focus rings on every control. The look is centralised in one stylesheet (assets/css/sp-admin.css) instead of being duplicated per page.
+* New menu icon treatment: the Shopify Pulse admin-menu icon is white at rest and turns marigold when the menu is open/active, matching the platform accent.
 
 = 1.7.7 =
 * Fraud layers now block in the intended order at checkout. The courier delivery-ratio gate used to run before the basic checks; now the checkout is screened in ascending order and stops at the first failure — Layer 1 (name / address / mobile) → Layer 2 (IP rate limit) → Layer 3 (courier ratio) — so the shopper always sees the lowest-numbered reason first in the popup. A fake name/address is caught before the courier check ever runs.

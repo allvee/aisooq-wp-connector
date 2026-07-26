@@ -219,10 +219,45 @@ class Shopify_Pulse_Settings {
 		add_action( 'admin_init', array( $this, 'maybe_save' ) );
 		add_action( 'wp_ajax_shopify_pulse_test', array( $this, 'ajax_test_connection' ) );
 		add_action( 'wp_ajax_shopify_pulse_sync', array( $this, 'ajax_sync' ) );
+		// Shared "Bazaar Console" admin design system for both plugin screens.
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
+		// Menu icon: white by default, marigold when the menu is current/hovered.
+		add_action( 'admin_head', array( $this, 'menu_icon_css' ) );
 		add_filter(
 			'plugin_action_links_' . SHOPIFY_PULSE_BASENAME,
 			array( $this, 'action_links' )
 		);
+	}
+
+	/** Load the shared admin stylesheet on the plugin's own screens only. */
+	public function enqueue_admin_assets( $hook ) {
+		if ( false === strpos( (string) $hook, 'shopify-pulse' ) ) {
+			return;
+		}
+		wp_enqueue_style( 'sp-admin', SHOPIFY_PULSE_URL . 'assets/css/sp-admin.css', array(), SHOPIFY_PULSE_VERSION );
+	}
+
+	/**
+	 * Recolour the top-level admin-menu icon: white in the resting state,
+	 * marigold when the item is current/open/hovered. WordPress renders the
+	 * base64 icon as a dimmed background/img and can't tint it, so we hide that
+	 * and paint the same glyph as a CSS mask whose colour we control. Printed in
+	 * admin_head (all screens) because the menu shows everywhere.
+	 */
+	public function menu_icon_css() {
+		$icon = self::menu_icon();
+		$sel  = '#toplevel_page_' . self::PAGE_SLUG;
+		echo '<style id="sp-menu-icon">'
+			. $sel . ' .wp-menu-image,' . $sel . ' .wp-menu-image.svg{background-image:none !important;}'
+			. $sel . ' .wp-menu-image img{opacity:0 !important;}'
+			. $sel . ' .wp-menu-image{position:relative;}'
+			. $sel . ' .wp-menu-image:after{content:"";position:absolute;top:7px;left:0;right:0;margin:0 auto;width:20px;height:20px;background-color:#fff;'
+			. '-webkit-mask:url(\'' . $icon . '\') center/20px no-repeat;mask:url(\'' . $icon . '\') center/20px no-repeat;transition:background-color .15s ease;}'
+			. $sel . ':hover .wp-menu-image:after,'
+			. $sel . '.current .wp-menu-image:after,'
+			. $sel . '.wp-has-current-submenu .wp-menu-image:after,'
+			. $sel . '.opensub .wp-menu-image:after{background-color:#e0891b;}'
+			. '</style>';
 	}
 
 	public function action_links( $links ) {
