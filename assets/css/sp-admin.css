@@ -43,17 +43,23 @@
 
 /* Links default to WP blue — bring them onto the teal brand (buttons + tabs
    keep their own styling). */
-.wrap.sp a:not(.button):not(.sp-tab):not(.nav-tab),
-.wrap.sp-ab a:not(.button):not(.sp-tab):not(.nav-tab),
+.wrap.sp a:not(.button):not(.sp-tab):not(.nav-tab):not(.on),
+.wrap.sp-ab a:not(.button):not(.sp-tab):not(.nav-tab):not(.on),
 .wrap.sp .button-link,
 .wrap.sp-ab .button-link {
 	color: var(--pri);
 }
-.wrap.sp a:not(.button):not(.sp-tab):hover,
-.wrap.sp-ab a:not(.button):not(.sp-tab):hover,
+.wrap.sp a:not(.button):not(.sp-tab):not(.on):hover,
+.wrap.sp-ab a:not(.button):not(.sp-tab):not(.on):hover,
 .wrap.sp .button-link:hover,
 .wrap.sp-ab .button-link:hover {
 	color: var(--pri-d);
+}
+
+/* Active filter pill: keep its white-on-teal label (its own inline rule sets
+   the teal fill) — the link recolour above intentionally skips `.on`. */
+.wrap.sp-ab .sp-filters a.on {
+	color: #fff;
 }
 
 /* Native checkboxes/radios adopt the brand even where WP doesn't use its var. */

@@ -6,7 +6,7 @@ Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 1.8.1
+Stable tag: 1.8.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,9 @@ No — one WooCommerce site connects to one Shopify Pulse store (one OAuth app =
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 1.8.2 =
+* Fix (mobile + desktop): the active status-filter pill on the Abandoned carts screen showed no label (teal text on the teal pill) after the redesign — its white label is now restored. Verified the full mobile layout on a phone-width viewport: KPI tiles reflow to two columns, filters stack, and each cart row becomes a clean labelled card with a tidy Actions menu.
 
 = 1.8.1 =
 * Redesign polish (verified in a live WordPress admin): links (Verify connection, per-entity Sync, Apply/Clear) and checkboxes/radios now use the teal brand accent instead of WordPress blue, so both screens read as one cohesive palette end to end.
