@@ -28,7 +28,7 @@
 		var out = {};
 		try {
 			new URLSearchParams( window.location.search ).forEach( function ( v, k ) {
-				if ( /^utm_/i.test( k ) || k === 'gclid' || k === 'fbclid' ) {
+				if ( /^utm_/i.test( k ) || k === 'gclid' || k === 'fbclid' || k === 'ttclid' ) {
 					out[ k.toLowerCase() ] = v.slice( 0, 256 );
 				}
 			} );
@@ -69,6 +69,7 @@
 		utm_term: utm.utm_term || '',
 		gclid: utm.gclid || '',
 		fbclid: utm.fbclid || '',
+		ttclid: utm.ttclid || '',
 		at: now.toISOString()
 	};
 
