@@ -6,7 +6,7 @@ Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 1.7.5
+Stable tag: 1.7.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,9 @@ No — one WooCommerce site connects to one Shopify Pulse store (one OAuth app =
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 1.7.6 =
+* Live inline validation at checkout. With fraud protection on, the classic checkout now flags a fake/gibberish name, a junk delivery address or a malformed phone number right under the field as the shopper fills the form — before they press Place order — instead of only rejecting on submit. It uses the same platform heuristics as the checkout block (no duplicated rules) and never records an attempt, so typing can't trip the IP limit. Purely advisory: if the check can't run, checkout is unaffected (the order is still screened server-side at placement). Needs the platform build with the /fraud/preview endpoint.
 
 = 1.7.5 =
 * Fraud protection is now configurable from the plugin — and actually screens. The Settings page gains a Fraud Protection panel that turns the platform's multi-layer engine on and tunes it without leaving WordPress: Layer 1 basic validation (block fake/gibberish names + addresses, choose the phone-number check mode), Layer 2 IP rate-limiting (auto-block after N blocked attempts per IP within a window), and Layer 3 the existing BDCourier success-ratio gate. The single "fraud screening" switch now arms both the plugin's checkout call and the platform engine, so a fresh install can enable protection with one click (previously the platform master switch could only be set on the platform admin, so enabling it in the plugin alone did nothing). Ships opt-in.
