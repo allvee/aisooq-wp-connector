@@ -223,31 +223,34 @@ class Shopify_Pulse_Fraud {
 			? $data['shipping_address_1']
 			: ( isset( $data['billing_address_1'] ) ? $data['billing_address_1'] : '' );
 
-		// Courier delivery-ratio gate — a hard forbid regardless of fraud_action,
-		// and runs even when the full fraud screen is disabled.
+		// Layers run in ascending order and stop at the first failure, so the
+		// shopper sees the lowest-numbered reason first:
+		//   Layer 1 basic validation (name/address/mobile) → Layer 2 IP velocity
+		//   [→ Layer 3 platform courier gate] — all via the platform fraud screen.
+		if ( $this->settings->get( 'enable_fraud' ) ) {
+			$verdict = $this->screen( $this->ctx( $name, $phone, $address ) );
+			if ( $verdict && empty( $verdict['allowed'] ) ) {
+				$action = $this->settings->get( 'fraud_action' );
+				if ( 'block' === $action ) {
+					$this->stash_block( 'fraud', $this->message( $verdict ) );
+					$errors->add( 'sp_fraud', $this->message( $verdict ) );
+					return;
+				}
+				// hold / flag: let the order be created, then act on it — but the
+				// courier gate below is still a hard forbid.
+				$this->stash( $verdict );
+			}
+		}
+
+		// Layer 3 — courier delivery-ratio gate. LAST, so it only fires once
+		// name/address/mobile + IP have passed. A hard forbid regardless of
+		// fraud_action, and runs even when the full fraud screen is disabled.
 		$courier_msg = $this->courier_block_message( $phone );
 		if ( $courier_msg ) {
 			$this->stash_block( 'courier', $courier_msg );
 			$errors->add( 'sp_courier', $courier_msg );
 			return;
 		}
-		if ( ! $this->settings->get( 'enable_fraud' ) ) {
-			return;
-		}
-
-		$verdict = $this->screen( $this->ctx( $name, $phone, $address ) );
-		if ( ! $verdict || ! empty( $verdict['allowed'] ) ) {
-			return;
-		}
-
-		$action = $this->settings->get( 'fraud_action' );
-		if ( 'block' === $action ) {
-			$this->stash_block( 'fraud', $this->message( $verdict ) );
-			$errors->add( 'sp_fraud', $this->message( $verdict ) );
-			return;
-		}
-		// hold / flag: let the order be created, then act on it.
-		$this->stash( $verdict );
 		} catch ( \Throwable $e ) {
 			// A connector must NEVER break the merchant's checkout — fail open.
 			$this->logger->error( 'Fraud/courier screen error (allowing checkout): ' . $e->getMessage() );
@@ -267,7 +270,33 @@ class Shopify_Pulse_Fraud {
 		$name    = trim( $order->get_billing_first_name() . ' ' . $order->get_billing_last_name() );
 		$address = $order->get_shipping_address_1() ? $order->get_shipping_address_1() : $order->get_billing_address_1();
 
-		// Courier delivery-ratio gate — hard forbid before payment.
+		// Ascending order (stop at first failure): Layer 1 basic validation
+		// (name/address/mobile) → Layer 2 IP velocity [→ Layer 3 platform courier]
+		// via the fraud screen, THEN the plugin's Layer 3 courier gate last.
+		if ( $this->settings->get( 'enable_fraud' ) ) {
+			$verdict = $this->screen( $this->ctx( $name, $order->get_billing_phone(), $address ) );
+			if ( $verdict && empty( $verdict['allowed'] ) ) {
+				$action = $this->settings->get( 'fraud_action' );
+				if ( 'block' === $action ) {
+					if ( class_exists( '\Automattic\WooCommerce\StoreApi\Exceptions\RouteException' ) ) {
+						throw new \Automattic\WooCommerce\StoreApi\Exceptions\RouteException(
+							'sp_fraud_blocked',
+							$this->with_contact( $this->message( $verdict ) ),
+							400
+						);
+					}
+					// Fallback if the exception class is unavailable: fail the order.
+					$order->update_status( 'failed', $this->message( $verdict ) );
+					return;
+				}
+				// hold / flag: stash now, apply once the order is fully processed
+				// (the courier gate below is still a hard forbid).
+				$this->stash( $verdict );
+			}
+		}
+
+		// Layer 3 — courier delivery-ratio gate. LAST: hard forbid before
+		// payment, only after name/address/mobile + IP have passed.
 		$courier_msg = $this->courier_block_message( $order->get_billing_phone() );
 		if ( $courier_msg ) {
 			if ( class_exists( '\Automattic\WooCommerce\StoreApi\Exceptions\RouteException' ) ) {
@@ -276,30 +305,6 @@ class Shopify_Pulse_Fraud {
 			$order->update_status( 'failed', $courier_msg );
 			return;
 		}
-		if ( ! $this->settings->get( 'enable_fraud' ) ) {
-			return;
-		}
-
-		$verdict = $this->screen( $this->ctx( $name, $order->get_billing_phone(), $address ) );
-		if ( ! $verdict || ! empty( $verdict['allowed'] ) ) {
-			return;
-		}
-
-		$action = $this->settings->get( 'fraud_action' );
-		if ( 'block' === $action ) {
-			if ( class_exists( '\Automattic\WooCommerce\StoreApi\Exceptions\RouteException' ) ) {
-				throw new \Automattic\WooCommerce\StoreApi\Exceptions\RouteException(
-					'sp_fraud_blocked',
-					$this->with_contact( $this->message( $verdict ) ),
-					400
-				);
-			}
-			// Fallback if the exception class is unavailable: fail the order.
-			$order->update_status( 'failed', $this->message( $verdict ) );
-			return;
-		}
-		// hold / flag: stash now, apply once the order is fully processed.
-		$this->stash( $verdict );
 	}
 
 	/** hold/flag for classic checkout (order id). */

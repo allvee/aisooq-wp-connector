@@ -6,7 +6,7 @@ Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 1.7.6
+Stable tag: 1.7.7
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,9 @@ No — one WooCommerce site connects to one Shopify Pulse store (one OAuth app =
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 1.7.7 =
+* Fraud layers now block in the intended order at checkout. The courier delivery-ratio gate used to run before the basic checks; now the checkout is screened in ascending order and stops at the first failure — Layer 1 (name / address / mobile) → Layer 2 (IP rate limit) → Layer 3 (courier ratio) — so the shopper always sees the lowest-numbered reason first in the popup. A fake name/address is caught before the courier check ever runs.
 
 = 1.7.6 =
 * Live inline validation at checkout. With fraud protection on, the classic checkout now flags a fake/gibberish name, a junk delivery address or a malformed phone number right under the field as the shopper fills the form — before they press Place order — instead of only rejecting on submit. It uses the same platform heuristics as the checkout block (no duplicated rules) and never records an attempt, so typing can't trip the IP limit. Purely advisory: if the check can't run, checkout is unaffected (the order is still screened server-side at placement). Needs the platform build with the /fraud/preview endpoint.
