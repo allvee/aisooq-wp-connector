@@ -33,6 +33,44 @@
 	--radius-sm: 8px;
 	--sh-card: 0 1px 2px rgba(23, 40, 36, .06), 0 1px 1px rgba(23, 40, 36, .04);
 	--sh-elev: 0 8px 24px -8px rgba(23, 40, 36, .16), 0 3px 8px -4px rgba(23, 40, 36, .08);
+	/* Repaint WordPress's own admin accent within our screens — recolours
+	   checkbox/radio checks, focus rings and any theme-var-driven control to
+	   teal in one shot. */
+	--wp-admin-theme-color: #0c6e63;
+	--wp-admin-theme-color-darker-10: #0a5a51;
+	--wp-admin-theme-color-darker-20: #084c44;
+}
+
+/* Links default to WP blue — bring them onto the teal brand (buttons + tabs
+   keep their own styling). */
+.wrap.sp a:not(.button):not(.sp-tab):not(.nav-tab),
+.wrap.sp-ab a:not(.button):not(.sp-tab):not(.nav-tab),
+.wrap.sp .button-link,
+.wrap.sp-ab .button-link {
+	color: var(--pri);
+}
+.wrap.sp a:not(.button):not(.sp-tab):hover,
+.wrap.sp-ab a:not(.button):not(.sp-tab):hover,
+.wrap.sp .button-link:hover,
+.wrap.sp-ab .button-link:hover {
+	color: var(--pri-d);
+}
+
+/* Native checkboxes/radios adopt the brand even where WP doesn't use its var. */
+.wrap.sp input[type="checkbox"],
+.wrap.sp input[type="radio"],
+.wrap.sp-ab input[type="checkbox"],
+.wrap.sp-ab input[type="radio"] {
+	accent-color: var(--pri);
+}
+.wrap.sp input[type="checkbox"]:checked,
+.wrap.sp-ab input[type="checkbox"]:checked {
+	background: var(--pri);
+	border-color: var(--pri-d);
+}
+.wrap.sp input[type="checkbox"]:checked::before,
+.wrap.sp-ab input[type="checkbox"]:checked::before {
+	color: #fff;
 }
 
 /* Page canvas + base type */
