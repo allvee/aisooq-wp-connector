@@ -36,6 +36,47 @@ class Shopify_Pulse_Abandoned_Sync {
 		return $wpdb->prefix . 'sp_abandoned_carts';
 	}
 
+	/**
+	 * Snapshot the shopper's first-touch campaign/social attribution from the
+	 * front-end tracker cookie (sp_first, written by assets/js/sp-attr.js), so a
+	 * captured cart records which channel/campaign it came from — the same
+	 * signal the order push carries. Returns the abandoned-table columns; the
+	 * flat UTM go in their own columns, the click ids (fbclid/gclid/ttclid) ride
+	 * in attribution_json. Empty array-safe: unknown fields stay null.
+	 *
+	 * @return array<string,string|null>
+	 */
+	private function attribution_snapshot() {
+		$t = array();
+		if ( ! empty( $_COOKIE['sp_first'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$decoded = json_decode( wp_unslash( $_COOKIE['sp_first'] ), true ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended,WordPress.Security.ValidatedSanitizedInput
+			if ( is_array( $decoded ) ) {
+				$t = $decoded;
+			}
+		}
+		$get = function ( $key, $max = 128 ) use ( $t ) {
+			return isset( $t[ $key ] ) && '' !== $t[ $key ]
+				? substr( sanitize_text_field( (string) $t[ $key ] ), 0, $max )
+				: null;
+		};
+		$clicks = array_filter( array(
+			'fbclid' => $get( 'fbclid', 512 ),
+			'gclid'  => $get( 'gclid', 512 ),
+			'ttclid' => $get( 'ttclid', 512 ),
+		) );
+		return array(
+			'utm_source'       => $get( 'utm_source' ),
+			'utm_medium'       => $get( 'utm_medium' ),
+			'utm_campaign'     => $get( 'utm_campaign' ),
+			'utm_term'         => $get( 'utm_term' ),
+			'utm_content'      => $get( 'utm_content' ),
+			'referrer'         => $get( 'referrer', 1024 ),
+			'landing_path'     => $get( 'landing_path', 1024 ),
+			'traffic_source'   => $get( 'traffic_source', 32 ),
+			'attribution_json' => $clicks ? wp_json_encode( $clicks ) : null,
+		);
+	}
+
 	public function register() {
 		add_action( 'woocommerce_add_to_cart', array( $this, 'capture' ), 20 );
 		add_action( 'woocommerce_after_cart_item_quantity_update', array( $this, 'capture' ), 20 );
@@ -180,6 +221,9 @@ class Shopify_Pulse_Abandoned_Sync {
 		if ( $exists ) {
 			$wpdb->update( $table, $data, array( 'session_key' => $session_key ) ); // phpcs:ignore WordPress.DB
 		} else {
+			// First-touch attribution: snapshot the campaign/social source once, on
+			// the row's creation, so a recovered cart keeps who/where it came from.
+			$data = array_merge( $data, $this->attribution_snapshot() );
 			$data['session_key'] = $session_key;
 			$data['created_at']  = $now;
 			$wpdb->insert( $table, $data ); // phpcs:ignore WordPress.DB
@@ -287,6 +331,7 @@ class Shopify_Pulse_Abandoned_Sync {
 		if ( $exists ) {
 			$wpdb->update( $table, $shared, array( 'session_key' => $session_key ) ); // phpcs:ignore WordPress.DB
 		} else {
+			$shared = array_merge( $shared, $this->attribution_snapshot() );
 			$shared['session_key'] = $session_key;
 			$shared['created_at']  = $now;
 			$wpdb->insert( $table, $shared ); // phpcs:ignore WordPress.DB
@@ -556,6 +601,23 @@ class Shopify_Pulse_Abandoned_Sync {
 			: null;
 		if ( is_array( $address ) && ! empty( $address ) ) {
 			$payload['addressDraft'] = $address;
+		}
+		// Campaign/social attribution captured at cart creation, carried so a
+		// recovered cart keeps its source and can be mapped to the ad channel.
+		$attribution = array_filter(
+			array(
+				'referrer'    => isset( $row->referrer ) ? $row->referrer : null,
+				'landingPath' => isset( $row->landing_path ) ? $row->landing_path : null,
+				'utmSource'   => isset( $row->utm_source ) ? $row->utm_source : null,
+				'utmMedium'   => isset( $row->utm_medium ) ? $row->utm_medium : null,
+				'utmCampaign' => isset( $row->utm_campaign ) ? $row->utm_campaign : null,
+				'utmTerm'     => isset( $row->utm_term ) ? $row->utm_term : null,
+				'utmContent'  => isset( $row->utm_content ) ? $row->utm_content : null,
+			),
+			function ( $v ) { return null !== $v && '' !== $v; }
+		);
+		if ( ! empty( $attribution ) ) {
+			$payload['attribution'] = $attribution;
 		}
 		$res = $this->api->post( '/connect/abandoned', $payload );
 		if ( is_wp_error( $res ) ) {

@@ -6,7 +6,7 @@ Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 1.8.2
+Stable tag: 1.9.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,10 @@ No — one WooCommerce site connects to one Shopify Pulse store (one OAuth app =
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 1.9.0 =
+* Abandoned carts now carry their campaign/social attribution to the platform. When a cart is captured, its first-touch source — utm_source/medium/campaign/term/content, referrer, landing path and traffic source — is snapshotted and pushed with the cart, so a recovered cart shows which channel/campaign it came from (previously only completed orders carried attribution). Existing installs get the new columns automatically on update.
+* TikTok click id (ttclid) is now captured alongside fbclid (Meta) and gclid (Google) in the front-end tracker and carried on orders, so TikTok conversions keep their click id.
 
 = 1.8.2 =
 * Fix (mobile + desktop): the active status-filter pill on the Abandoned carts screen showed no label (teal text on the teal pill) after the redesign — its white label is now restored. Verified the full mobile layout on a phone-width viewport: KPI tiles reflow to two columns, filters stack, and each cart row becomes a clean labelled card with a tidy Actions menu.
