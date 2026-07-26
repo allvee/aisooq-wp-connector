@@ -58,6 +58,65 @@ class Shopify_Pulse_Fraud {
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_guard' ), 20 );
 		add_action( 'wp_ajax_shopify_pulse_guard', array( $this, 'ajax_guard' ) );
 		add_action( 'wp_ajax_nopriv_shopify_pulse_guard', array( $this, 'ajax_guard' ) );
+
+		// Live inline Layer-1 validation on the classic checkout — flag a junk
+		// name/address/number under the field as the shopper types, before they
+		// hit Place order (advisory; the server still screens at placement).
+		if ( $fraud ) {
+			add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_validate' ), 21 );
+			add_action( 'wp_ajax_shopify_pulse_validate', array( $this, 'ajax_validate' ) );
+			add_action( 'wp_ajax_nopriv_shopify_pulse_validate', array( $this, 'ajax_validate' ) );
+		}
+	}
+
+	/** Load the inline field-validation script on the (classic) checkout page. */
+	public function enqueue_validate() {
+		if ( is_admin() || ! function_exists( 'is_checkout' ) || ! is_checkout() ) {
+			return;
+		}
+		wp_enqueue_script( 'sp-checkout-validate', SHOPIFY_PULSE_URL . 'assets/js/sp-checkout-validate.js', array( 'jquery' ), SHOPIFY_PULSE_VERSION, true );
+		wp_localize_script(
+			'sp-checkout-validate',
+			'SPValidate',
+			array(
+				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( 'sp_validate' ),
+			)
+		);
+	}
+
+	/**
+	 * AJAX: forward the in-progress checkout fields to the platform's
+	 * non-recording Layer-1 preview and return the per-field verdict. Fails open
+	 * (returns enabled:false) on any error — inline validation is advisory, and
+	 * the authoritative block still happens server-side at order placement.
+	 */
+	public function ajax_validate() {
+		check_ajax_referer( 'sp_validate', 'nonce' );
+		$name    = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
+		$phone   = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
+		$address = isset( $_POST['address'] ) ? sanitize_text_field( wp_unslash( $_POST['address'] ) ) : '';
+
+		$body = array();
+		if ( '' !== $name ) {
+			$body['name'] = substr( $name, 0, 255 );
+		}
+		if ( '' !== $phone ) {
+			$body['phone'] = substr( $phone, 0, 32 );
+		}
+		if ( '' !== $address ) {
+			$body['address'] = substr( $address, 0, 500 );
+		}
+		$open = array( 'enabled' => false, 'allowed' => true, 'fields' => array() );
+		if ( empty( $body ) ) {
+			wp_send_json_success( $open );
+		}
+
+		$res = $this->api->storefront_post( '/fraud/preview', $body, true );
+		if ( is_wp_error( $res ) || ! is_array( $res ) ) {
+			wp_send_json_success( $open );
+		}
+		wp_send_json_success( $res );
 	}
 
 	/** Load the checkout-guard modal on the (classic) checkout page. */
