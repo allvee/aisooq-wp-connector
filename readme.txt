@@ -6,7 +6,7 @@ Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 1.7.4
+Stable tag: 1.7.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,11 @@ No — one WooCommerce site connects to one Shopify Pulse store (one OAuth app =
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 1.7.5 =
+* Fraud protection is now configurable from the plugin — and actually screens. The Settings page gains a Fraud Protection panel that turns the platform's multi-layer engine on and tunes it without leaving WordPress: Layer 1 basic validation (block fake/gibberish names + addresses, choose the phone-number check mode), Layer 2 IP rate-limiting (auto-block after N blocked attempts per IP within a window), and Layer 3 the existing BDCourier success-ratio gate. The single "fraud screening" switch now arms both the plugin's checkout call and the platform engine, so a fresh install can enable protection with one click (previously the platform master switch could only be set on the platform admin, so enabling it in the plugin alone did nothing). Ships opt-in.
+* Stronger fake-name detection: a keyboard-mash word inside a multi-word name (e.g. "qwertgh dsfgnm") is now caught, not just single-word gibberish.
+* Blocked-checkout popup can now show a Messenger button alongside Call / WhatsApp — set your m.me link under Settings → Support contact.
 
 = 1.7.4 =
 * Recovered carts now close on the platform automatically. When a shopper abandons the checkout (the cart is captured to the platform) and then comes back and completes the order, that order now carries the cart's fingerprint, so the platform marks the matching abandoned cart "recovered" and links it to the order — it drops out of the recovery inbox and no recovery reminder is sent for a purchase already made. Older behaviour only cleared the cart locally. Needs the platform build that accepts the order's cart fingerprint (falls back to phone/email matching otherwise).

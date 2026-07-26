@@ -43,6 +43,9 @@ class Shopify_Pulse_Settings {
 			// tenant's contact number.
 			'support_phone'         => '',
 			'support_whatsapp'      => '',
+			// Optional Messenger link (m.me/<page> or a full messenger URL) shown as
+			// a third contact button on a blocked checkout.
+			'support_messenger'     => '',
 			// Configurable checkout block messages, per case (Bangla defaults; the
 			// operator can set any language). Blank = the built-in default.
 			// {ratio} and {parcels} tokens are substituted in the courier message.
@@ -299,6 +302,7 @@ class Shopify_Pulse_Settings {
 		$clean['courier_min_parcels']   = max( 1, absint( isset( $raw['courier_min_parcels'] ) ? $raw['courier_min_parcels'] : 3 ) );
 		$clean['support_phone']         = sanitize_text_field( isset( $raw['support_phone'] ) ? $raw['support_phone'] : '' );
 		$clean['support_whatsapp']      = sanitize_text_field( isset( $raw['support_whatsapp'] ) ? $raw['support_whatsapp'] : '' );
+		$clean['support_messenger']     = esc_url_raw( isset( $raw['support_messenger'] ) ? trim( $raw['support_messenger'] ) : '' );
 		foreach ( array( 'msg_courier', 'msg_fraud_contact', 'msg_fraud_velocity', 'msg_fraud_generic', 'msg_help' ) as $mk ) {
 			$clean[ $mk ] = isset( $raw[ $mk ] ) ? sanitize_textarea_field( $raw[ $mk ] ) : '';
 		}
@@ -349,6 +353,65 @@ class Shopify_Pulse_Settings {
 		delete_transient( SHOPIFY_PULSE_TOKEN_TRANSIENT );
 
 		add_settings_error( 'sp_connector', 'saved', __( 'Settings saved.', 'shopify-pulse-connector' ), 'updated' );
+
+		// Push the platform-side fraud layers (name/address/phone/IP) + arm the
+		// master switch to match the local toggle. The platform is the source of
+		// truth for these; the plugin dashboard just configures them.
+		$this->push_platform_fraud( $clean );
+	}
+
+	/**
+	 * Sync the fraud-prevention configuration to the platform via
+	 * PUT /connect/fraud-config. The master switch mirrors the local
+	 * `enable_fraud` toggle (so one action arms both the plugin's fraud-screen
+	 * call AND the platform engine), and the layer settings come from the
+	 * `sp_fraud[...]` fields. No-op when the fraud card wasn't submitted or the
+	 * store isn't connected. Never blocks the save — a failure just warns.
+	 *
+	 * @param array $clean the sanitized local settings just saved
+	 */
+	private function push_platform_fraud( $clean ) {
+		$fraud = isset( $_POST['sp_fraud'] ) && is_array( $_POST['sp_fraud'] ) ? wp_unslash( $_POST['sp_fraud'] ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce checked in maybe_save()
+		if ( null === $fraud ) {
+			return; // fraud card not on this submit
+		}
+		$status = get_option( self::STATUS_OPTION, array() );
+		if ( empty( $status['ok'] ) ) {
+			add_settings_error( 'sp_connector', 'fraud_offline', __( 'Fraud layers not saved to the platform — connect the store first (Verify connection).', 'shopify-pulse-connector' ), 'warning' );
+			return;
+		}
+
+		$phone_mode = isset( $fraud['phone_mode'] ) ? sanitize_key( $fraud['phone_mode'] ) : 'bd';
+		if ( ! in_array( $phone_mode, array( 'bd', 'intl', 'off' ), true ) ) {
+			$phone_mode = 'bd';
+		}
+		$payload = array(
+			// One master: the local checkbox arms the platform engine too.
+			'enabled'           => (bool) $clean['enable_fraud'],
+			'phoneMode'         => $phone_mode,
+			'nameValidation'    => ! empty( $fraud['name_validation'] ),
+			'addressValidation' => ! empty( $fraud['address_validation'] ),
+			'ipMaxAttempts'     => max( 1, min( 100, absint( isset( $fraud['ip_max_attempts'] ) ? $fraud['ip_max_attempts'] : 3 ) ) ),
+			'ipWindowHours'     => max( 1, min( 168, absint( isset( $fraud['ip_window_hours'] ) ? $fraud['ip_window_hours'] : 24 ) ) ),
+		);
+
+		$res = Shopify_Pulse_Plugin::instance()->api()->request( 'PUT', '/connect/fraud-config', $payload );
+		if ( is_wp_error( $res ) ) {
+			add_settings_error( 'sp_connector', 'fraud_put', sprintf( /* translators: %s: error */ __( 'Fraud layers could not be saved to the platform: %s', 'shopify-pulse-connector' ), $res->get_error_message() ), 'warning' );
+		}
+	}
+
+	/**
+	 * Read the platform fraud config for the settings form (GET
+	 * /connect/fraud-config). Returns the config array, or null when the store
+	 * isn't connected / the call fails (the form then shows a connect prompt).
+	 */
+	private function load_platform_fraud( $status ) {
+		if ( empty( $status['ok'] ) ) {
+			return null;
+		}
+		$res = Shopify_Pulse_Plugin::instance()->api()->get( '/connect/fraud-config' );
+		return is_wp_error( $res ) || ! is_array( $res ) ? null : $res;
 	}
 
 	public function ajax_test_connection() {
@@ -595,6 +658,9 @@ class Shopify_Pulse_Settings {
 				update_option( self::STATUS_OPTION, $status );
 			}
 		}
+		// Live platform fraud config (name/address/phone/IP layers) so the form
+		// renders the real per-tenant values; null when disconnected.
+		$fraud = $this->load_platform_fraud( $status );
 		$active = $this->is_active();
 		$k      = $this->stats();
 		if ( ! $active ) {
@@ -789,6 +855,41 @@ class Shopify_Pulse_Settings {
 								</select>
 								<p class="description"><?php esc_html_e( 'Phone/name/address, IP velocity, courier history. Fails open if the API is unreachable.', 'shopify-pulse-connector' ); ?></p>
 							</div>
+							<?php if ( null === $fraud ) : ?>
+								<div class="sp-field">
+									<p class="description"><?php esc_html_e( 'Connect the store (Verify connection) to configure the screening layers below.', 'shopify-pulse-connector' ); ?></p>
+								</div>
+							<?php else :
+								$fv = function ( $key, $default ) use ( $fraud ) { return array_key_exists( $key, $fraud ) ? $fraud[ $key ] : $default; };
+								$pm = $fv( 'phoneMode', 'bd' );
+								?>
+								<input type="hidden" name="sp_fraud[_present]" value="1" />
+								<div class="sp-field">
+									<label class="h"><?php esc_html_e( 'Layer 1 — basic validation', 'shopify-pulse-connector' ); ?></label>
+									<label class="sp-check"><input type="checkbox" name="sp_fraud[name_validation]" value="1" <?php checked( ! empty( $fv( 'nameValidation', true ) ) ); ?> /> <?php esc_html_e( 'Block fake / gibberish customer names', 'shopify-pulse-connector' ); ?></label>
+									<label class="sp-check"><input type="checkbox" name="sp_fraud[address_validation]" value="1" <?php checked( ! empty( $fv( 'addressValidation', true ) ) ); ?> /> <?php esc_html_e( 'Block fake / gibberish delivery addresses', 'shopify-pulse-connector' ); ?></label>
+									<p class="description"><?php esc_html_e( 'Smart heuristics reject keyboard-mash names ("Ahshs Hsjs"), junk addresses and malformed numbers instantly.', 'shopify-pulse-connector' ); ?></p>
+								</div>
+								<div class="sp-field">
+									<label class="h" for="sp_fraud_phone_mode"><?php esc_html_e( 'Phone number check', 'shopify-pulse-connector' ); ?></label>
+									<select name="sp_fraud[phone_mode]" id="sp_fraud_phone_mode">
+										<option value="bd" <?php selected( $pm, 'bd' ); ?>><?php esc_html_e( 'Bangladesh mobile only (recommended)', 'shopify-pulse-connector' ); ?></option>
+										<option value="intl" <?php selected( $pm, 'intl' ); ?>><?php esc_html_e( 'International', 'shopify-pulse-connector' ); ?></option>
+										<option value="off" <?php selected( $pm, 'off' ); ?>><?php esc_html_e( 'Off', 'shopify-pulse-connector' ); ?></option>
+									</select>
+								</div>
+								<div class="sp-field">
+									<label class="h"><?php esc_html_e( 'Layer 2 — IP rate limiting', 'shopify-pulse-connector' ); ?></label>
+									<span style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;">
+										<?php esc_html_e( 'Auto-block after', 'shopify-pulse-connector' ); ?>
+										<input name="sp_fraud[ip_max_attempts]" type="number" min="1" max="100" step="1" value="<?php echo esc_attr( (int) $fv( 'ipMaxAttempts', 3 ) ); ?>" class="small-text" />
+										<?php esc_html_e( 'blocked attempts within', 'shopify-pulse-connector' ); ?>
+										<input name="sp_fraud[ip_window_hours]" type="number" min="1" max="168" step="1" value="<?php echo esc_attr( (int) $fv( 'ipWindowHours', 24 ) ); ?>" class="small-text" />
+										<?php esc_html_e( 'hours from one IP', 'shopify-pulse-connector' ); ?>
+									</span>
+									<p class="description"><?php esc_html_e( 'Detects spam bursts from a single IP. Layer 3 (BDCourier success-ratio gate) is the “Courier ratio gate” below.', 'shopify-pulse-connector' ); ?></p>
+								</div>
+							<?php endif; ?>
 							<div class="sp-field">
 								<label class="h" for="sp_courier_ratio"><?php esc_html_e( 'Courier ratio gate', 'shopify-pulse-connector' ); ?></label>
 								<span style="display:inline-flex;align-items:center;gap:6px;">
@@ -805,6 +906,7 @@ class Shopify_Pulse_Settings {
 								<div style="display:flex;gap:8px;flex-wrap:wrap;">
 									<input name="sp[support_phone]" id="sp_support_phone" type="text" value="<?php echo esc_attr( $s['support_phone'] ); ?>" placeholder="<?php esc_attr_e( 'Call number, e.g. 01XXXXXXXXX', 'shopify-pulse-connector' ); ?>" style="flex:1 1 180px;" />
 									<input name="sp[support_whatsapp]" id="sp_support_whatsapp" type="text" value="<?php echo esc_attr( $s['support_whatsapp'] ); ?>" placeholder="<?php esc_attr_e( 'WhatsApp, e.g. 8801XXXXXXXXX', 'shopify-pulse-connector' ); ?>" style="flex:1 1 180px;" />
+									<input name="sp[support_messenger]" id="sp_support_messenger" type="url" value="<?php echo esc_attr( $s['support_messenger'] ); ?>" placeholder="<?php esc_attr_e( 'Messenger, e.g. https://m.me/yourpage', 'shopify-pulse-connector' ); ?>" style="flex:1 1 180px;" />
 								</div>
 								<p class="description"><?php esc_html_e( 'When fraud or the courier gate blocks a checkout, the shopper sees a popup with these Call / WhatsApp buttons so a genuine buyer can still reach you. Leave blank to use the connected store’s contact number.', 'shopify-pulse-connector' ); ?></p>
 							</div>
