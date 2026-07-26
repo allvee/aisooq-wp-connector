@@ -75,16 +75,18 @@ class Shopify_Pulse_Fraud {
 			'sp-checkout-guard',
 			'SPGuard',
 			array(
-				'ajaxUrl'  => admin_url( 'admin-ajax.php' ),
-				'nonce'    => wp_create_nonce( 'sp_guard' ),
-				'phone'    => $c['phone'],
-				'whatsapp' => $c['whatsapp'],
-				'i18n'     => array(
-					'title'   => __( 'We can’t place this order', 'shopify-pulse-connector' ),
-					'callBtn' => __( 'Call', 'shopify-pulse-connector' ),
-					'waBtn'   => __( 'WhatsApp us', 'shopify-pulse-connector' ),
-					'close'   => __( 'Close', 'shopify-pulse-connector' ),
-					'help'    => $help,
+				'ajaxUrl'   => admin_url( 'admin-ajax.php' ),
+				'nonce'     => wp_create_nonce( 'sp_guard' ),
+				'phone'     => $c['phone'],
+				'whatsapp'  => $c['whatsapp'],
+				'messenger' => $c['messenger'],
+				'i18n'      => array(
+					'title'    => __( 'We can’t place this order', 'shopify-pulse-connector' ),
+					'callBtn'  => __( 'Call', 'shopify-pulse-connector' ),
+					'waBtn'    => __( 'WhatsApp us', 'shopify-pulse-connector' ),
+					'msgrBtn'  => __( 'Messenger', 'shopify-pulse-connector' ),
+					'close'    => __( 'Close', 'shopify-pulse-connector' ),
+					'help'     => $help,
 				),
 			)
 		);
@@ -134,10 +136,12 @@ class Shopify_Pulse_Fraud {
 				$wa = $tenant;
 			}
 		}
+		$messenger = trim( (string) $this->settings->get( 'support_messenger' ) );
 		return array(
-			'phone'    => $phone,
+			'phone'     => $phone,
 			// wa.me wants digits only (country code, no +/spaces).
-			'whatsapp' => $wa ? preg_replace( '/\D+/', '', $wa ) : '',
+			'whatsapp'  => $wa ? preg_replace( '/\D+/', '', $wa ) : '',
+			'messenger' => $messenger ? esc_url_raw( $messenger ) : '',
 		);
 	}
 

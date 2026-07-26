@@ -41,6 +41,7 @@
 			'.spg-btn{display:inline-flex;align-items:center;gap:7px;padding:11px 16px;border-radius:10px;font-weight:600;font-size:14px;text-decoration:none;min-height:44px;box-sizing:border-box}' +
 			'.spg-call{background:#eff6ff;color:#1d4ed8}' +
 			'.spg-wa{background:#22c55e;color:#fff}' +
+			'.spg-msgr{background:#0084ff;color:#fff}' +
 			'.spg-btn:focus-visible{outline:2px solid #1d4ed8;outline-offset:2px}' +
 			'@media(prefers-reduced-motion:no-preference){.spg{animation:spgIn .18s ease-out}@keyframes spgIn{from{transform:translateY(8px) scale(.98);opacity:0}to{transform:none;opacity:1}}}';
 		$( '<style id="spg-style">' ).text( css ).appendTo( 'head' );
@@ -62,6 +63,9 @@
 		}
 		if ( wa ) {
 			buttons += '<a class="spg-btn spg-wa" href="' + wa + '" target="_blank" rel="noopener">' + esc( G.i18n.waBtn ) + '</a>';
+		}
+		if ( G.messenger ) {
+			buttons += '<a class="spg-btn spg-msgr" href="' + esc( G.messenger ) + '" target="_blank" rel="noopener">' + esc( G.i18n.msgrBtn ) + '</a>';
 		}
 		var contactBlock = buttons ? '<p class="spg-help">' + esc( G.i18n.help ) + '</p><div class="spg-btns">' + buttons + '</div>' : '';
 		var $m = $(
