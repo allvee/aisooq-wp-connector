@@ -1,0 +1,275 @@
+/**
+ * Shopify Pulse — admin design system ("Bazaar Console").
+ *
+ * A single shared skin for BOTH plugin admin screens (Settings `.wrap.sp` and
+ * Abandoned carts `.wrap.sp-ab`), mirroring the platform admin UI: petrol-teal
+ * primary + rickshaw-marigold highlight on a warm off-white surface, soft
+ * elevation, 12px radius, pill badges, tabular figures.
+ *
+ * Selectors are scoped under `.wrap.sp` / `.wrap.sp-ab` so their specificity
+ * (0,2,x) beats each page's inline base rules (0,1,x) regardless of source
+ * order — this restyles both pages without rewriting their markup, and is the
+ * single source of truth for the plugin's admin look.
+ */
+
+/* ── Design tokens (light) — mirror of the platform's Bazaar Console ─────── */
+.wrap.sp,
+.wrap.sp-ab {
+	--pri: #0c6e63;          /* petrol teal */
+	--pri-d: #0a5a51;        /* teal, hover/active */
+	--pri-fg: #fefdf9;       /* warm white on teal */
+	--hl: #e0891b;           /* marigold highlight */
+	--hl-d: #c8760f;
+	--ok: #2f8055;
+	--warn: #a8690a;
+	--err: #c33a29;
+	--info: #1f6f9c;
+	--bd: #e4e0d6;           /* warm border */
+	--muted: #5f6b67;
+	--fg: #17211e;
+	--bg: #f7f5ef;
+	--card: #fffef9;
+	--radius: 12px;
+	--radius-sm: 8px;
+	--sh-card: 0 1px 2px rgba(23, 40, 36, .06), 0 1px 1px rgba(23, 40, 36, .04);
+	--sh-elev: 0 8px 24px -8px rgba(23, 40, 36, .16), 0 3px 8px -4px rgba(23, 40, 36, .08);
+}
+
+/* Page canvas + base type */
+.wrap.sp,
+.wrap.sp-ab {
+	color: var(--fg);
+	-webkit-font-smoothing: antialiased;
+}
+body.toplevel_page_shopify-pulse-connector,
+body[class*="page_shopify-pulse-abandoned"] {
+	background: var(--bg);
+}
+
+/* ── Hero ───────────────────────────────────────────────────────────────── */
+.wrap.sp .sp-hero,
+.wrap.sp-ab .sp-hero {
+	background: var(--card);
+	border: 1px solid var(--bd);
+	border-radius: var(--radius);
+	box-shadow: var(--sh-card);
+	position: relative;
+	overflow: hidden;
+}
+.wrap.sp .sp-hero::before,
+.wrap.sp-ab .sp-hero::before {
+	content: "";
+	position: absolute;
+	inset: 0 auto 0 0;
+	width: 4px;
+	background: linear-gradient(var(--pri), var(--hl));
+}
+.wrap.sp .sp-hero__title,
+.wrap.sp-ab .sp-hero__title,
+.wrap.sp-ab h1 {
+	color: var(--fg);
+	letter-spacing: -.01em;
+}
+
+/* ── Cards ──────────────────────────────────────────────────────────────── */
+.wrap.sp .sp-card,
+.wrap.sp-ab .sp-card,
+.wrap.sp-ab .sp-panel {
+	background: var(--card);
+	border: 1px solid var(--bd);
+	border-radius: var(--radius);
+	box-shadow: var(--sh-card);
+	overflow: hidden;
+}
+.wrap.sp .sp-card__head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 13px 18px;
+	font-weight: 650;
+	font-size: 13.5px;
+	color: var(--fg);
+	background: linear-gradient(0deg, rgba(12, 110, 99, .015), rgba(12, 110, 99, .05));
+	border-bottom: 1px solid var(--bd);
+}
+.wrap.sp .sp-card__head .dashicons {
+	color: var(--pri);
+}
+.wrap.sp .sp-card__body {
+	padding: 16px 18px;
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+.wrap.sp .button,
+.wrap.sp-ab .button {
+	border-radius: var(--radius-sm);
+	border-color: var(--bd);
+	min-height: 34px;
+	font-weight: 550;
+}
+.wrap.sp .button-primary,
+.wrap.sp-ab .button-primary,
+.wrap.sp .sp-btn-primary {
+	background: var(--pri);
+	border-color: var(--pri-d);
+	color: var(--pri-fg);
+	text-shadow: none;
+	box-shadow: 0 1px 0 rgba(23, 40, 36, .12);
+}
+.wrap.sp .button-primary:hover,
+.wrap.sp-ab .button-primary:hover,
+.wrap.sp .button-primary:focus {
+	background: var(--pri-d);
+	border-color: var(--pri-d);
+	color: var(--pri-fg);
+}
+.wrap.sp .button:focus-visible,
+.wrap.sp-ab .button:focus-visible,
+.wrap.sp a:focus-visible,
+.wrap.sp-ab a:focus-visible {
+	outline: 2px solid var(--pri);
+	outline-offset: 2px;
+	box-shadow: none;
+}
+
+/* ── Inputs ─────────────────────────────────────────────────────────────── */
+.wrap.sp input[type="text"],
+.wrap.sp input[type="url"],
+.wrap.sp input[type="number"],
+.wrap.sp input[type="password"],
+.wrap.sp input[type="search"],
+.wrap.sp select,
+.wrap.sp textarea,
+.wrap.sp-ab input[type="text"],
+.wrap.sp-ab input[type="search"],
+.wrap.sp-ab input[type="date"],
+.wrap.sp-ab select {
+	border-radius: var(--radius-sm);
+	border-color: var(--bd);
+	background: #fff;
+	color: var(--fg);
+}
+.wrap.sp input:focus,
+.wrap.sp select:focus,
+.wrap.sp textarea:focus,
+.wrap.sp-ab input:focus,
+.wrap.sp-ab select:focus {
+	border-color: var(--pri);
+	box-shadow: 0 0 0 2px rgba(12, 110, 99, .18);
+	outline: none;
+}
+.wrap.sp .sp-field > label.h,
+.wrap.sp .sp-field label.h {
+	color: var(--fg);
+	font-weight: 600;
+}
+
+/* ── Badges / pills ─────────────────────────────────────────────────────── */
+.wrap.sp .sp-badge,
+.wrap.sp-ab .sp-badge,
+.wrap.sp .sp-act-badge {
+	border-radius: 999px;
+	font-weight: 600;
+	font-size: 11.5px;
+	padding: 2px 10px;
+	line-height: 1.7;
+	letter-spacing: .01em;
+}
+.wrap.sp-ab .sp-badge.ok { background: #e7f3ec; color: #216b45; }
+.wrap.sp-ab .sp-badge.warn { background: #fbf0dd; color: #97620a; }
+.wrap.sp-ab .sp-badge.err { background: #fbe9e6; color: #a5301f; }
+.wrap.sp-ab .sp-badge.info { background: #e4eff5; color: #1a5c82; }
+.wrap.sp-ab .sp-badge.muted { background: #efece4; color: #5f6b67; }
+
+/* ── KPI tiles ──────────────────────────────────────────────────────────── */
+.wrap.sp .sp-kpi,
+.wrap.sp-ab .sp-kpi {
+	background: var(--card);
+	border: 1px solid var(--bd);
+	border-radius: var(--radius);
+	box-shadow: var(--sh-card);
+}
+.wrap.sp .sp-kpi__value,
+.wrap.sp-ab .sp-kpi__value {
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -.02em;
+	color: var(--fg);
+}
+.wrap.sp-ab .sp-kpi.ok { border-left: 3px solid var(--ok); }
+.wrap.sp-ab .sp-kpi.warn { border-left: 3px solid var(--hl); }
+.wrap.sp-ab .sp-kpi.info { border-left: 3px solid var(--info); }
+.wrap.sp-ab .sp-kpi.err { border-left: 3px solid var(--err); }
+.wrap.sp-ab .sp-kpi.muted { border-left: 3px solid var(--muted); }
+
+/* ── Tabs (settings) ────────────────────────────────────────────────────── */
+.wrap.sp .sp-tab.is-active,
+.wrap.sp .sp-tabnav a.is-active,
+.wrap.sp .nav-tab-active {
+	color: var(--pri);
+	border-bottom-color: var(--pri);
+}
+
+/* ── Connection panel / permissions (settings) ─────────────────────────── */
+.wrap.sp .sp-conn {
+	background: linear-gradient(180deg, rgba(12, 110, 99, .04), rgba(12, 110, 99, 0));
+	border: 1px solid var(--bd);
+	border-radius: var(--radius);
+}
+.wrap.sp .sp-perms__h { color: var(--muted); }
+.wrap.sp .sp-act-badge.other { background: #efece4; color: var(--muted); }
+
+/* ── Data table (abandoned) ─────────────────────────────────────────────── */
+.wrap.sp-ab .sp-tbl {
+	border: 1px solid var(--bd);
+	border-radius: var(--radius);
+	overflow: hidden;
+	box-shadow: var(--sh-card);
+	border-collapse: separate;
+	border-spacing: 0;
+}
+.wrap.sp-ab .sp-tbl th {
+	background: #f4f1e9;
+	color: var(--muted);
+	font-weight: 650;
+	border-bottom: 1px solid var(--bd);
+}
+.wrap.sp-ab .sp-tbl td { border-bottom: 1px solid var(--bd); }
+.wrap.sp-ab .sp-tbl tbody tr:hover { background: rgba(12, 110, 99, .035); }
+.wrap.sp-ab .sp-tbl tbody tr:last-child td { border-bottom: 0; }
+
+/* ── Row action menu (abandoned) ────────────────────────────────────────── */
+.wrap.sp-ab .sp-menu {
+	border: 1px solid var(--bd);
+	border-radius: var(--radius);
+	box-shadow: var(--sh-elev);
+	overflow: hidden;
+}
+.wrap.sp-ab .sp-act:hover { background: rgba(12, 110, 99, .06); }
+.wrap.sp-ab .sp-primary,
+.wrap.sp-ab .sp-primary .dashicons { color: var(--pri); }
+.wrap.sp-ab .sp-danger,
+.wrap.sp-ab .sp-danger .dashicons { color: var(--err); }
+
+/* ── Details modal (abandoned) ──────────────────────────────────────────── */
+.wrap.sp-ab .sp-dl,
+.wrap.sp-ab .sp-modal__box {
+	border-radius: var(--radius);
+	box-shadow: var(--sh-elev);
+}
+
+/* ── Toolbar (abandoned) ────────────────────────────────────────────────── */
+.wrap.sp-ab .sp-toolbar {
+	background: var(--card);
+	border: 1px solid var(--bd);
+	border-radius: var(--radius);
+	box-shadow: var(--sh-card);
+}
+
+/* ── Motion / a11y ──────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+	.wrap.sp *,
+	.wrap.sp-ab * {
+		animation-duration: .001ms !important;
+		transition-duration: .001ms !important;
+	}
+}
