@@ -60,7 +60,10 @@ store). Run separate sites for separate stores.
 = 2.0.0 =
 * **Renamed to AI Sooq Connector.** The plugin is now branded for the AI Sooq platform throughout — plugin name, admin screens, logos and documentation. This is a full rename: the plugin folder, its classes, constants, option keys, order meta, database table, cron hooks and asset files all move from the `shopify-pulse` / `sp_` namespace to `aisooq`.
 * **Your data comes with you.** On first load after the update the plugin migrates settings, connection status, synced-order meta and the abandoned-cart table from the old names automatically. Installs still on the original "Wafi Commerce Connector" naming are migrated too. Nothing needs to be re-entered and no synced order loses its link to the platform.
-* **Upgrade note — the plugin must be reactivated once.** Because the folder name changed, WordPress sees this as a new plugin rather than an update to the old one. Install 2.0.0, activate it, then delete the old "Shopify Pulse Connector" entry from the Plugins screen. Delete it *after* activating the new one so the migration runs first. Do not use "Delete" on the old plugin before activating 2.0.0 — that would run its uninstall routine and drop the abandoned-cart table.
+* **Upgrade note — order matters.** Because the folder name changed, WordPress sees this as a new plugin rather than an update to the old one. Do it in this order:
+  1. Install and **activate** AI Sooq Connector 2.0.0. The migration runs on activation.
+  2. *Then* delete the old "Shopify Pulse Connector" entry from the Plugins screen.
+  Deleting the old plugin first runs its uninstall routine, which drops the abandoned-cart table and removes the stored connection settings — you would lose every captured cart and have to re-enter your Store ID, Client ID and Client secret. (Synced orders keep their platform link either way; order meta is deliberately left alone on uninstall.) Done in the right order, nothing is lost.
 * Visitor attribution survives the rename: the tracker reads its previous cookies and carries first-touch, last-touch and visit count forward, so returning visitors are not counted as brand-new traffic.
 * The `shopify_pulse_order_payload` filter still fires for sites that hooked it, alongside the new `aisooq_order_payload`. The old name is deprecated and will be removed in 3.0.
 

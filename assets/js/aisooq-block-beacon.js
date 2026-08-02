@@ -12,10 +12,10 @@
 ( function () {
 	'use strict';
 
-	if ( ! window.wp || ! window.wp.data || ! window.SPBeacon || ! window.SPBeacon.url ) {
+	if ( ! window.wp || ! window.wp.data || ! window.AISooqBeacon || ! window.AISooqBeacon.url ) {
 		return;
 	}
-	var cfg = window.SPBeacon;
+	var cfg = window.AISooqBeacon;
 	var STORAGE_KEY = 'aisooq_cart_key';
 	var lastHash = '';
 	var timer = null;

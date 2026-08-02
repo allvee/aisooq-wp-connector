@@ -154,7 +154,7 @@ class AI_Sooq_Analytics {
 
 		wp_localize_script(
 			'aisooq-pixel',
-			'spPixel',
+			'aiSooqPixel',
 			array(
 				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 				'nonce'   => wp_create_nonce( self::NONCE ),

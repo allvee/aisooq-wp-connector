@@ -77,7 +77,7 @@ class AI_Sooq_Fraud {
 		wp_enqueue_script( 'aisooq-checkout-validate', AISOOQ_URL . 'assets/js/aisooq-checkout-validate.js', array( 'jquery' ), AISOOQ_VERSION, true );
 		wp_localize_script(
 			'aisooq-checkout-validate',
-			'SPValidate',
+			'AISooqValidate',
 			array(
 				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 				'nonce'   => wp_create_nonce( 'aisooq_validate' ),
@@ -132,7 +132,7 @@ class AI_Sooq_Fraud {
 		}
 		wp_localize_script(
 			'aisooq-checkout-guard',
-			'SPGuard',
+			'AISooqGuard',
 			array(
 				'ajaxUrl'   => admin_url( 'admin-ajax.php' ),
 				'nonce'     => wp_create_nonce( 'aisooq_guard' ),

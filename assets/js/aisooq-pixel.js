@@ -7,11 +7,11 @@
 ( function () {
 	'use strict';
 
-	if ( typeof window.spPixel === 'undefined' || ! window.spPixel.ajaxUrl ) {
+	if ( typeof window.aiSooqPixel === 'undefined' || ! window.aiSooqPixel.ajaxUrl ) {
 		return;
 	}
 
-	var cfg = window.spPixel;
+	var cfg = window.aiSooqPixel;
 
 	function uid( name ) {
 		return name + '-' + Date.now() + '-' + Math.floor( Math.random() * 1e6 );

@@ -13,10 +13,10 @@
  */
 ( function ( $ ) {
 	'use strict';
-	if ( ! window.SPGuard || ! window.SPGuard.ajaxUrl ) {
+	if ( ! window.AISooqGuard || ! window.AISooqGuard.ajaxUrl ) {
 		return;
 	}
-	var G = window.SPGuard;
+	var G = window.AISooqGuard;
 	var styled = false;
 
 	function esc( s ) {

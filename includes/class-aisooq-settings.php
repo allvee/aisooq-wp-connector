@@ -328,7 +328,7 @@ class AI_Sooq_Settings {
 		check_admin_referer( self::NONCE );
 
 		$existing = $this->all();
-		$raw      = isset( $_POST['sp'] ) && is_array( $_POST['sp'] ) ? wp_unslash( $_POST['sp'] ) : array();
+		$raw      = isset( $_POST['aisooq'] ) && is_array( $_POST['aisooq'] ) ? wp_unslash( $_POST['aisooq'] ) : array(); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce checked above
 
 		$clean                          = array();
 		$clean['active']                = empty( $raw['active'] ) ? 0 : 1;

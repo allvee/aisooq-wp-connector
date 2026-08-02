@@ -95,7 +95,7 @@ class AI_Sooq_Block_Beacon {
 		);
 		wp_localize_script(
 			'aisooq-block-beacon',
-			'SPBeacon',
+			'AISooqBeacon',
 			array(
 				'url'      => rest_url( self::REST_NS . self::REST_ROUTE ),
 				'nonce'    => wp_create_nonce( 'wp_rest' ),

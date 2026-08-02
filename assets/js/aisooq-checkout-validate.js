@@ -14,10 +14,10 @@
  */
 ( function ( $ ) {
 	'use strict';
-	if ( ! window.SPValidate || ! window.SPValidate.ajaxUrl ) {
+	if ( ! window.AISooqValidate || ! window.AISooqValidate.ajaxUrl ) {
 		return;
 	}
-	var V = window.SPValidate;
+	var V = window.AISooqValidate;
 	var timer = null;
 
 	// Each platform field → the WooCommerce form-row wrapper to render its error
