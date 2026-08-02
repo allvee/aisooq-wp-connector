@@ -138,7 +138,7 @@ body[class*="page_aisooq-abandoned"] {
 	font-weight: 650;
 	font-size: 13.5px;
 	color: var(--fg);
-	background: linear-gradient(0deg, rgba(12, 110, 99, .015), rgba(12, 110, 99, .05));
+	background: linear-gradient(0deg, rgba(8, 41, 76, .015), rgba(8, 41, 76, .05));
 	border-bottom: 1px solid var(--bd);
 }
 .wrap.aisooq .aisooq-card__head .dashicons {
@@ -204,13 +204,62 @@ body[class*="page_aisooq-abandoned"] {
 .wrap.aisooq-ab input:focus,
 .wrap.aisooq-ab select:focus {
 	border-color: var(--pri);
-	box-shadow: 0 0 0 2px rgba(12, 110, 99, .18);
+	box-shadow: 0 0 0 2px rgba(8, 41, 76, .18);
 	outline: none;
 }
 .wrap.aisooq .aisooq-field > label.h,
 .wrap.aisooq .aisooq-field label.h {
 	color: var(--fg);
 	font-weight: 600;
+}
+
+/* ── Tap targets ─────────────────────────────────────────────────────────
+   WordPress only enlarges form controls below its own 783px breakpoint, so on
+   a tablet in landscape — or any desktop — checkboxes render at 16px and
+   `.button-link` at 20px, both under the 24px WCAG 2.5.8 minimum. These
+   screens are worked on from tablets in the field, so lift the controls at
+   every width instead of inheriting core's phone-only treatment. Sizing
+   mirrors WordPress's own <783px rule so the dashicon check still centres. */
+.wrap.aisooq input[type="checkbox"],
+.wrap.aisooq input[type="radio"],
+.wrap.aisooq-ab input[type="checkbox"],
+.wrap.aisooq-ab input[type="radio"] {
+	width: 24px;
+	height: 24px;
+}
+.wrap.aisooq input[type="checkbox"]:checked::before,
+.wrap.aisooq-ab input[type="checkbox"]:checked::before {
+	width: 24px;
+	height: 24px;
+	margin: -2px 0 0 -4px;
+	font-size: 28px;
+}
+.wrap.aisooq input[type="radio"]:checked::before,
+.wrap.aisooq-ab input[type="radio"]:checked::before {
+	width: 10px;
+	height: 10px;
+	margin: 6px;
+	line-height: 1;
+}
+.wrap.aisooq .button-link,
+.wrap.aisooq-ab .button-link {
+	display: inline-flex;
+	align-items: center;
+	min-height: 28px;
+}
+
+/* An inline sentence-with-inputs ("Block orders below [n]% …") is laid out as
+   one long line, which pushes past a 320px viewport. Let it wrap and keep the
+   inputs from being the thing that can't shrink. */
+.wrap.aisooq .aisooq-field span {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px;
+	max-width: 100%;
+}
+.wrap.aisooq .aisooq-field input.small-text {
+	max-width: 100%;
 }
 
 /* ── Badges / pills ─────────────────────────────────────────────────────── */
@@ -260,7 +309,7 @@ body[class*="page_aisooq-abandoned"] {
 
 /* ── Connection panel / permissions (settings) ─────────────────────────── */
 .wrap.aisooq .aisooq-conn {
-	background: linear-gradient(180deg, rgba(12, 110, 99, .04), rgba(12, 110, 99, 0));
+	background: linear-gradient(180deg, rgba(8, 41, 76, .04), rgba(8, 41, 76, 0));
 	border: 1px solid var(--bd);
 	border-radius: var(--radius);
 }
@@ -283,7 +332,7 @@ body[class*="page_aisooq-abandoned"] {
 	border-bottom: 1px solid var(--bd);
 }
 .wrap.aisooq-ab .aisooq-tbl td { border-bottom: 1px solid var(--bd); }
-.wrap.aisooq-ab .aisooq-tbl tbody tr:hover { background: rgba(12, 110, 99, .035); }
+.wrap.aisooq-ab .aisooq-tbl tbody tr:hover { background: rgba(8, 41, 76, .035); }
 .wrap.aisooq-ab .aisooq-tbl tbody tr:last-child td { border-bottom: 0; }
 
 /* ── Row action menu (abandoned) ────────────────────────────────────────── */
@@ -293,7 +342,7 @@ body[class*="page_aisooq-abandoned"] {
 	box-shadow: var(--sh-elev);
 	overflow: hidden;
 }
-.wrap.aisooq-ab .aisooq-act:hover { background: rgba(12, 110, 99, .06); }
+.wrap.aisooq-ab .aisooq-act:hover { background: rgba(8, 41, 76, .06); }
 .wrap.aisooq-ab .aisooq-primary,
 .wrap.aisooq-ab .aisooq-primary .dashicons { color: var(--pri); }
 .wrap.aisooq-ab .aisooq-danger,
