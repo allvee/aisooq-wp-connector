@@ -47,7 +47,14 @@ STAGE="$STAGE_ROOT/$SLUG"
 mkdir -p "$STAGE"
 
 # Ship only what runs. Everything dev/build/VCS is excluded.
+#
+# The `--filter` line applies .gitignore to the copy. rsync reads the working
+# tree, not git, so without it ANY ignored file a developer happens to have
+# lying around ships inside the plugin zip — `.phpunit.result.cache` did
+# exactly that after a local test run. Ignoring it here means the ignore list
+# only has to be maintained in one place.
 rsync -a \
+	--filter=':- .gitignore' \
 	--exclude='.git' \
 	--exclude='.github' \
 	--exclude='.gitignore' \
