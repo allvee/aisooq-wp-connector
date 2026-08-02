@@ -10,7 +10,7 @@
  * server-side at order placement (woocommerce_after_checkout_validation), so a
  * network hiccup here never affects whether the order can be placed.
  *
- * @package ShopifyPulse
+ * @package AISooq
  */
 ( function ( $ ) {
 	'use strict';
@@ -40,7 +40,7 @@
 	}
 
 	function clearError( field ) {
-		$( TARGET[ field ] ).find( '.sp-inline-err' ).remove();
+		$( TARGET[ field ] ).find( '.aisooq-inline-err' ).remove();
 	}
 
 	function showError( field, message ) {
@@ -48,9 +48,9 @@
 		if ( ! $wrap.length ) {
 			return;
 		}
-		var $err = $wrap.find( '.sp-inline-err' );
+		var $err = $wrap.find( '.aisooq-inline-err' );
 		if ( ! $err.length ) {
-			$err = $( '<span class="sp-inline-err" role="alert" style="display:block;color:#b32d2e;font-size:13px;line-height:1.4;margin-top:4px;"></span>' );
+			$err = $( '<span class="aisooq-inline-err" role="alert" style="display:block;color:#b32d2e;font-size:13px;line-height:1.4;margin-top:4px;"></span>' );
 			$wrap.append( $err );
 		}
 		$err.text( message );
@@ -62,7 +62,7 @@
 			return;
 		}
 		$.post( V.ajaxUrl, {
-			action: 'shopify_pulse_validate',
+			action: 'aisooq_validate',
 			nonce: V.nonce,
 			name: vals.name,
 			phone: vals.phone,

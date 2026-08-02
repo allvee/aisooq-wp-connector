@@ -1,5 +1,5 @@
 /**
- * Shopify Pulse Connector — visitor attribution tracker.
+ * AI Sooq Connector — visitor attribution tracker.
  *
  * Persists FIRST-touch and LAST-touch attribution in cookies (landing page,
  * referrer, traffic source, utm_*), a visit counter, device/language, and a
@@ -22,6 +22,18 @@
 	function getCookie( name ) {
 		var m = document.cookie.match( '(^|;)\\s*' + name + '\\s*=\\s*([^;]+)' );
 		return m ? decodeURIComponent( m.pop() ) : '';
+	}
+
+	/**
+	 * Read a tracker cookie, falling back to the names used before the plugin
+	 * was renamed. A returning visitor is still carrying `sp_*` (or `wafi_*`)
+	 * cookies; without this their first touch and visit count would reset to
+	 * zero on the update, which would look like a wave of brand-new traffic.
+	 * The legacy names can go once DAYS has rolled over for everyone.
+	 */
+	function getTracked( name ) {
+		var suffix = name.replace( /^aisooq_/, '' );
+		return getCookie( name ) || getCookie( 'sp_' + suffix ) || getCookie( 'wafi_' + suffix );
 	}
 
 	function utmParams() {
@@ -73,20 +85,25 @@
 		at: now.toISOString()
 	};
 
-	// First touch: write once, keep forever (within DAYS).
-	if ( ! getCookie( 'sp_first' ) ) {
-		setCookie( 'sp_first', JSON.stringify( touch ), DAYS );
+	// First touch: write once, keep forever (within DAYS). Carries a legacy
+	// cookie forward under the new name rather than overwriting it, so the
+	// original landing survives the rename.
+	var firstTouch = getTracked( 'aisooq_first' );
+	if ( ! getCookie( 'aisooq_first' ) ) {
+		setCookie( 'aisooq_first', firstTouch || JSON.stringify( touch ), DAYS );
 	}
 
 	// Last touch: refresh whenever this landing carries campaign info, an
 	// external referrer, or there is no last touch yet.
-	if ( utm.utm_source || ( ref && trafficSource( ref ) !== 'internal' ) || ! getCookie( 'sp_last' ) ) {
-		setCookie( 'sp_last', JSON.stringify( touch ), DAYS );
+	if ( utm.utm_source || ( ref && trafficSource( ref ) !== 'internal' ) || ! getTracked( 'aisooq_last' ) ) {
+		setCookie( 'aisooq_last', JSON.stringify( touch ), DAYS );
+	} else if ( ! getCookie( 'aisooq_last' ) ) {
+		setCookie( 'aisooq_last', getTracked( 'aisooq_last' ), DAYS );
 	}
 
-	// Visit counter.
-	var vc = parseInt( getCookie( 'sp_vc' ) || '0', 10 ) + 1;
-	setCookie( 'sp_vc', String( vc ), DAYS );
+	// Visit counter — continues from the legacy count instead of restarting.
+	var vc = parseInt( getTracked( 'aisooq_vc' ) || '0', 10 ) + 1;
+	setCookie( 'aisooq_vc', String( vc ), DAYS );
 
 	// Client-local browser time snapshot (captured every page; the order picks
 	// up the most recent one).
@@ -100,9 +117,9 @@
 		tz_offset_min: now.getTimezoneOffset()
 	};
 	try { bt.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch ( e ) {}
-	setCookie( 'sp_bt', JSON.stringify( bt ), 1 );
+	setCookie( 'aisooq_bt', JSON.stringify( bt ), 1 );
 
 	// Device + language (cheap signals).
-	setCookie( 'sp_dev', /Mobi|Android|iPhone|iPad|Windows Phone/i.test( navigator.userAgent ) ? 'mobile' : 'desktop', DAYS );
-	setCookie( 'sp_lang', ( navigator.language || '' ).slice( 0, 16 ), DAYS );
+	setCookie( 'aisooq_dev', /Mobi|Android|iPhone|iPad|Windows Phone/i.test( navigator.userAgent ) ? 'mobile' : 'desktop', DAYS );
+	setCookie( 'aisooq_lang', ( navigator.language || '' ).slice( 0, 16 ), DAYS );
 } )();

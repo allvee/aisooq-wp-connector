@@ -9,16 +9,16 @@
  *    browser through a same-site AJAX proxy (avoids cross-origin issues; lets
  *    the server derive the real client IP/UA).
  *
- * @package ShopifyPulse
+ * @package AISooq
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class Shopify_Pulse_Analytics {
+class AI_Sooq_Analytics {
 
-	const NONCE = 'sp_pixel';
+	const NONCE = 'aisooq_pixel';
 
 	const ALLOWED = array(
 		'PageView', 'ViewContent', 'Search', 'AddToCart', 'AddToWishlist',
@@ -26,14 +26,14 @@ class Shopify_Pulse_Analytics {
 		'Lead', 'Contact', 'Subscribe',
 	);
 
-	/** @var Shopify_Pulse_Settings */
+	/** @var AI_Sooq_Settings */
 	private $settings;
-	/** @var Shopify_Pulse_Api_Client */
+	/** @var AI_Sooq_Api_Client */
 	private $api;
-	/** @var Shopify_Pulse_Logger */
+	/** @var AI_Sooq_Logger */
 	private $logger;
 
-	public function __construct( Shopify_Pulse_Settings $settings, Shopify_Pulse_Api_Client $api, Shopify_Pulse_Logger $logger ) {
+	public function __construct( AI_Sooq_Settings $settings, AI_Sooq_Api_Client $api, AI_Sooq_Logger $logger ) {
 		$this->settings = $settings;
 		$this->api      = $api;
 		$this->logger   = $logger;
@@ -47,14 +47,14 @@ class Shopify_Pulse_Analytics {
 		add_action( 'woocommerce_order_status_completed', array( $this, 'track_purchase' ), 20, 1 );
 		add_action( 'user_register', array( $this, 'track_registration' ), 20, 1 );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
-		add_action( 'wp_ajax_sp_track', array( $this, 'ajax_track' ) );
-		add_action( 'wp_ajax_nopriv_sp_track', array( $this, 'ajax_track' ) );
+		add_action( 'wp_ajax_aisooq_track', array( $this, 'ajax_track' ) );
+		add_action( 'wp_ajax_nopriv_aisooq_track', array( $this, 'ajax_track' ) );
 	}
 
 	/** Server-side Purchase — deduped by the platform on order_id. */
 	public function track_purchase( $order_id ) {
 		$order = wc_get_order( $order_id );
-		if ( ! $order || $order->get_meta( SHOPIFY_PULSE_META_PIXEL_SENT ) ) {
+		if ( ! $order || $order->get_meta( AISOOQ_META_PIXEL_SENT ) ) {
 			return;
 		}
 
@@ -96,7 +96,7 @@ class Shopify_Pulse_Analytics {
 
 		$res = $this->api->public_post( '/pixel/events', array( 'events' => array( $event ) ) );
 		if ( ! is_wp_error( $res ) ) {
-			$order->update_meta_data( SHOPIFY_PULSE_META_PIXEL_SENT, current_time( 'mysql' ) );
+			$order->update_meta_data( AISOOQ_META_PIXEL_SENT, current_time( 'mysql' ) );
 			$order->save();
 			$this->logger->debug( 'Purchase pixel sent for order ' . $order->get_id() );
 		} else {
@@ -129,10 +129,10 @@ class Shopify_Pulse_Analytics {
 			return;
 		}
 		wp_register_script(
-			'sp-pixel',
-			SHOPIFY_PULSE_URL . 'assets/js/sp-pixel.js',
+			'aisooq-pixel',
+			AISOOQ_URL . 'assets/js/aisooq-pixel.js',
 			array(),
-			SHOPIFY_PULSE_VERSION,
+			AISOOQ_VERSION,
 			true
 		);
 
@@ -153,7 +153,7 @@ class Shopify_Pulse_Analytics {
 		}
 
 		wp_localize_script(
-			'sp-pixel',
+			'aisooq-pixel',
 			'spPixel',
 			array(
 				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
@@ -161,7 +161,7 @@ class Shopify_Pulse_Analytics {
 				'page'    => $page,
 			)
 		);
-		wp_enqueue_script( 'sp-pixel' );
+		wp_enqueue_script( 'aisooq-pixel' );
 	}
 
 	private function page_type() {
@@ -229,7 +229,7 @@ class Shopify_Pulse_Analytics {
 	/** Crude per-IP throttle for the public pixel proxy (120 events/min). */
 	private function rate_limited() {
 		$ip  = isset( $_SERVER['REMOTE_ADDR'] ) ? preg_replace( '/[^0-9a-fA-F:.]/', '', wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '0';
-		$key = 'sp_px_rl_' . md5( $ip );
+		$key = 'aisooq_px_rl_' . md5( $ip );
 		$n   = (int) get_transient( $key );
 		if ( $n >= 120 ) {
 			return true;

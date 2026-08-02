@@ -2,20 +2,20 @@
 #
 # Build an installable WordPress plugin zip for the current version.
 #
-# The version is read from the plugin header in shopify-pulse-connector.php,
+# The version is read from the plugin header in aisooq-connector.php,
 # so bumping the version there is the ONLY thing you edit per release — this
 # script always packages "the latest version".
 #
-# Output: dist/shopify-pulse-connector-<version>.zip, with a single top-level
-# folder "shopify-pulse-connector/" (what WordPress expects on upload).
+# Output: dist/aisooq-connector-<version>.zip, with a single top-level
+# folder "aisooq-connector/" (what WordPress expects on upload).
 #
 # Usage:
-#   bin/build-zip.sh          # build dist/shopify-pulse-connector-<version>.zip
+#   bin/build-zip.sh          # build dist/aisooq-connector-<version>.zip
 #   composer build            # same, via the composer script alias
 #
 set -euo pipefail
 
-SLUG="shopify-pulse-connector"
+SLUG="aisooq-connector"
 MAIN_FILE="${SLUG}.php"
 
 # Repo root = parent of this script's dir, regardless of where it's called from.
@@ -41,7 +41,7 @@ mkdir -p "$OUT_DIR"
 rm -f "$OUT"
 
 # Stage runtime files under a folder named exactly $SLUG so the zip unpacks to
-# wp-content/plugins/shopify-pulse-connector/.
+# wp-content/plugins/aisooq-connector/.
 STAGE_ROOT="$(mktemp -d)"
 STAGE="$STAGE_ROOT/$SLUG"
 mkdir -p "$STAGE"

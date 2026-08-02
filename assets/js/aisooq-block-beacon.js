@@ -7,7 +7,7 @@
  * once a contact (email or phone) is present. The platform dedupes on a stable
  * per-browser key, so repeated posts update the same cart, never duplicate it.
  *
- * @package ShopifyPulse
+ * @package AISooq
  */
 ( function () {
 	'use strict';
@@ -16,7 +16,7 @@
 		return;
 	}
 	var cfg = window.SPBeacon;
-	var STORAGE_KEY = 'sp_cart_key';
+	var STORAGE_KEY = 'aisooq_cart_key';
 	var lastHash = '';
 	var timer = null;
 

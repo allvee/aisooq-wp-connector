@@ -11,31 +11,31 @@
  *
  * Direction is operator-controlled (push / pull / both).
  *
- * @package ShopifyPulse
+ * @package AISooq
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class Shopify_Pulse_Customer_Sync {
+class AI_Sooq_Customer_Sync {
 
-	const CURSOR_OPTION        = 'shopify_pulse_customer_cursor';
-	const META_PLATFORM_ID     = '_sp_platform_customer_id';
-	const META_HASH            = '_sp_cust_hash';
-	const META_PLATFORM_UPDATED = '_sp_cust_platform_updated';
+	const CURSOR_OPTION        = 'aisooq_customer_cursor';
+	const META_PLATFORM_ID     = '_aisooq_platform_customer_id';
+	const META_HASH            = '_aisooq_cust_hash';
+	const META_PLATFORM_UPDATED = '_aisooq_cust_platform_updated';
 
 	/** True while applying a platform change, so the WP user hooks don't echo it back. */
 	private static $suppress = false;
 
-	/** @var Shopify_Pulse_Settings */
+	/** @var AI_Sooq_Settings */
 	private $settings;
-	/** @var Shopify_Pulse_Api_Client */
+	/** @var AI_Sooq_Api_Client */
 	private $api;
-	/** @var Shopify_Pulse_Logger */
+	/** @var AI_Sooq_Logger */
 	private $logger;
 
-	public function __construct( Shopify_Pulse_Settings $settings, Shopify_Pulse_Api_Client $api, Shopify_Pulse_Logger $logger ) {
+	public function __construct( AI_Sooq_Settings $settings, AI_Sooq_Api_Client $api, AI_Sooq_Logger $logger ) {
 		$this->settings = $settings;
 		$this->api      = $api;
 		$this->logger   = $logger;
@@ -52,10 +52,10 @@ class Shopify_Pulse_Customer_Sync {
 			add_action( 'profile_update', array( $this, 'on_change' ), 20, 1 );
 			add_action( 'woocommerce_created_customer', array( $this, 'on_change' ), 20, 1 );
 			add_action( 'woocommerce_save_account_details', array( $this, 'on_change' ), 20, 1 );
-			add_action( SHOPIFY_PULSE_CUSTOMER_SYNC_ACTION, array( $this, 'handle_push' ), 10, 1 );
+			add_action( AISOOQ_CUSTOMER_SYNC_ACTION, array( $this, 'handle_push' ), 10, 1 );
 		}
 		if ( 'pull' === $dir || 'both' === $dir ) {
-			add_action( SHOPIFY_PULSE_CUSTOMER_PULL_CRON, array( $this, 'pull' ) );
+			add_action( AISOOQ_CUSTOMER_PULL_CRON, array( $this, 'pull' ) );
 		}
 	}
 
@@ -66,10 +66,10 @@ class Shopify_Pulse_Customer_Sync {
 		$user_id = (int) $user_id;
 		if ( function_exists( 'as_enqueue_async_action' ) ) {
 			if ( function_exists( 'as_has_scheduled_action' )
-				&& as_has_scheduled_action( SHOPIFY_PULSE_CUSTOMER_SYNC_ACTION, array( $user_id ), SHOPIFY_PULSE_AS_GROUP ) ) {
+				&& as_has_scheduled_action( AISOOQ_CUSTOMER_SYNC_ACTION, array( $user_id ), AISOOQ_AS_GROUP ) ) {
 				return;
 			}
-			as_enqueue_async_action( SHOPIFY_PULSE_CUSTOMER_SYNC_ACTION, array( $user_id ), SHOPIFY_PULSE_AS_GROUP );
+			as_enqueue_async_action( AISOOQ_CUSTOMER_SYNC_ACTION, array( $user_id ), AISOOQ_AS_GROUP );
 		} else {
 			$this->push_user( $user_id );
 		}
@@ -127,7 +127,7 @@ class Shopify_Pulse_Customer_Sync {
 		if ( ! empty( $res['id'] ) ) {
 			update_user_meta( $user_id, self::META_PLATFORM_ID, (int) $res['id'] );
 		}
-		update_user_meta( $user_id, '_sp_cust_synced_at', current_time( 'mysql' ) );
+		update_user_meta( $user_id, '_aisooq_cust_synced_at', current_time( 'mysql' ) );
 		$this->logger->debug( 'Customer ' . $user_id . ' pushed (platform id ' . ( isset( $res['id'] ) ? $res['id'] : '?' ) . ').' );
 	}
 

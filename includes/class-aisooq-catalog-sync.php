@@ -8,17 +8,17 @@
  * description, image, SEO (Yoast/Rank Math/AIOSEO) and — for categories — the
  * parent's external id for hierarchy. Hash-gated so nothing re-sends unchanged.
  *
- * @package ShopifyPulse
+ * @package AISooq
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class Shopify_Pulse_Catalog_Sync {
+class AI_Sooq_Catalog_Sync {
 
-	const HASH_META     = '_sp_term_hash';
-	const PLATFORM_META = '_sp_platform_id';
+	const HASH_META     = '_aisooq_term_hash';
+	const PLATFORM_META = '_aisooq_platform_id';
 
 	/** WooCommerce category taxonomy. */
 	private static $cat_tax = array( 'product_cat' );
@@ -28,14 +28,14 @@ class Shopify_Pulse_Catalog_Sync {
 	/** True while applying a pulled change, so the term hooks don't echo it back. */
 	private static $suppress = false;
 
-	/** @var Shopify_Pulse_Settings */
+	/** @var AI_Sooq_Settings */
 	private $settings;
-	/** @var Shopify_Pulse_Api_Client */
+	/** @var AI_Sooq_Api_Client */
 	private $api;
-	/** @var Shopify_Pulse_Logger */
+	/** @var AI_Sooq_Logger */
 	private $logger;
 
-	public function __construct( Shopify_Pulse_Settings $settings, Shopify_Pulse_Api_Client $api, Shopify_Pulse_Logger $logger ) {
+	public function __construct( AI_Sooq_Settings $settings, AI_Sooq_Api_Client $api, AI_Sooq_Logger $logger ) {
 		$this->settings = $settings;
 		$this->api      = $api;
 		$this->logger   = $logger;
@@ -54,10 +54,10 @@ class Shopify_Pulse_Catalog_Sync {
 		if ( $cat_push || $brand_push ) {
 			add_action( 'created_term', array( $this, 'on_term' ), 20, 3 );
 			add_action( 'edited_term', array( $this, 'on_term' ), 20, 3 );
-			add_action( SHOPIFY_PULSE_TERM_SYNC_ACTION, array( $this, 'handle_term' ), 10, 2 );
+			add_action( AISOOQ_TERM_SYNC_ACTION, array( $this, 'handle_term' ), 10, 2 );
 		}
 		if ( $cat_pull || $brand_pull ) {
-			add_action( SHOPIFY_PULSE_CATALOG_PULL_CRON, array( $this, 'pull' ) );
+			add_action( AISOOQ_CATALOG_PULL_CRON, array( $this, 'pull' ) );
 		}
 	}
 
@@ -120,10 +120,10 @@ class Shopify_Pulse_Catalog_Sync {
 		$args = array( (int) $term_id, (string) $taxonomy );
 		if ( function_exists( 'as_enqueue_async_action' ) ) {
 			if ( function_exists( 'as_has_scheduled_action' )
-				&& as_has_scheduled_action( SHOPIFY_PULSE_TERM_SYNC_ACTION, $args, SHOPIFY_PULSE_AS_GROUP ) ) {
+				&& as_has_scheduled_action( AISOOQ_TERM_SYNC_ACTION, $args, AISOOQ_AS_GROUP ) ) {
 				return;
 			}
-			as_enqueue_async_action( SHOPIFY_PULSE_TERM_SYNC_ACTION, $args, SHOPIFY_PULSE_AS_GROUP );
+			as_enqueue_async_action( AISOOQ_TERM_SYNC_ACTION, $args, AISOOQ_AS_GROUP );
 		} else {
 			$this->push_term( (int) $term_id, (string) $taxonomy );
 		}
@@ -150,7 +150,7 @@ class Shopify_Pulse_Catalog_Sync {
 			'isActive'        => true,
 			'sourceUpdatedAt' => gmdate( 'c' ),
 		);
-		$payload = array_merge( $payload, Shopify_Pulse_Seo::get_term_seo( $term_id, $taxonomy ) );
+		$payload = array_merge( $payload, AI_Sooq_Seo::get_term_seo( $term_id, $taxonomy ) );
 
 		if ( $is_brand ) {
 			$path = '/connect/brands';
@@ -234,7 +234,7 @@ class Shopify_Pulse_Catalog_Sync {
 		if ( ! taxonomy_exists( $taxonomy ) ) {
 			return;
 		}
-		$opt    = 'sp_cat_pull_' . $cursor_key;
+		$opt    = 'aisooq_cat_pull_' . $cursor_key;
 		$cursor = get_option( $opt, '' );
 		$res    = $this->api->get( $path . '?limit=100' . ( $cursor ? '&updatedSince=' . rawurlencode( $cursor ) : '' ) );
 		if ( is_wp_error( $res ) ) {
@@ -282,7 +282,7 @@ class Shopify_Pulse_Catalog_Sync {
 
 		// Last-write-wins: skip anything we've already applied or older.
 		if ( $term_id ) {
-			$last = get_term_meta( $term_id, '_sp_term_platform_updated', true );
+			$last = get_term_meta( $term_id, '_aisooq_term_platform_updated', true );
 			if ( $last && $platform_updated && $platform_updated <= $last ) {
 				return;
 			}
@@ -316,14 +316,14 @@ class Shopify_Pulse_Catalog_Sync {
 			}
 		}
 
-		Shopify_Pulse_Seo::set_term_seo(
+		AI_Sooq_Seo::set_term_seo(
 			$term_id,
 			$taxonomy,
 			isset( $t['seoTitle'] ) ? $t['seoTitle'] : '',
 			isset( $t['seoDescription'] ) ? $t['seoDescription'] : ''
 		);
 		update_term_meta( $term_id, self::PLATFORM_META, $platform_id );
-		update_term_meta( $term_id, '_sp_term_platform_updated', $platform_updated );
+		update_term_meta( $term_id, '_aisooq_term_platform_updated', $platform_updated );
 		self::$suppress = false;
 		$this->logger->debug( 'Pulled term ' . $taxonomy . '#' . $term_id . ' from platform.' );
 	}

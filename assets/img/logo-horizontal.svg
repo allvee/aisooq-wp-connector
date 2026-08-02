@@ -1,9 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="340" height="72" viewBox="0 0 340 72" fill="none">
-
+  <!-- AI Sooq lockup for dark surfaces: gold mark + wordmark on night. -->
   <g transform="translate(4,4)">
-  <circle cx="32" cy="32" r="26" fill="none" stroke="#6A8C8C" stroke-width="2.5"></circle>
-  <circle cx="32" cy="32" r="26" fill="none" stroke="#5FE3C0" stroke-width="2.5" stroke-dasharray="82 200" stroke-linecap="round" transform="rotate(-90 32 32)"></circle>
-  <path d="M14 34h8l4-9 6 17 5-12 3 4h10" fill="none" stroke="#5FE3C0" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"></path></g>
-  <text x="86" y="38" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="500" letter-spacing="-0.5" fill="#E9E9ED">Shopify <tspan fill="#5FE3C0">Pulse</tspan></text>
-  <text x="87" y="56" font-family="Inter, Arial, sans-serif" font-size="9" letter-spacing="2.2" fill="#6A8C8C">AI COMMERCE INTELLIGENCE</text>
+    <path d="M16 8H48A10 10 0 0 1 58 18V34A10 10 0 0 1 48 44H26L14 56L20 44H16A10 10 0 0 1 6 34V18A10 10 0 0 1 16 8Z" fill="none" stroke="#FDC137" stroke-width="3" stroke-linejoin="round"></path>
+    <g fill="none" stroke="#FDC137" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M17 26H27V17H45V32"></path>
+      <path d="M27 26V36H37"></path>
+    </g>
+    <g fill="#FDC137" stroke="#FDC137" stroke-width="2.2">
+      <circle cx="17" cy="26" r="2.9" fill="none"></circle>
+      <circle cx="37" cy="36" r="2.9" fill="none"></circle>
+      <circle cx="27" cy="17" r="1.9"></circle>
+      <circle cx="45" cy="32" r="1.9"></circle>
+      <circle cx="27" cy="26" r="1.2"></circle>
+    </g>
+  </g>
+  <text x="86" y="38" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="500" letter-spacing="-0.5" fill="#EDF3FA">AI <tspan fill="#FDC137">Sooq</tspan></text>
+  <text x="87" y="56" font-family="Inter, Arial, sans-serif" font-size="9" letter-spacing="2.2" fill="#93AECB">COMMERCE, ROUTED BY AI</text>
 </svg>

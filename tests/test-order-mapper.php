@@ -4,7 +4,7 @@
  * platform ingest depends on (COD pending rule, fee/discount handling,
  * authoritative totals). Skipped when WooCommerce isn't installed.
  *
- * @package ShopifyPulse
+ * @package AISooq
  */
 
 class Test_Order_Mapper extends WP_UnitTestCase {
@@ -37,21 +37,21 @@ class Test_Order_Mapper extends WP_UnitTestCase {
 
 	public function test_cod_processing_maps_to_pending_on_live_push() {
 		$order   = $this->make_cod_order( 'processing' );
-		$payload = Shopify_Pulse_Order_Mapper::map( $order, false );
+		$payload = AI_Sooq_Order_Mapper::map( $order, false );
 		$this->assertSame( 'pending', $payload['financialStatus'] );
 		$this->assertSame( 'cod', $payload['paymentGateway'] );
 	}
 
 	public function test_cod_processing_keeps_source_status_on_backfill() {
 		$order   = $this->make_cod_order( 'processing' );
-		$payload = Shopify_Pulse_Order_Mapper::map( $order, true );
+		$payload = AI_Sooq_Order_Mapper::map( $order, true );
 		// is_paid() is true for processing → mirrored verbatim (paid) on backfill.
 		$this->assertSame( 'paid', $payload['financialStatus'] );
 	}
 
 	public function test_authoritative_total_and_line_reconstruction() {
 		$order   = $this->make_cod_order( 'processing', 2, 500 ); // subtotal 1000
-		$payload = Shopify_Pulse_Order_Mapper::map( $order, false );
+		$payload = AI_Sooq_Order_Mapper::map( $order, false );
 
 		$this->assertEqualsWithDelta( (float) $order->get_total(), $payload['orderTotal'], 0.01 );
 
@@ -76,7 +76,7 @@ class Test_Order_Mapper extends WP_UnitTestCase {
 		$order->calculate_totals();
 		$order->save();
 
-		$payload = Shopify_Pulse_Order_Mapper::map( wc_get_order( $order->get_id() ), false );
+		$payload = AI_Sooq_Order_Mapper::map( wc_get_order( $order->get_id() ), false );
 
 		$titles = wp_list_pluck( $payload['lineItems'], 'title' );
 		$this->assertContains( 'COD fee', $titles );
@@ -90,7 +90,7 @@ class Test_Order_Mapper extends WP_UnitTestCase {
 			'amount'   => (float) $order->get_total(),
 		) );
 
-		$payload = Shopify_Pulse_Order_Mapper::map( wc_get_order( $order->get_id() ), false );
+		$payload = AI_Sooq_Order_Mapper::map( wc_get_order( $order->get_id() ), false );
 		$this->assertArrayHasKey( 'refundedAmount', $payload );
 		$this->assertGreaterThan( 0, $payload['refundedAmount'] );
 	}

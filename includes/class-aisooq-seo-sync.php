@@ -8,27 +8,27 @@
  * filter. The platform is the source of truth for SEO redirects; the plugin is
  * the enforcement point on WordPress (no third-party redirect plugin needed).
  *
- * @package ShopifyPulse
+ * @package AISooq
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class Shopify_Pulse_Seo_Sync {
+class AI_Sooq_Seo_Sync {
 
-	const REDIRECTS_OPTION = 'sp_redirects';
-	const ROBOTS_OPTION    = 'sp_robots_disallow';
-	const CURSOR_OPTION    = 'sp_redirect_cursor';
+	const REDIRECTS_OPTION = 'aisooq_redirects';
+	const ROBOTS_OPTION    = 'aisooq_robots_disallow';
+	const CURSOR_OPTION    = 'aisooq_redirect_cursor';
 
-	/** @var Shopify_Pulse_Settings */
+	/** @var AI_Sooq_Settings */
 	private $settings;
-	/** @var Shopify_Pulse_Api_Client */
+	/** @var AI_Sooq_Api_Client */
 	private $api;
-	/** @var Shopify_Pulse_Logger */
+	/** @var AI_Sooq_Logger */
 	private $logger;
 
-	public function __construct( Shopify_Pulse_Settings $settings, Shopify_Pulse_Api_Client $api, Shopify_Pulse_Logger $logger ) {
+	public function __construct( AI_Sooq_Settings $settings, AI_Sooq_Api_Client $api, AI_Sooq_Logger $logger ) {
 		$this->settings = $settings;
 		$this->api      = $api;
 		$this->logger   = $logger;
@@ -44,12 +44,12 @@ class Shopify_Pulse_Seo_Sync {
 
 		$dir = $this->settings->get( 'catalog_sync_dir', 'push' );
 		if ( 'pull' === $dir || 'both' === $dir ) {
-			add_action( SHOPIFY_PULSE_CATALOG_PULL_CRON, array( $this, 'pull' ) );
+			add_action( AISOOQ_CATALOG_PULL_CRON, array( $this, 'pull' ) );
 		}
 		if ( 'push' === $dir || 'both' === $dir ) {
 			// Push WordPress-authored redirects (from the active redirect plugin)
 			// up to the platform, on the same tick as the pull.
-			add_action( SHOPIFY_PULSE_CATALOG_PULL_CRON, array( $this, 'push_redirects' ) );
+			add_action( AISOOQ_CATALOG_PULL_CRON, array( $this, 'push_redirects' ) );
 		}
 	}
 
@@ -138,7 +138,7 @@ class Shopify_Pulse_Seo_Sync {
 
 	// ── Push (WooCommerce → platform) ───────────────────────────────────────
 
-	const PUSH_HASHES_OPTION = 'sp_redirect_push_hashes';
+	const PUSH_HASHES_OPTION = 'aisooq_redirect_push_hashes';
 
 	/**
 	 * Cron: read WordPress-authored redirects from whichever SEO/redirect plugin

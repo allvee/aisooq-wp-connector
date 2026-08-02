@@ -13,25 +13,25 @@
  * Fails OPEN: if the API is unreachable the checkout proceeds, so a platform
  * outage never blocks legitimate sales.
  *
- * @package ShopifyPulse
+ * @package AISooq
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class Shopify_Pulse_Fraud {
+class AI_Sooq_Fraud {
 
-	const SESSION_KEY = 'sp_fraud_verdict';
+	const SESSION_KEY = 'aisooq_fraud_verdict';
 
-	/** @var Shopify_Pulse_Settings */
+	/** @var AI_Sooq_Settings */
 	private $settings;
-	/** @var Shopify_Pulse_Api_Client */
+	/** @var AI_Sooq_Api_Client */
 	private $api;
-	/** @var Shopify_Pulse_Logger */
+	/** @var AI_Sooq_Logger */
 	private $logger;
 
-	public function __construct( Shopify_Pulse_Settings $settings, Shopify_Pulse_Api_Client $api, Shopify_Pulse_Logger $logger ) {
+	public function __construct( AI_Sooq_Settings $settings, AI_Sooq_Api_Client $api, AI_Sooq_Logger $logger ) {
 		$this->settings = $settings;
 		$this->api      = $api;
 		$this->logger   = $logger;
@@ -56,16 +56,16 @@ class Shopify_Pulse_Fraud {
 		}
 		// Modern block popup on classic checkout + its stash-reader endpoint.
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_guard' ), 20 );
-		add_action( 'wp_ajax_shopify_pulse_guard', array( $this, 'ajax_guard' ) );
-		add_action( 'wp_ajax_nopriv_shopify_pulse_guard', array( $this, 'ajax_guard' ) );
+		add_action( 'wp_ajax_aisooq_guard', array( $this, 'ajax_guard' ) );
+		add_action( 'wp_ajax_nopriv_aisooq_guard', array( $this, 'ajax_guard' ) );
 
 		// Live inline Layer-1 validation on the classic checkout — flag a junk
 		// name/address/number under the field as the shopper types, before they
 		// hit Place order (advisory; the server still screens at placement).
 		if ( $fraud ) {
 			add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_validate' ), 21 );
-			add_action( 'wp_ajax_shopify_pulse_validate', array( $this, 'ajax_validate' ) );
-			add_action( 'wp_ajax_nopriv_shopify_pulse_validate', array( $this, 'ajax_validate' ) );
+			add_action( 'wp_ajax_aisooq_validate', array( $this, 'ajax_validate' ) );
+			add_action( 'wp_ajax_nopriv_aisooq_validate', array( $this, 'ajax_validate' ) );
 		}
 	}
 
@@ -74,13 +74,13 @@ class Shopify_Pulse_Fraud {
 		if ( is_admin() || ! function_exists( 'is_checkout' ) || ! is_checkout() ) {
 			return;
 		}
-		wp_enqueue_script( 'sp-checkout-validate', SHOPIFY_PULSE_URL . 'assets/js/sp-checkout-validate.js', array( 'jquery' ), SHOPIFY_PULSE_VERSION, true );
+		wp_enqueue_script( 'aisooq-checkout-validate', AISOOQ_URL . 'assets/js/aisooq-checkout-validate.js', array( 'jquery' ), AISOOQ_VERSION, true );
 		wp_localize_script(
-			'sp-checkout-validate',
+			'aisooq-checkout-validate',
 			'SPValidate',
 			array(
 				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-				'nonce'   => wp_create_nonce( 'sp_validate' ),
+				'nonce'   => wp_create_nonce( 'aisooq_validate' ),
 			)
 		);
 	}
@@ -92,7 +92,7 @@ class Shopify_Pulse_Fraud {
 	 * the authoritative block still happens server-side at order placement.
 	 */
 	public function ajax_validate() {
-		check_ajax_referer( 'sp_validate', 'nonce' );
+		check_ajax_referer( 'aisooq_validate', 'nonce' );
 		$name    = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
 		$phone   = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
 		$address = isset( $_POST['address'] ) ? sanitize_text_field( wp_unslash( $_POST['address'] ) ) : '';
@@ -124,27 +124,27 @@ class Shopify_Pulse_Fraud {
 		if ( is_admin() || ! function_exists( 'is_checkout' ) || ! is_checkout() ) {
 			return;
 		}
-		wp_enqueue_script( 'sp-checkout-guard', SHOPIFY_PULSE_URL . 'assets/js/sp-checkout-guard.js', array( 'jquery' ), SHOPIFY_PULSE_VERSION, true );
+		wp_enqueue_script( 'aisooq-checkout-guard', AISOOQ_URL . 'assets/js/aisooq-checkout-guard.js', array( 'jquery' ), AISOOQ_VERSION, true );
 		$c    = $this->support_contact();
 		$help = trim( (string) $this->settings->get( 'msg_help' ) );
 		if ( '' === $help ) {
-			$help = __( 'Need help completing your order? Reach us:', 'shopify-pulse-connector' );
+			$help = __( 'Need help completing your order? Reach us:', 'aisooq-connector' );
 		}
 		wp_localize_script(
-			'sp-checkout-guard',
+			'aisooq-checkout-guard',
 			'SPGuard',
 			array(
 				'ajaxUrl'   => admin_url( 'admin-ajax.php' ),
-				'nonce'     => wp_create_nonce( 'sp_guard' ),
+				'nonce'     => wp_create_nonce( 'aisooq_guard' ),
 				'phone'     => $c['phone'],
 				'whatsapp'  => $c['whatsapp'],
 				'messenger' => $c['messenger'],
 				'i18n'      => array(
-					'title'    => __( 'We can’t place this order', 'shopify-pulse-connector' ),
-					'callBtn'  => __( 'Call', 'shopify-pulse-connector' ),
-					'waBtn'    => __( 'WhatsApp us', 'shopify-pulse-connector' ),
-					'msgrBtn'  => __( 'Messenger', 'shopify-pulse-connector' ),
-					'close'    => __( 'Close', 'shopify-pulse-connector' ),
+					'title'    => __( 'We can’t place this order', 'aisooq-connector' ),
+					'callBtn'  => __( 'Call', 'aisooq-connector' ),
+					'waBtn'    => __( 'WhatsApp us', 'aisooq-connector' ),
+					'msgrBtn'  => __( 'Messenger', 'aisooq-connector' ),
+					'close'    => __( 'Close', 'aisooq-connector' ),
 					'help'     => $help,
 				),
 			)
@@ -153,12 +153,12 @@ class Shopify_Pulse_Fraud {
 
 	/** Return the last checkout block stashed for this session (and clear it). */
 	public function ajax_guard() {
-		check_ajax_referer( 'sp_guard', 'nonce' );
+		check_ajax_referer( 'aisooq_guard', 'nonce' );
 		$block = null;
 		if ( function_exists( 'WC' ) && WC()->session ) {
-			$block = WC()->session->get( 'sp_guard_block' );
+			$block = WC()->session->get( 'aisooq_guard_block' );
 			if ( $block ) {
-				WC()->session->set( 'sp_guard_block', null );
+				WC()->session->set( 'aisooq_guard_block', null );
 			}
 		}
 		if ( is_array( $block ) && ! empty( $block['message'] ) ) {
@@ -170,7 +170,7 @@ class Shopify_Pulse_Fraud {
 	/** Stash a block for the checkout-guard modal to pick up. */
 	private function stash_block( $type, $message ) {
 		if ( function_exists( 'WC' ) && WC()->session ) {
-			WC()->session->set( 'sp_guard_block', array( 'type' => $type, 'message' => wp_strip_all_tags( (string) $message ) ) );
+			WC()->session->set( 'aisooq_guard_block', array( 'type' => $type, 'message' => wp_strip_all_tags( (string) $message ) ) );
 		}
 	}
 
@@ -185,7 +185,7 @@ class Shopify_Pulse_Fraud {
 		$phone = trim( (string) $this->settings->get( 'support_phone' ) );
 		$wa    = trim( (string) $this->settings->get( 'support_whatsapp' ) );
 		if ( '' === $phone || '' === $wa ) {
-			$status = get_option( 'shopify_pulse_status', array() );
+			$status = get_option( 'aisooq_status', array() );
 			$store  = ( is_array( $status ) && isset( $status['store'] ) && is_array( $status['store'] ) ) ? $status['store'] : array();
 			$tenant = ! empty( $store['contactPhone'] ) ? (string) $store['contactPhone'] : '';
 			if ( '' === $phone ) {
@@ -233,7 +233,7 @@ class Shopify_Pulse_Fraud {
 				$action = $this->settings->get( 'fraud_action' );
 				if ( 'block' === $action ) {
 					$this->stash_block( 'fraud', $this->message( $verdict ) );
-					$errors->add( 'sp_fraud', $this->message( $verdict ) );
+					$errors->add( 'aisooq_fraud', $this->message( $verdict ) );
 					return;
 				}
 				// hold / flag: let the order be created, then act on it — but the
@@ -248,7 +248,7 @@ class Shopify_Pulse_Fraud {
 		$courier_msg = $this->courier_block_message( $phone );
 		if ( $courier_msg ) {
 			$this->stash_block( 'courier', $courier_msg );
-			$errors->add( 'sp_courier', $courier_msg );
+			$errors->add( 'aisooq_courier', $courier_msg );
 			return;
 		}
 		} catch ( \Throwable $e ) {
@@ -280,7 +280,7 @@ class Shopify_Pulse_Fraud {
 				if ( 'block' === $action ) {
 					if ( class_exists( '\Automattic\WooCommerce\StoreApi\Exceptions\RouteException' ) ) {
 						throw new \Automattic\WooCommerce\StoreApi\Exceptions\RouteException(
-							'sp_fraud_blocked',
+							'aisooq_fraud_blocked',
 							$this->with_contact( $this->message( $verdict ) ),
 							400
 						);
@@ -300,7 +300,7 @@ class Shopify_Pulse_Fraud {
 		$courier_msg = $this->courier_block_message( $order->get_billing_phone() );
 		if ( $courier_msg ) {
 			if ( class_exists( '\Automattic\WooCommerce\StoreApi\Exceptions\RouteException' ) ) {
-				throw new \Automattic\WooCommerce\StoreApi\Exceptions\RouteException( 'sp_courier_blocked', $this->with_contact( $courier_msg ), 400 );
+				throw new \Automattic\WooCommerce\StoreApi\Exceptions\RouteException( 'aisooq_courier_blocked', $this->with_contact( $courier_msg ), 400 );
 			}
 			$order->update_status( 'failed', $courier_msg );
 			return;
@@ -368,13 +368,13 @@ class Shopify_Pulse_Fraud {
 		$layer  = isset( $verdict['layer'] ) ? $verdict['layer'] : 'unknown';
 		$reason = isset( $verdict['reason'] ) ? $verdict['reason'] : '';
 
-		$order->update_meta_data( '_sp_fraud_flagged', '1' );
-		$order->update_meta_data( '_sp_fraud_layer', $layer );
-		$order->update_meta_data( '_sp_fraud_reason', $reason );
+		$order->update_meta_data( '_aisooq_fraud_flagged', '1' );
+		$order->update_meta_data( '_aisooq_fraud_layer', $layer );
+		$order->update_meta_data( '_aisooq_fraud_reason', $reason );
 
 		$note = sprintf(
 			/* translators: 1: fraud layer, 2: reason */
-			__( 'Shopify Pulse fraud screen: flagged by layer "%1$s" (%2$s).', 'shopify-pulse-connector' ),
+			__( 'AI Sooq fraud screen: flagged by layer "%1$s" (%2$s).', 'aisooq-connector' ),
 			$layer,
 			$reason
 		);
@@ -421,7 +421,7 @@ class Shopify_Pulse_Fraud {
 		}
 		return ! empty( $verdict['message'] )
 			? $verdict['message']
-			: __( 'This order could not be accepted. Please contact support.', 'shopify-pulse-connector' );
+			: __( 'This order could not be accepted. Please contact support.', 'aisooq-connector' );
 	}
 
 	/** Append the store's contact to a block message (Store API path, which has
@@ -432,7 +432,7 @@ class Shopify_Pulse_Fraud {
 			return $message;
 		}
 		/* translators: %s: store contact phone number */
-		return $message . ' ' . sprintf( __( 'Contact us: %s', 'shopify-pulse-connector' ), $c['phone'] );
+		return $message . ' ' . sprintf( __( 'Contact us: %s', 'aisooq-connector' ), $c['phone'] );
 	}
 
 	/**
@@ -491,7 +491,7 @@ class Shopify_Pulse_Fraud {
 		);
 		$template = trim( (string) $this->settings->get( 'msg_courier' ) );
 		if ( '' === $template ) {
-			$template = __( 'We are unable to accept this order for delivery right now (courier delivery-success rate {ratio}% over {parcels} past parcels). Please contact us to complete your purchase.', 'shopify-pulse-connector' );
+			$template = __( 'We are unable to accept this order for delivery right now (courier delivery-success rate {ratio}% over {parcels} past parcels). Please contact us to complete your purchase.', 'aisooq-connector' );
 		}
 		return strtr(
 			$template,

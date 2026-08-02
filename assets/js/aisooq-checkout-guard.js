@@ -9,7 +9,7 @@
  * show the modal. Everything degrades gracefully — the underlying notice still
  * renders if JS is off.
  *
- * @package ShopifyPulse
+ * @package AISooq
  */
 ( function ( $ ) {
 	'use strict';
@@ -85,7 +85,7 @@
 
 	// WooCommerce fires this on the body after a failed AJAX checkout.
 	$( document.body ).on( 'checkout_error', function () {
-		$.post( G.ajaxUrl, { action: 'shopify_pulse_guard', nonce: G.nonce } ).done( function ( res ) {
+		$.post( G.ajaxUrl, { action: 'aisooq_guard', nonce: G.nonce } ).done( function ( res ) {
 			if ( res && res.success && res.data && res.data.message ) {
 				showModal( res.data.message );
 			}

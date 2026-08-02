@@ -11,3 +11,6 @@
 .idea/
 .vscode/
 *.log
+
+# Test artefacts
+.phpunit.result.cache

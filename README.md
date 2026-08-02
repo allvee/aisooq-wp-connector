@@ -1,10 +1,10 @@
 <div align="center">
 
-# Shopify Pulse Connector
+# AI Sooq Connector
 
-**Connect your WooCommerce store to the Shopify Pulse platform — two-way sync, server-side analytics, and fraud screening in one plugin.**
+**Connect your WooCommerce store to the AI Sooq platform — two-way sync, server-side analytics, and fraud screening in one plugin.**
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
 ![WordPress](https://img.shields.io/badge/WordPress-5.8%2B-21759b.svg)
 ![WooCommerce](https://img.shields.io/badge/WooCommerce-6.0%2B-96588a.svg)
 ![PHP](https://img.shields.io/badge/PHP-7.4%2B-777bb4.svg)
@@ -14,9 +14,9 @@
 
 ---
 
-Shopify Pulse Connector links a single WooCommerce store to the Shopify Pulse platform. It keeps customers and catalog in sync both ways, mirrors every order for reporting, pushes server-side conversion events, and screens checkouts through the platform's fraud engine — all from one admin screen.
+AI Sooq Connector links a single WooCommerce store to the AI Sooq platform. It keeps customers and catalog in sync both ways, mirrors every order for reporting, pushes server-side conversion events, and screens checkouts through the platform's fraud engine — all from one admin screen.
 
-> **This is the store-side plugin.** The platform-side connector API lives in a companion repository (`api.wafiperume.com`, under `apps/admin-api/.../connector`; see `docs/runbooks/woocommerce-connector.md`). This README covers only what runs on your WordPress site.
+> **This is the store-side plugin.** The platform-side connector API lives in a companion repository (`api.aisooq.com`, under `apps/admin-api/.../connector`; see `docs/runbooks/woocommerce-connector.md`). This README covers only what runs on your WordPress site.
 
 ## Table of contents
 
@@ -93,7 +93,7 @@ Shopify Pulse Connector links a single WooCommerce store to the Shopify Pulse pl
 | WordPress | 5.8+ | |
 | WooCommerce | 6.0+ | HPOS-compatible |
 | PHP | 7.4+ | |
-| Shopify Pulse store | One per site | One OAuth app = one store |
+| AI Sooq store | One per site | One OAuth app = one store |
 
 Authentication is OAuth 2.0 `client_credentials`. The plugin mints a `wat_` bearer token (1-hour TTL, auto-refreshed) via `POST {admin}/api/v1/oauth/token` and sends `Authorization` plus `X-Store-Sid` on every request. The admin host handles OAuth and `/connect/*`; the storefront host handles `/pixel/*` and `/fraud/*` (leave the storefront base blank to use the same host).
 
@@ -109,8 +109,8 @@ brands.write     categories.write     collections.write
 ## Installation
 
 1. Upload and activate the plugin (**Plugins → Add New → Upload**, or drop the folder in `wp-content/plugins/`).
-2. Register an OAuth app for your store on the Shopify Pulse platform, grant the scopes listed above, and copy the **client id**, **client secret**, and **store SID**.
-3. Open **Shopify Pulse** in the WordPress admin, enter the API base URL and credentials, and click **Verify connection**.
+2. Register an OAuth app for your store on the AI Sooq platform, grant the scopes listed above, and copy the **client id**, **client secret**, and **store SID**.
+3. Open **AI Sooq** in the WordPress admin, enter the API base URL and credentials, and click **Verify connection**.
 4. Enable the features you want, set sync directions, then flip the **Active** master switch on.
 
 For a step-by-step walkthrough, see `SETUP.md` in this repo or the **Quick setup guide** panel on the plugin's settings page.
@@ -124,10 +124,10 @@ current version for upload:
 bin/build-zip.sh          # or: composer build
 ```
 
-It reads the version from the plugin header in `shopify-pulse-connector.php`
-and writes `dist/shopify-pulse-connector-<version>.zip` with the single
+It reads the version from the plugin header in `aisooq-connector.php`
+and writes `dist/aisooq-connector-<version>.zip` with the single
 top-level folder WordPress expects. **Bump the `Version:` header (and
-`SHOPIFY_PULSE_VERSION`) — that's the only per-release edit;** the script always
+`AISOOQ_VERSION`) — that's the only per-release edit;** the script always
 packages the latest.
 
 **Automated releases:** pushing a version tag builds the zip and attaches it to
@@ -139,7 +139,7 @@ git tag v1.2.5 && git push origin v1.2.5
 
 ## Configuration
 
-All settings live in the `sp_connector_settings` option.
+All settings live in the `aisooq_connector_settings` option.
 
 **Connection**
 
@@ -172,7 +172,7 @@ All settings live in the `sp_connector_settings` option.
 
 ## Admin screen
 
-The **Shopify Pulse** settings page gives you:
+The **AI Sooq** settings page gives you:
 
 - **Status badge** — live connection state: **Connected**, **Paused**, or **Not verified**.
 - **Active master switch** — pauses every sync at once while preserving all settings.
@@ -184,27 +184,27 @@ The **Shopify Pulse** settings page gives you:
 
 ```
 includes/
-├── class-sp-plugin.php          Singleton orchestrator / bootstrap
-├── class-sp-settings.php        Admin screen + Verify / Sync / status badge
-├── class-sp-api-client.php      OAuth token + signed HTTP (admin + storefront hosts)
-├── class-sp-logger.php          WC_Logger wrapper
-├── class-sp-order-mapper.php    WC_Order → payload
-├── class-sp-order-sync.php      Order hooks → Action Scheduler → /connect/orders
-├── class-sp-status-poller.php   Poll → reconcile WC status (forward-only)
-├── class-sp-abandoned-sync.php  Capture table + idle-cart sweep
-├── class-sp-attribution.php     Visitor tracker → order metafield
-├── class-sp-analytics.php       Server Purchase + browser event proxy
-├── class-sp-fraud.php           Checkout screen → block / hold / flag
-├── class-sp-customer-sync.php   Customers push + pull
-├── class-sp-catalog-sync.php    Categories + brands push + pull
-├── class-sp-product-sync.php    Products + variations push + pull
-├── class-sp-seo-sync.php        Redirects (301/302) + robots rules
-├── class-sp-seo.php             Yoast / Rank Math / AIOSEO read + write bridge
-└── class-sp-install.php         Capture-table dbDelta + cron schedules
+├── class-aisooq-plugin.php          Singleton orchestrator / bootstrap
+├── class-aisooq-settings.php        Admin screen + Verify / Sync / status badge
+├── class-aisooq-api-client.php      OAuth token + signed HTTP (admin + storefront hosts)
+├── class-aisooq-logger.php          WC_Logger wrapper
+├── class-aisooq-order-mapper.php    WC_Order → payload
+├── class-aisooq-order-sync.php      Order hooks → Action Scheduler → /connect/orders
+├── class-aisooq-status-poller.php   Poll → reconcile WC status (forward-only)
+├── class-aisooq-abandoned-sync.php  Capture table + idle-cart sweep
+├── class-aisooq-attribution.php     Visitor tracker → order metafield
+├── class-aisooq-analytics.php       Server Purchase + browser event proxy
+├── class-aisooq-fraud.php           Checkout screen → block / hold / flag
+├── class-aisooq-customer-sync.php   Customers push + pull
+├── class-aisooq-catalog-sync.php    Categories + brands push + pull
+├── class-aisooq-product-sync.php    Products + variations push + pull
+├── class-aisooq-seo-sync.php        Redirects (301/302) + robots rules
+├── class-aisooq-seo.php             Yoast / Rank Math / AIOSEO read + write bridge
+└── class-aisooq-install.php         Capture-table dbDelta + cron schedules
 
 assets/
-├── js/sp-attr.js                Attribution tracker
-└── js/sp-pixel.js               Browser analytics events
+├── js/aisooq-attr.js                Attribution tracker
+└── js/aisooq-pixel.js               Browser analytics events
 
 uninstall.php                      Cleans options, token, cron, and the capture table
 ```
@@ -227,10 +227,10 @@ uninstall.php                      Cleans options, token, cron, and the capture 
 
 ## Extending
 
-Use the `sp_connector_order_payload` filter to mutate the order payload before it is pushed.
+Use the `aisooq_connector_order_payload` filter to mutate the order payload before it is pushed.
 
 ```php
-add_filter( 'sp_connector_order_payload', function ( array $payload, WC_Order $order ) {
+add_filter( 'aisooq_connector_order_payload', function ( array $payload, WC_Order $order ) {
     // Attach a custom field to every mirrored order.
     $payload['metafields']['app:woocommerce/gift_note'] = $order->get_customer_note();
 
@@ -240,7 +240,7 @@ add_filter( 'sp_connector_order_payload', function ( array $payload, WC_Order $o
 
 ## Notes
 
-- **One store per app.** A WooCommerce site connects to exactly one Shopify Pulse store (one OAuth app = one store).
+- **One store per app.** A WooCommerce site connects to exactly one AI Sooq store (one OAuth app = one store).
 - **Purchase is server-side.** The authoritative `Purchase` event fires from the server and is deduped by the platform on order id; browser events are supplemental.
 - **Order lines are free-text.** Mirrored order lines carry no platform inventory impact — stock stays in WooCommerce.
 - **Variant pull needs the product first.** Pulling variants requires the parent product to already exist on the WooCommerce side.

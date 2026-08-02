@@ -1,7 +1,7 @@
 /**
- * Shopify Pulse Connector — browser analytics. Fires PageView / ViewContent /
+ * AI Sooq Connector — browser analytics. Fires PageView / ViewContent /
  * InitiateCheckout / AddToCart through the same-site AJAX proxy
- * (admin-ajax.php?action=sp_track), which forwards to the platform's public
+ * (admin-ajax.php?action=aisooq_track), which forwards to the platform's public
  * /pixel/events. Purchase is handled server-side, never here.
  */
 ( function () {
@@ -19,7 +19,7 @@
 
 	function send( eventName, custom ) {
 		var data = new FormData();
-		data.append( 'action', 'sp_track' );
+		data.append( 'action', 'aisooq_track' );
 		data.append( 'nonce', cfg.nonce );
 		data.append( 'eventName', eventName );
 		data.append( 'eventId', uid( eventName ) );

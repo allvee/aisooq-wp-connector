@@ -5,31 +5,31 @@
  * WooCommerce Blocks has no server-side hook that fires while the shopper fills
  * the checkout form (unlike the classic checkout's
  * `woocommerce_checkout_update_order_review`), so a small front-end script
- * ({@see assets/js/sp-block-beacon.js}) reads the contact + cart from the
+ * ({@see assets/js/aisooq-block-beacon.js}) reads the contact + cart from the
  * checkout data store and POSTs a snapshot to the REST route here, which hands
- * it to {@see Shopify_Pulse_Abandoned_Sync::capture_beacon()}. Only loaded on a
+ * it to {@see AI_Sooq_Abandoned_Sync::capture_beacon()}. Only loaded on a
  * block-based checkout; classic checkouts are already captured server-side.
  *
- * @package ShopifyPulse
+ * @package AISooq
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class Shopify_Pulse_Block_Beacon {
+class AI_Sooq_Block_Beacon {
 
-	const REST_NS    = 'shopify-pulse/v1';
+	const REST_NS    = 'aisooq/v1';
 	const REST_ROUTE = '/abandoned-beacon';
 
-	/** @var Shopify_Pulse_Settings */
+	/** @var AI_Sooq_Settings */
 	private $settings;
-	/** @var Shopify_Pulse_Abandoned_Sync */
+	/** @var AI_Sooq_Abandoned_Sync */
 	private $abandoned;
-	/** @var Shopify_Pulse_Logger */
+	/** @var AI_Sooq_Logger */
 	private $logger;
 
-	public function __construct( Shopify_Pulse_Settings $settings, Shopify_Pulse_Abandoned_Sync $abandoned, Shopify_Pulse_Logger $logger ) {
+	public function __construct( AI_Sooq_Settings $settings, AI_Sooq_Abandoned_Sync $abandoned, AI_Sooq_Logger $logger ) {
 		$this->settings  = $settings;
 		$this->abandoned = $abandoned;
 		$this->logger    = $logger;
@@ -87,14 +87,14 @@ class Shopify_Pulse_Block_Beacon {
 			return;
 		}
 		wp_enqueue_script(
-			'sp-block-beacon',
-			SHOPIFY_PULSE_URL . 'assets/js/sp-block-beacon.js',
+			'aisooq-block-beacon',
+			AISOOQ_URL . 'assets/js/aisooq-block-beacon.js',
 			array( 'wp-data' ),
-			SHOPIFY_PULSE_VERSION,
+			AISOOQ_VERSION,
 			true
 		);
 		wp_localize_script(
-			'sp-block-beacon',
+			'aisooq-block-beacon',
 			'SPBeacon',
 			array(
 				'url'      => rest_url( self::REST_NS . self::REST_ROUTE ),

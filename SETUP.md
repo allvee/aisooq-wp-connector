@@ -1,9 +1,9 @@
-# Setup — connect WooCommerce to your Shopify Pulse store
+# Setup — connect WooCommerce to your AI Sooq store
 
-Takes ~5 minutes. You need admin access to both the Shopify Pulse platform and the
+Takes ~5 minutes. You need admin access to both the AI Sooq platform and the
 WooCommerce site.
 
-## 1. Register an OAuth app (on the Shopify Pulse platform)
+## 1. Register an OAuth app (on the AI Sooq platform)
 
 Grant the app the scopes for every feature you plan to enable — the plugin's
 token carries exactly the app's registered scopes, so a missing scope makes
@@ -33,12 +33,12 @@ Copy three things:
 
 ## 2. Install the plugin (on WooCommerce)
 
-Upload `sp-connector.zip` under *Plugins → Add New → Upload Plugin* and
+Upload `aisooq-connector.zip` under *Plugins → Add New → Upload Plugin* and
 activate it. (WooCommerce must be active.)
 
 ## 3. Configure
 
-Open **Shopify Pulse** in the wp-admin menu and fill in:
+Open **AI Sooq** in the wp-admin menu and fill in:
 
 | Field | Value |
 | --- | --- |
@@ -61,7 +61,7 @@ Then:
 
 ## Where do I find my host URLs?
 
-They're the public domains your Shopify Pulse platform is served on:
+They're the public domains your AI Sooq platform is served on:
 - Admin API — usually `api.admin.<yourdomain>`
 - Storefront API — usually `api.<yourdomain>`
 
@@ -70,13 +70,13 @@ URL** and leave **Storefront API base URL** blank.
 
 ## Notes
 
-- One WooCommerce site connects to **one** Shopify Pulse store (one OAuth app = one
+- One WooCommerce site connects to **one** AI Sooq store (one OAuth app = one
   store). Use a separate app per store.
 - The access token lasts 1 hour and is refreshed automatically — you never
   handle it.
 - Fraud screening **fails open**: if the platform is unreachable, checkout
   proceeds so sales aren't blocked.
-- Logs: *WooCommerce → Status → Logs*, source `sp-connector` (enable
+- Logs: *WooCommerce → Status → Logs*, source `aisooq-connector` (enable
   **Debug logging** in settings for verbose output).
 
 See [README.md](./README.md) for the full architecture and endpoint reference.

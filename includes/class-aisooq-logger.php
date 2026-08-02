@@ -1,24 +1,24 @@
 <?php
 /**
  * Thin wrapper over WC_Logger so all connector output lands in one source
- * ("shopify-pulse-connector") under WooCommerce › Status › Logs.
+ * ("aisooq-connector") under WooCommerce › Status › Logs.
  *
- * @package ShopifyPulse
+ * @package AISooq
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class Shopify_Pulse_Logger {
+class AI_Sooq_Logger {
 
-	/** @var Shopify_Pulse_Settings */
+	/** @var AI_Sooq_Settings */
 	private $settings;
 
 	/** @var WC_Logger_Interface|null */
 	private $wc_logger = null;
 
-	public function __construct( Shopify_Pulse_Settings $settings ) {
+	public function __construct( AI_Sooq_Settings $settings ) {
 		$this->settings = $settings;
 	}
 
@@ -45,7 +45,7 @@ class Shopify_Pulse_Logger {
 		if ( ! is_scalar( $message ) ) {
 			$message = wp_json_encode( $message );
 		}
-		$logger->log( $level, (string) $message, array( 'source' => 'shopify-pulse-connector' ) );
+		$logger->log( $level, (string) $message, array( 'source' => 'aisooq-connector' ) );
 	}
 
 	public function error( $message ) {

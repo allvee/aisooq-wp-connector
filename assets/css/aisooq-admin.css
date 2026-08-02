@@ -1,98 +1,103 @@
 /**
- * Shopify Pulse — admin design system ("Bazaar Console").
+ * AI Sooq — admin design system.
  *
- * A single shared skin for BOTH plugin admin screens (Settings `.wrap.sp` and
- * Abandoned carts `.wrap.sp-ab`), mirroring the platform admin UI: petrol-teal
- * primary + rickshaw-marigold highlight on a warm off-white surface, soft
- * elevation, 12px radius, pill badges, tabular figures.
+ * A single shared skin for BOTH plugin admin screens (Settings `.wrap.aisooq`
+ * and Abandoned carts `.wrap.aisooq-ab`), mirroring the platform admin UI:
+ * navy primary + gold highlight on a cool off-white surface, soft elevation,
+ * 12px radius, pill badges, tabular figures.
  *
- * Selectors are scoped under `.wrap.sp` / `.wrap.sp-ab` so their specificity
+ * The palette is AI Sooq's, adapted for a light surface — wp-admin is a light
+ * UI, so the brand's night/navy ground can't be the page. Navy becomes the
+ * primary (14.6:1 on white) and gold stays the single accent, used as a fill
+ * rather than as text so it never has to carry contrast on its own.
+ *
+ * Selectors are scoped under `.wrap.aisooq` / `.wrap.aisooq-ab` so their specificity
  * (0,2,x) beats each page's inline base rules (0,1,x) regardless of source
  * order — this restyles both pages without rewriting their markup, and is the
  * single source of truth for the plugin's admin look.
  */
 
-/* ── Design tokens (light) — mirror of the platform's Bazaar Console ─────── */
-.wrap.sp,
-.wrap.sp-ab {
-	--pri: #0c6e63;          /* petrol teal */
-	--pri-d: #0a5a51;        /* teal, hover/active */
-	--pri-fg: #fefdf9;       /* warm white on teal */
-	--hl: #e0891b;           /* marigold highlight */
-	--hl-d: #c8760f;
+/* ── Design tokens (light) — AI Sooq on a light admin surface ───────────── */
+.wrap.aisooq,
+.wrap.aisooq-ab {
+	--pri: #08294C;          /* AI Sooq navy */
+	--pri-d: #04162B;        /* night — hover/active */
+	--pri-fg: #EDF3FA;       /* paper on navy */
+	--hl: #FDC137;           /* AI Sooq gold — the only accent */
+	--hl-d: #E0A81F;
 	--ok: #2f8055;
 	--warn: #a8690a;
 	--err: #c33a29;
 	--info: #1f6f9c;
-	--bd: #e4e0d6;           /* warm border */
-	--muted: #5f6b67;
-	--fg: #17211e;
-	--bg: #f7f5ef;
-	--card: #fffef9;
+	--bd: #dce3ec;           /* cool border */
+	--muted: #5a6b80;        /* 5.1:1 on --bg */
+	--fg: #0f1d2e;
+	--bg: #f4f7fb;
+	--card: #ffffff;
 	--radius: 12px;
 	--radius-sm: 8px;
-	--sh-card: 0 1px 2px rgba(23, 40, 36, .06), 0 1px 1px rgba(23, 40, 36, .04);
-	--sh-elev: 0 8px 24px -8px rgba(23, 40, 36, .16), 0 3px 8px -4px rgba(23, 40, 36, .08);
+	--sh-card: 0 1px 2px rgba(8, 41, 76, .07), 0 1px 1px rgba(8, 41, 76, .04);
+	--sh-elev: 0 8px 24px -8px rgba(8, 41, 76, .18), 0 3px 8px -4px rgba(8, 41, 76, .09);
 	/* Repaint WordPress's own admin accent within our screens — recolours
 	   checkbox/radio checks, focus rings and any theme-var-driven control to
-	   teal in one shot. */
-	--wp-admin-theme-color: #0c6e63;
-	--wp-admin-theme-color-darker-10: #0a5a51;
-	--wp-admin-theme-color-darker-20: #084c44;
+	   navy in one shot. */
+	--wp-admin-theme-color: #08294C;
+	--wp-admin-theme-color-darker-10: #061F3A;
+	--wp-admin-theme-color-darker-20: #04162B;
 }
 
 /* Links default to WP blue — bring them onto the teal brand (buttons + tabs
    keep their own styling). */
-.wrap.sp a:not(.button):not(.sp-tab):not(.nav-tab):not(.on),
-.wrap.sp-ab a:not(.button):not(.sp-tab):not(.nav-tab):not(.on),
-.wrap.sp .button-link,
-.wrap.sp-ab .button-link {
+.wrap.aisooq a:not(.button):not(.aisooq-tab):not(.nav-tab):not(.on),
+.wrap.aisooq-ab a:not(.button):not(.aisooq-tab):not(.nav-tab):not(.on),
+.wrap.aisooq .button-link,
+.wrap.aisooq-ab .button-link {
 	color: var(--pri);
 }
-.wrap.sp a:not(.button):not(.sp-tab):not(.on):hover,
-.wrap.sp-ab a:not(.button):not(.sp-tab):not(.on):hover,
-.wrap.sp .button-link:hover,
-.wrap.sp-ab .button-link:hover {
+.wrap.aisooq a:not(.button):not(.aisooq-tab):not(.on):hover,
+.wrap.aisooq-ab a:not(.button):not(.aisooq-tab):not(.on):hover,
+.wrap.aisooq .button-link:hover,
+.wrap.aisooq-ab .button-link:hover {
 	color: var(--pri-d);
 }
 
 /* Active filter pill: keep its white-on-teal label (its own inline rule sets
    the teal fill) — the link recolour above intentionally skips `.on`. */
-.wrap.sp-ab .sp-filters a.on {
+.wrap.aisooq-ab .aisooq-filters a.on {
 	color: #fff;
 }
 
 /* Native checkboxes/radios adopt the brand even where WP doesn't use its var. */
-.wrap.sp input[type="checkbox"],
-.wrap.sp input[type="radio"],
-.wrap.sp-ab input[type="checkbox"],
-.wrap.sp-ab input[type="radio"] {
+.wrap.aisooq input[type="checkbox"],
+.wrap.aisooq input[type="radio"],
+.wrap.aisooq-ab input[type="checkbox"],
+.wrap.aisooq-ab input[type="radio"] {
 	accent-color: var(--pri);
 }
-.wrap.sp input[type="checkbox"]:checked,
-.wrap.sp-ab input[type="checkbox"]:checked {
+.wrap.aisooq input[type="checkbox"]:checked,
+.wrap.aisooq-ab input[type="checkbox"]:checked {
 	background: var(--pri);
 	border-color: var(--pri-d);
 }
-.wrap.sp input[type="checkbox"]:checked::before,
-.wrap.sp-ab input[type="checkbox"]:checked::before {
+.wrap.aisooq input[type="checkbox"]:checked::before,
+.wrap.aisooq-ab input[type="checkbox"]:checked::before {
 	color: #fff;
 }
 
 /* Page canvas + base type */
-.wrap.sp,
-.wrap.sp-ab {
+.wrap.aisooq,
+.wrap.aisooq-ab {
 	color: var(--fg);
 	-webkit-font-smoothing: antialiased;
 }
-body.toplevel_page_shopify-pulse-connector,
-body[class*="page_shopify-pulse-abandoned"] {
+body.toplevel_page_aisooq-connector,
+body[class*="page_aisooq-abandoned"] {
 	background: var(--bg);
 }
 
 /* ── Hero ───────────────────────────────────────────────────────────────── */
-.wrap.sp .sp-hero,
-.wrap.sp-ab .sp-hero {
+.wrap.aisooq .aisooq-hero,
+.wrap.aisooq-ab .aisooq-hero {
 	background: var(--card);
 	border: 1px solid var(--bd);
 	border-radius: var(--radius);
@@ -100,32 +105,32 @@ body[class*="page_shopify-pulse-abandoned"] {
 	position: relative;
 	overflow: hidden;
 }
-.wrap.sp .sp-hero::before,
-.wrap.sp-ab .sp-hero::before {
+.wrap.aisooq .aisooq-hero::before,
+.wrap.aisooq-ab .aisooq-hero::before {
 	content: "";
 	position: absolute;
 	inset: 0 auto 0 0;
 	width: 4px;
 	background: linear-gradient(var(--pri), var(--hl));
 }
-.wrap.sp .sp-hero__title,
-.wrap.sp-ab .sp-hero__title,
-.wrap.sp-ab h1 {
+.wrap.aisooq .aisooq-hero__title,
+.wrap.aisooq-ab .aisooq-hero__title,
+.wrap.aisooq-ab h1 {
 	color: var(--fg);
 	letter-spacing: -.01em;
 }
 
 /* ── Cards ──────────────────────────────────────────────────────────────── */
-.wrap.sp .sp-card,
-.wrap.sp-ab .sp-card,
-.wrap.sp-ab .sp-panel {
+.wrap.aisooq .aisooq-card,
+.wrap.aisooq-ab .aisooq-card,
+.wrap.aisooq-ab .aisooq-panel {
 	background: var(--card);
 	border: 1px solid var(--bd);
 	border-radius: var(--radius);
 	box-shadow: var(--sh-card);
 	overflow: hidden;
 }
-.wrap.sp .sp-card__head {
+.wrap.aisooq .aisooq-card__head {
 	display: flex;
 	align-items: center;
 	gap: 8px;
@@ -136,82 +141,82 @@ body[class*="page_shopify-pulse-abandoned"] {
 	background: linear-gradient(0deg, rgba(12, 110, 99, .015), rgba(12, 110, 99, .05));
 	border-bottom: 1px solid var(--bd);
 }
-.wrap.sp .sp-card__head .dashicons {
+.wrap.aisooq .aisooq-card__head .dashicons {
 	color: var(--pri);
 }
-.wrap.sp .sp-card__body {
+.wrap.aisooq .aisooq-card__body {
 	padding: 16px 18px;
 }
 
 /* ── Buttons ────────────────────────────────────────────────────────────── */
-.wrap.sp .button,
-.wrap.sp-ab .button {
+.wrap.aisooq .button,
+.wrap.aisooq-ab .button {
 	border-radius: var(--radius-sm);
 	border-color: var(--bd);
 	min-height: 34px;
 	font-weight: 550;
 }
-.wrap.sp .button-primary,
-.wrap.sp-ab .button-primary,
-.wrap.sp .sp-btn-primary {
+.wrap.aisooq .button-primary,
+.wrap.aisooq-ab .button-primary,
+.wrap.aisooq .aisooq-btn-primary {
 	background: var(--pri);
 	border-color: var(--pri-d);
 	color: var(--pri-fg);
 	text-shadow: none;
 	box-shadow: 0 1px 0 rgba(23, 40, 36, .12);
 }
-.wrap.sp .button-primary:hover,
-.wrap.sp-ab .button-primary:hover,
-.wrap.sp .button-primary:focus {
+.wrap.aisooq .button-primary:hover,
+.wrap.aisooq-ab .button-primary:hover,
+.wrap.aisooq .button-primary:focus {
 	background: var(--pri-d);
 	border-color: var(--pri-d);
 	color: var(--pri-fg);
 }
-.wrap.sp .button:focus-visible,
-.wrap.sp-ab .button:focus-visible,
-.wrap.sp a:focus-visible,
-.wrap.sp-ab a:focus-visible {
+.wrap.aisooq .button:focus-visible,
+.wrap.aisooq-ab .button:focus-visible,
+.wrap.aisooq a:focus-visible,
+.wrap.aisooq-ab a:focus-visible {
 	outline: 2px solid var(--pri);
 	outline-offset: 2px;
 	box-shadow: none;
 }
 
 /* ── Inputs ─────────────────────────────────────────────────────────────── */
-.wrap.sp input[type="text"],
-.wrap.sp input[type="url"],
-.wrap.sp input[type="number"],
-.wrap.sp input[type="password"],
-.wrap.sp input[type="search"],
-.wrap.sp select,
-.wrap.sp textarea,
-.wrap.sp-ab input[type="text"],
-.wrap.sp-ab input[type="search"],
-.wrap.sp-ab input[type="date"],
-.wrap.sp-ab select {
+.wrap.aisooq input[type="text"],
+.wrap.aisooq input[type="url"],
+.wrap.aisooq input[type="number"],
+.wrap.aisooq input[type="password"],
+.wrap.aisooq input[type="search"],
+.wrap.aisooq select,
+.wrap.aisooq textarea,
+.wrap.aisooq-ab input[type="text"],
+.wrap.aisooq-ab input[type="search"],
+.wrap.aisooq-ab input[type="date"],
+.wrap.aisooq-ab select {
 	border-radius: var(--radius-sm);
 	border-color: var(--bd);
 	background: #fff;
 	color: var(--fg);
 }
-.wrap.sp input:focus,
-.wrap.sp select:focus,
-.wrap.sp textarea:focus,
-.wrap.sp-ab input:focus,
-.wrap.sp-ab select:focus {
+.wrap.aisooq input:focus,
+.wrap.aisooq select:focus,
+.wrap.aisooq textarea:focus,
+.wrap.aisooq-ab input:focus,
+.wrap.aisooq-ab select:focus {
 	border-color: var(--pri);
 	box-shadow: 0 0 0 2px rgba(12, 110, 99, .18);
 	outline: none;
 }
-.wrap.sp .sp-field > label.h,
-.wrap.sp .sp-field label.h {
+.wrap.aisooq .aisooq-field > label.h,
+.wrap.aisooq .aisooq-field label.h {
 	color: var(--fg);
 	font-weight: 600;
 }
 
 /* ── Badges / pills ─────────────────────────────────────────────────────── */
-.wrap.sp .sp-badge,
-.wrap.sp-ab .sp-badge,
-.wrap.sp .sp-act-badge {
+.wrap.aisooq .aisooq-badge,
+.wrap.aisooq-ab .aisooq-badge,
+.wrap.aisooq .aisooq-act-badge {
 	border-radius: 999px;
 	font-weight: 600;
 	font-size: 11.5px;
@@ -219,51 +224,51 @@ body[class*="page_shopify-pulse-abandoned"] {
 	line-height: 1.7;
 	letter-spacing: .01em;
 }
-.wrap.sp-ab .sp-badge.ok { background: #e7f3ec; color: #216b45; }
-.wrap.sp-ab .sp-badge.warn { background: #fbf0dd; color: #97620a; }
-.wrap.sp-ab .sp-badge.err { background: #fbe9e6; color: #a5301f; }
-.wrap.sp-ab .sp-badge.info { background: #e4eff5; color: #1a5c82; }
-.wrap.sp-ab .sp-badge.muted { background: #efece4; color: #5f6b67; }
+.wrap.aisooq-ab .aisooq-badge.ok { background: #e7f3ec; color: #216b45; }
+.wrap.aisooq-ab .aisooq-badge.warn { background: #fbf0dd; color: #97620a; }
+.wrap.aisooq-ab .aisooq-badge.err { background: #fbe9e6; color: #a5301f; }
+.wrap.aisooq-ab .aisooq-badge.info { background: #e4eff5; color: #1a5c82; }
+.wrap.aisooq-ab .aisooq-badge.muted { background: #e8edf4; color: #5a6b80; }
 
 /* ── KPI tiles ──────────────────────────────────────────────────────────── */
-.wrap.sp .sp-kpi,
-.wrap.sp-ab .sp-kpi {
+.wrap.aisooq .aisooq-kpi,
+.wrap.aisooq-ab .aisooq-kpi {
 	background: var(--card);
 	border: 1px solid var(--bd);
 	border-radius: var(--radius);
 	box-shadow: var(--sh-card);
 }
-.wrap.sp .sp-kpi__value,
-.wrap.sp-ab .sp-kpi__value {
+.wrap.aisooq .aisooq-kpi__value,
+.wrap.aisooq-ab .aisooq-kpi__value {
 	font-variant-numeric: tabular-nums;
 	letter-spacing: -.02em;
 	color: var(--fg);
 }
-.wrap.sp-ab .sp-kpi.ok { border-left: 3px solid var(--ok); }
-.wrap.sp-ab .sp-kpi.warn { border-left: 3px solid var(--hl); }
-.wrap.sp-ab .sp-kpi.info { border-left: 3px solid var(--info); }
-.wrap.sp-ab .sp-kpi.err { border-left: 3px solid var(--err); }
-.wrap.sp-ab .sp-kpi.muted { border-left: 3px solid var(--muted); }
+.wrap.aisooq-ab .aisooq-kpi.ok { border-left: 3px solid var(--ok); }
+.wrap.aisooq-ab .aisooq-kpi.warn { border-left: 3px solid var(--hl); }
+.wrap.aisooq-ab .aisooq-kpi.info { border-left: 3px solid var(--info); }
+.wrap.aisooq-ab .aisooq-kpi.err { border-left: 3px solid var(--err); }
+.wrap.aisooq-ab .aisooq-kpi.muted { border-left: 3px solid var(--muted); }
 
 /* ── Tabs (settings) ────────────────────────────────────────────────────── */
-.wrap.sp .sp-tab.is-active,
-.wrap.sp .sp-tabnav a.is-active,
-.wrap.sp .nav-tab-active {
+.wrap.aisooq .aisooq-tab.is-active,
+.wrap.aisooq .aisooq-tabnav a.is-active,
+.wrap.aisooq .nav-tab-active {
 	color: var(--pri);
 	border-bottom-color: var(--pri);
 }
 
 /* ── Connection panel / permissions (settings) ─────────────────────────── */
-.wrap.sp .sp-conn {
+.wrap.aisooq .aisooq-conn {
 	background: linear-gradient(180deg, rgba(12, 110, 99, .04), rgba(12, 110, 99, 0));
 	border: 1px solid var(--bd);
 	border-radius: var(--radius);
 }
-.wrap.sp .sp-perms__h { color: var(--muted); }
-.wrap.sp .sp-act-badge.other { background: #efece4; color: var(--muted); }
+.wrap.aisooq .aisooq-perms__h { color: var(--muted); }
+.wrap.aisooq .aisooq-act-badge.other { background: #efece4; color: var(--muted); }
 
 /* ── Data table (abandoned) ─────────────────────────────────────────────── */
-.wrap.sp-ab .sp-tbl {
+.wrap.aisooq-ab .aisooq-tbl {
 	border: 1px solid var(--bd);
 	border-radius: var(--radius);
 	overflow: hidden;
@@ -271,38 +276,38 @@ body[class*="page_shopify-pulse-abandoned"] {
 	border-collapse: separate;
 	border-spacing: 0;
 }
-.wrap.sp-ab .sp-tbl th {
+.wrap.aisooq-ab .aisooq-tbl th {
 	background: #f4f1e9;
 	color: var(--muted);
 	font-weight: 650;
 	border-bottom: 1px solid var(--bd);
 }
-.wrap.sp-ab .sp-tbl td { border-bottom: 1px solid var(--bd); }
-.wrap.sp-ab .sp-tbl tbody tr:hover { background: rgba(12, 110, 99, .035); }
-.wrap.sp-ab .sp-tbl tbody tr:last-child td { border-bottom: 0; }
+.wrap.aisooq-ab .aisooq-tbl td { border-bottom: 1px solid var(--bd); }
+.wrap.aisooq-ab .aisooq-tbl tbody tr:hover { background: rgba(12, 110, 99, .035); }
+.wrap.aisooq-ab .aisooq-tbl tbody tr:last-child td { border-bottom: 0; }
 
 /* ── Row action menu (abandoned) ────────────────────────────────────────── */
-.wrap.sp-ab .sp-menu {
+.wrap.aisooq-ab .aisooq-menu {
 	border: 1px solid var(--bd);
 	border-radius: var(--radius);
 	box-shadow: var(--sh-elev);
 	overflow: hidden;
 }
-.wrap.sp-ab .sp-act:hover { background: rgba(12, 110, 99, .06); }
-.wrap.sp-ab .sp-primary,
-.wrap.sp-ab .sp-primary .dashicons { color: var(--pri); }
-.wrap.sp-ab .sp-danger,
-.wrap.sp-ab .sp-danger .dashicons { color: var(--err); }
+.wrap.aisooq-ab .aisooq-act:hover { background: rgba(12, 110, 99, .06); }
+.wrap.aisooq-ab .aisooq-primary,
+.wrap.aisooq-ab .aisooq-primary .dashicons { color: var(--pri); }
+.wrap.aisooq-ab .aisooq-danger,
+.wrap.aisooq-ab .aisooq-danger .dashicons { color: var(--err); }
 
 /* ── Details modal (abandoned) ──────────────────────────────────────────── */
-.wrap.sp-ab .sp-dl,
-.wrap.sp-ab .sp-modal__box {
+.wrap.aisooq-ab .aisooq-dl,
+.wrap.aisooq-ab .aisooq-modal__box {
 	border-radius: var(--radius);
 	box-shadow: var(--sh-elev);
 }
 
 /* ── Toolbar (abandoned) ────────────────────────────────────────────────── */
-.wrap.sp-ab .sp-toolbar {
+.wrap.aisooq-ab .aisooq-toolbar {
 	background: var(--card);
 	border: 1px solid var(--bd);
 	border-radius: var(--radius);
@@ -311,8 +316,8 @@ body[class*="page_shopify-pulse-abandoned"] {
 
 /* ── Motion / a11y ──────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-	.wrap.sp *,
-	.wrap.sp-ab * {
+	.wrap.aisooq *,
+	.wrap.aisooq-ab * {
 		animation-duration: .001ms !important;
 		transition-duration: .001ms !important;
 	}

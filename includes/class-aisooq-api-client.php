@@ -1,6 +1,6 @@
 <?php
 /**
- * HTTP client for the Shopify Pulse platform. Owns the OAuth client_credentials token
+ * HTTP client for the AI Sooq platform. Owns the OAuth client_credentials token
  * lifecycle (mint, cache, refresh, single retry on 401) and attaches the
  * required X-Store-Sid tenant header to every call.
  *
@@ -10,24 +10,24 @@
  *   - Every request carries `Authorization: Bearer wat_…` + `X-Store-Sid`.
  *   - The public pixel endpoint needs only `X-Store-Sid` (public_post()).
  *
- * @package ShopifyPulse
+ * @package AISooq
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class Shopify_Pulse_Api_Client {
+class AI_Sooq_Api_Client {
 
 	const TIMEOUT = 20;
 
-	/** @var Shopify_Pulse_Settings */
+	/** @var AI_Sooq_Settings */
 	private $settings;
 
-	/** @var Shopify_Pulse_Logger */
+	/** @var AI_Sooq_Logger */
 	private $logger;
 
-	public function __construct( Shopify_Pulse_Settings $settings, Shopify_Pulse_Logger $logger ) {
+	public function __construct( AI_Sooq_Settings $settings, AI_Sooq_Logger $logger ) {
 		$this->settings = $settings;
 		$this->logger   = $logger;
 	}
@@ -55,13 +55,13 @@ class Shopify_Pulse_Api_Client {
 	 */
 	public function get_token( $force = false ) {
 		if ( ! $force ) {
-			$cached = get_transient( SHOPIFY_PULSE_TOKEN_TRANSIENT );
+			$cached = get_transient( AISOOQ_TOKEN_TRANSIENT );
 			if ( is_string( $cached ) && '' !== $cached ) {
 				return $cached;
 			}
 		}
 		if ( ! $this->settings->is_configured() ) {
-			return new WP_Error( 'sp_not_configured', __( 'Connector is not configured (API base, SID, client id/secret required).', 'shopify-pulse-connector' ) );
+			return new WP_Error( 'aisooq_not_configured', __( 'Connector is not configured (API base, SID, client id/secret required).', 'aisooq-connector' ) );
 		}
 
 		$response = wp_remote_post(
@@ -100,13 +100,13 @@ class Shopify_Pulse_Api_Client {
 		if ( $code < 200 || $code >= 300 || empty( $body['access_token'] ) ) {
 			$msg = isset( $body['message'] ) ? ( is_array( $body['message'] ) ? implode( '; ', $body['message'] ) : $body['message'] ) : 'HTTP ' . $code;
 			$this->logger->error( 'Token mint rejected: ' . $msg );
-			return new WP_Error( 'sp_token_failed', $msg );
+			return new WP_Error( 'aisooq_token_failed', $msg );
 		}
 
 		$token   = (string) $body['access_token'];
 		$expires = isset( $body['expires_in'] ) ? (int) $body['expires_in'] : 3600;
 		// Refresh a minute early so an in-flight request never races expiry.
-		set_transient( SHOPIFY_PULSE_TOKEN_TRANSIENT, $token, max( 60, $expires - 60 ) );
+		set_transient( AISOOQ_TOKEN_TRANSIENT, $token, max( 60, $expires - 60 ) );
 		$this->logger->debug( 'Minted access token (expires_in=' . $expires . ')' );
 		return $token;
 	}
@@ -125,7 +125,7 @@ class Shopify_Pulse_Api_Client {
 	 */
 	private function send( $base, $method, $path, $body, $auth, $retry = true ) {
 		if ( '' === $this->settings->get_sid() ) {
-			return new WP_Error( 'sp_not_configured', __( 'Missing Store SID.', 'shopify-pulse-connector' ) );
+			return new WP_Error( 'aisooq_not_configured', __( 'Missing Store SID.', 'aisooq-connector' ) );
 		}
 		$headers = array(
 			'Content-Type' => 'application/json',
@@ -158,7 +158,7 @@ class Shopify_Pulse_Api_Client {
 
 		if ( 401 === $code && $auth && $retry ) {
 			// Token expired or app re-enabled — mint fresh and retry once.
-			delete_transient( SHOPIFY_PULSE_TOKEN_TRANSIENT );
+			delete_transient( AISOOQ_TOKEN_TRANSIENT );
 			$this->get_token( true );
 			return $this->send( $base, $method, $path, $body, $auth, false );
 		}
@@ -169,7 +169,7 @@ class Shopify_Pulse_Api_Client {
 				? ( is_array( $decoded['message'] ) ? implode( '; ', $decoded['message'] ) : $decoded['message'] )
 				: 'HTTP ' . $code;
 			$this->logger->error( $method . ' ' . $path . ' -> ' . $msg );
-			return new WP_Error( 'sp_http_' . $code, $msg, array( 'status' => $code, 'body' => $decoded ) );
+			return new WP_Error( 'aisooq_http_' . $code, $msg, array( 'status' => $code, 'body' => $decoded ) );
 		}
 		return is_array( $decoded ) ? $decoded : array();
 	}

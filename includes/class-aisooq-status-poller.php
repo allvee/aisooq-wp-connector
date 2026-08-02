@@ -4,16 +4,16 @@
  * from the platform (the operator manages fulfillment/cancellation there).
  * Off by default — enabled via "allow_status_writeback".
  *
- * @package ShopifyPulse
+ * @package AISooq
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class Shopify_Pulse_Status_Poller {
+class AI_Sooq_Status_Poller {
 
-	const CURSOR_OPTION = 'shopify_pulse_poll_cursor';
+	const CURSOR_OPTION = 'aisooq_poll_cursor';
 	const PAGE_SIZE     = 100;
 
 	/**
@@ -24,14 +24,14 @@ class Shopify_Pulse_Status_Poller {
 	 */
 	private static $writing_back = false;
 
-	/** @var Shopify_Pulse_Settings */
+	/** @var AI_Sooq_Settings */
 	private $settings;
-	/** @var Shopify_Pulse_Api_Client */
+	/** @var AI_Sooq_Api_Client */
 	private $api;
-	/** @var Shopify_Pulse_Logger */
+	/** @var AI_Sooq_Logger */
 	private $logger;
 
-	public function __construct( Shopify_Pulse_Settings $settings, Shopify_Pulse_Api_Client $api, Shopify_Pulse_Logger $logger ) {
+	public function __construct( AI_Sooq_Settings $settings, AI_Sooq_Api_Client $api, AI_Sooq_Logger $logger ) {
 		$this->settings = $settings;
 		$this->api      = $api;
 		$this->logger   = $logger;
@@ -42,7 +42,7 @@ class Shopify_Pulse_Status_Poller {
 	}
 
 	public function register() {
-		add_action( SHOPIFY_PULSE_POLL_CRON, array( $this, 'poll' ) );
+		add_action( AISOOQ_POLL_CRON, array( $this, 'poll' ) );
 	}
 
 	public function poll() {
@@ -70,7 +70,7 @@ class Shopify_Pulse_Status_Poller {
 				$target = $this->map_status( $o );
 				if ( $wc && $target && $wc->get_status() !== $target && $this->should_apply( $wc->get_status(), $target ) ) {
 					self::$writing_back = true;
-					$wc->update_status( $target, __( 'Updated from Shopify Pulse.', 'shopify-pulse-connector' ) );
+					$wc->update_status( $target, __( 'Updated from AI Sooq.', 'aisooq-connector' ) );
 					self::$writing_back = false;
 					$this->logger->debug( 'Order ' . $ext . ' status set to ' . $target . ' from platform.' );
 				}

@@ -1,20 +1,20 @@
-=== Shopify Pulse Connector ===
-Contributors: shopifypulse
+=== AI Sooq Connector ===
+Contributors: aisooq
 Tags: woocommerce, orders, analytics, sync, abandoned cart
 Requires at least: 5.8
 Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 1.9.0
+Stable tag: 2.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Mirror WooCommerce orders, incomplete/abandoned carts and analytics into your Shopify Pulse store and manage them from the platform.
+Mirror WooCommerce orders, incomplete/abandoned carts and analytics into your AI Sooq store and manage them from the platform.
 
 == Description ==
 
-Shopify Pulse Connector links any WooCommerce store to a single Shopify Pulse
+AI Sooq Connector links any WooCommerce store to a single AI Sooq
 store using an OAuth app credential. It pushes:
 
 * **Orders** — every order (paid and unpaid/incomplete) is mirrored as a native
@@ -35,7 +35,7 @@ WooCommerce order status from the platform.
 == Installation ==
 
 1. Upload and activate the plugin (WooCommerce must be active).
-2. Open **Shopify Pulse** in the admin menu.
+2. Open **AI Sooq** in the admin menu.
 3. Enter the Platform API base URL (host only), Store SID, OAuth Client ID and
    Client Secret. Register the OAuth app on the platform with scopes for the
    features you enable (orders, customers, products, brands, categories,
@@ -50,12 +50,19 @@ WooCommerce order status from the platform.
 No. Order lines are pushed as free-text (title/sku/price), so no mapping is
 required and ingestion never affects platform inventory.
 
-= Can one plugin connect to multiple Shopify Pulse stores? =
+= Can one plugin connect to multiple AI Sooq stores? =
 
-No — one WooCommerce site connects to one Shopify Pulse store (one OAuth app = one
+No — one WooCommerce site connects to one AI Sooq store (one OAuth app = one
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 2.0.0 =
+* **Renamed to AI Sooq Connector.** The plugin is now branded for the AI Sooq platform throughout — plugin name, admin screens, logos and documentation. This is a full rename: the plugin folder, its classes, constants, option keys, order meta, database table, cron hooks and asset files all move from the `shopify-pulse` / `sp_` namespace to `aisooq`.
+* **Your data comes with you.** On first load after the update the plugin migrates settings, connection status, synced-order meta and the abandoned-cart table from the old names automatically. Installs still on the original "Wafi Commerce Connector" naming are migrated too. Nothing needs to be re-entered and no synced order loses its link to the platform.
+* **Upgrade note — the plugin must be reactivated once.** Because the folder name changed, WordPress sees this as a new plugin rather than an update to the old one. Install 2.0.0, activate it, then delete the old "Shopify Pulse Connector" entry from the Plugins screen. Delete it *after* activating the new one so the migration runs first. Do not use "Delete" on the old plugin before activating 2.0.0 — that would run its uninstall routine and drop the abandoned-cart table.
+* Visitor attribution survives the rename: the tracker reads its previous cookies and carries first-touch, last-touch and visit count forward, so returning visitors are not counted as brand-new traffic.
+* The `shopify_pulse_order_payload` filter still fires for sites that hooked it, alongside the new `aisooq_order_payload`. The old name is deprecated and will be removed in 3.0.
 
 = 1.9.0 =
 * Abandoned carts now carry their campaign/social attribution to the platform. When a cart is captured, its first-touch source — utm_source/medium/campaign/term/content, referrer, landing path and traffic source — is snapshotted and pushed with the cart, so a recovered cart shows which channel/campaign it came from (previously only completed orders carried attribution). Existing installs get the new columns automatically on update.
@@ -68,8 +75,8 @@ store). Run separate sites for separate stores.
 * Redesign polish (verified in a live WordPress admin): links (Verify connection, per-entity Sync, Apply/Clear) and checkboxes/radios now use the teal brand accent instead of WordPress blue, so both screens read as one cohesive palette end to end.
 
 = 1.8.0 =
-* Redesigned admin UI to match the platform ("Bazaar Console"): both the Settings and Abandoned carts screens now share one design system — petrol-teal primary + marigold highlights on a warm off-white surface, softly elevated 12px cards, pill-shaped status badges, tabular figures in the KPIs and table, teal primary buttons, and clear teal focus rings on every control. The look is centralised in one stylesheet (assets/css/sp-admin.css) instead of being duplicated per page.
-* New menu icon treatment: the Shopify Pulse admin-menu icon is white at rest and turns marigold when the menu is open/active, matching the platform accent.
+* Redesigned admin UI to match the platform ("Bazaar Console"): both the Settings and Abandoned carts screens now share one design system — petrol-teal primary + marigold highlights on a warm off-white surface, softly elevated 12px cards, pill-shaped status badges, tabular figures in the KPIs and table, teal primary buttons, and clear teal focus rings on every control. The look is centralised in one stylesheet (assets/css/aisooq-admin.css) instead of being duplicated per page.
+* New menu icon treatment: the AI Sooq admin-menu icon is white at rest and turns marigold when the menu is open/active, matching the platform accent.
 
 = 1.7.7 =
 * Fraud layers now block in the intended order at checkout. The courier delivery-ratio gate used to run before the basic checks; now the checkout is screened in ascending order and stops at the first failure — Layer 1 (name / address / mobile) → Layer 2 (IP rate limit) → Layer 3 (courier ratio) — so the shopper always sees the lowest-numbered reason first in the popup. A fake name/address is caught before the courier check ever runs.
@@ -89,7 +96,7 @@ store). Run separate sites for separate stores.
 * Blocked-checkout popup messages are now fully editable and Bangla by default. Under Settings → Checkout messages you can set the exact text a shopper sees for each block reason — courier delivery gate, unverified contact details, too-many-attempts, a generic fallback, and the "need help?" line above the Call / WhatsApp buttons. The courier message supports {ratio} and {parcels} tokens. Leave a box blank to keep the built-in default. Ships with sensible Bangla defaults for BD/COD stores; write English or both if you prefer.
 
 = 1.7.2 =
-* Critical fix: the plugin can no longer block a WooCommerce checkout. Every hook that runs while placing an order (fraud/courier screen, abandoned-cart capture + convert bookkeeping, attribution, order-sync scheduling) is now wrapped so any unexpected error is logged and the order still goes through. If you saw "There was an error processing your order" after installing, update to this version. Check WooCommerce → Status → Logs (source: shopify-pulse) for the underlying cause.
+* Critical fix: the plugin can no longer block a WooCommerce checkout. Every hook that runs while placing an order (fraud/courier screen, abandoned-cart capture + convert bookkeeping, attribution, order-sync scheduling) is now wrapped so any unexpected error is logged and the order still goes through. If you saw "There was an error processing your order" after installing, update to this version. Check WooCommerce → Status → Logs (source: aisooq) for the underlying cause.
 
 = 1.7.1 =
 * Fix: the connected store's name + permissions now appear automatically on the settings page (back-filled from the platform once), instead of only after a manual "Verify connection" — so a connection made before this info existed shows it without re-verifying.
@@ -103,7 +110,7 @@ store). Run separate sites for separate stores.
 
 = 1.6.0 =
 * Abandoned carts screen redesigned for a cleaner, fully responsive layout — equal-height KPIs, aligned tables, and a modernized details popup with product thumbnails, a matched WooCommerce customer, timestamps, status, and cart totals.
-* Menu: Settings and Abandoned carts now show icons in the Shopify Pulse admin menu.
+* Menu: Settings and Abandoned carts now show icons in the AI Sooq admin menu.
 * Auto-generate missing SKUs: a product/variant with no SKU gets a unique one (SP-<id>) written to WooCommerce at sync time so the platform can map it (new toggle under Two-way sync → Products, on by default).
 
 = 1.5.2 =
@@ -132,20 +139,20 @@ store). Run separate sites for separate stores.
 
 = 1.3.0 =
 * Abandoned carts now capture the shopper's name and full billing/shipping address at the checkout step and push them to the platform, so a recovered cart arrives with who + where (was phone-only).
-* New "Abandoned carts" admin screen under Shopify Pulse: recovery analytics (captured / open / pushed / recovered + value), a drop-off funnel, and a filtered cart list with per-row and bulk Resync. Resync re-pushes without ever duplicating a cart on the platform (upsert on the stable cart fingerprint).
+* New "Abandoned carts" admin screen under AI Sooq: recovery analytics (captured / open / pushed / recovered + value), a drop-off funnel, and a filtered cart list with per-row and bulk Resync. Resync re-pushes without ever duplicating a cart on the platform (upsert on the stable cart fingerprint).
 * Recovered carts are now retained (marked, not deleted) for 30 days to power the recovery-rate analytics, then garbage-collected.
 
 = 1.2.5 =
 * Fix: token now requests the app's full registered scope set instead of a hardcoded orders-only scope, so product/customer/catalog sync no longer 403s with "You don't have permission to do that". Cached token is dropped on upgrade so the fix applies immediately.
 
 = 1.2.4 =
-* Products list: a Shopify Pulse column showing Synced, or a per-product Sync button.
+* Products list: a AI Sooq column showing Synced, or a per-product Sync button.
 
 = 1.2.3 =
-* Orders list: the Shopify Pulse column now sits right after the Status column.
+* Orders list: the AI Sooq column now sits right after the Status column.
 
 = 1.2.2 =
-* Orders list: a Shopify Pulse column showing Synced, or a per-order Sync
+* Orders list: a AI Sooq column showing Synced, or a per-order Sync
   button (works on both classic + HPOS order screens).
 
 = 1.2.1 =
@@ -153,7 +160,7 @@ store). Run separate sites for separate stores.
 * Proper WordPress admin-menu icon (tinted monochrome), correctly sized.
 
 = 1.2.0 =
-* Full internal rename to Shopify Pulse (code prefixes, slug, asset + cookie
+* Full internal rename to AI Sooq (code prefixes, slug, asset + cookie
   names). One-time data migration re-keys existing synced-order meta and
   renames the capture table, so no synced data is lost.
 

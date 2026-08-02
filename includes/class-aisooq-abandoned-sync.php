@@ -7,25 +7,25 @@
  * carts idle beyond the threshold to POST /connect/abandoned (free-text lines,
  * OAuth-guarded). Converted carts are dropped on checkout.
  *
- * @package ShopifyPulse
+ * @package AISooq
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class Shopify_Pulse_Abandoned_Sync {
+class AI_Sooq_Abandoned_Sync {
 
 	const SWEEP_BATCH = 25;
 
-	/** @var Shopify_Pulse_Settings */
+	/** @var AI_Sooq_Settings */
 	private $settings;
-	/** @var Shopify_Pulse_Api_Client */
+	/** @var AI_Sooq_Api_Client */
 	private $api;
-	/** @var Shopify_Pulse_Logger */
+	/** @var AI_Sooq_Logger */
 	private $logger;
 
-	public function __construct( Shopify_Pulse_Settings $settings, Shopify_Pulse_Api_Client $api, Shopify_Pulse_Logger $logger ) {
+	public function __construct( AI_Sooq_Settings $settings, AI_Sooq_Api_Client $api, AI_Sooq_Logger $logger ) {
 		$this->settings = $settings;
 		$this->api      = $api;
 		$this->logger   = $logger;
@@ -33,12 +33,12 @@ class Shopify_Pulse_Abandoned_Sync {
 
 	public static function table_name() {
 		global $wpdb;
-		return $wpdb->prefix . 'sp_abandoned_carts';
+		return $wpdb->prefix . 'aisooq_abandoned_carts';
 	}
 
 	/**
 	 * Snapshot the shopper's first-touch campaign/social attribution from the
-	 * front-end tracker cookie (sp_first, written by assets/js/sp-attr.js), so a
+	 * front-end tracker cookie (aisooq_first, written by assets/js/aisooq-attr.js), so a
 	 * captured cart records which channel/campaign it came from — the same
 	 * signal the order push carries. Returns the abandoned-table columns; the
 	 * flat UTM go in their own columns, the click ids (fbclid/gclid/ttclid) ride
@@ -48,10 +48,16 @@ class Shopify_Pulse_Abandoned_Sync {
 	 */
 	private function attribution_snapshot() {
 		$t = array();
-		if ( ! empty( $_COOKIE['sp_first'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-			$decoded = json_decode( wp_unslash( $_COOKIE['sp_first'] ), true ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended,WordPress.Security.ValidatedSanitizedInput
+		// Falls back to the pre-rename cookie names, so a visitor who landed
+		// before the update keeps their first-touch attribution.
+		foreach ( array( 'aisooq_first', 'sp_first', 'wafi_first' ) as $cookie ) {
+			if ( empty( $_COOKIE[ $cookie ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+				continue;
+			}
+			$decoded = json_decode( wp_unslash( $_COOKIE[ $cookie ] ), true ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended,WordPress.Security.ValidatedSanitizedInput
 			if ( is_array( $decoded ) ) {
 				$t = $decoded;
+				break;
 			}
 		}
 		$get = function ( $key, $max = 128 ) use ( $t ) {
@@ -86,8 +92,8 @@ class Shopify_Pulse_Abandoned_Sync {
 		add_action( 'woocommerce_checkout_order_processed', array( $this, 'mark_converted' ), 20 );
 		add_action( 'woocommerce_store_api_checkout_order_processed', array( $this, 'mark_converted_order' ), 20 );
 		// Sweep worker + instant per-cart push.
-		add_action( SHOPIFY_PULSE_ABANDONED_CRON, array( $this, 'sweep' ) );
-		add_action( SHOPIFY_PULSE_ABANDONED_PUSH_ACTION, array( $this, 'handle_push' ), 10, 1 );
+		add_action( AISOOQ_ABANDONED_CRON, array( $this, 'sweep' ) );
+		add_action( AISOOQ_ABANDONED_PUSH_ACTION, array( $this, 'handle_push' ), 10, 1 );
 	}
 
 	/**
@@ -169,7 +175,7 @@ class Shopify_Pulse_Abandoned_Sync {
 				// product_id lets the admin worklist filter carts by product and
 				// lets Convert re-add the exact product to the WooCommerce order.
 				'product_id' => $product ? $product->get_id() : null,
-				'title'      => $this->clamp( $product ? $product->get_name() : __( 'Item', 'shopify-pulse-connector' ), 255 ),
+				'title'      => $this->clamp( $product ? $product->get_name() : __( 'Item', 'aisooq-connector' ), 255 ),
 				'sku'        => ( $product && $product->get_sku() ) ? $this->clamp( $product->get_sku(), 64 ) : null,
 				'qty'        => max( 1, $qty ),
 				'price'      => max( 0, (float) $unit ),
@@ -274,7 +280,7 @@ class Shopify_Pulse_Abandoned_Sync {
 			}
 			$lines[] = array(
 				'product_id' => isset( $l['product_id'] ) ? (int) $l['product_id'] : null,
-				'title'      => isset( $l['title'] ) ? $this->clamp( sanitize_text_field( (string) $l['title'] ), 255 ) : __( 'Item', 'shopify-pulse-connector' ),
+				'title'      => isset( $l['title'] ) ? $this->clamp( sanitize_text_field( (string) $l['title'] ), 255 ) : __( 'Item', 'aisooq-connector' ),
 				'sku'        => ! empty( $l['sku'] ) ? $this->clamp( sanitize_text_field( (string) $l['sku'] ), 64 ) : null,
 				'qty'        => max( 1, isset( $l['qty'] ) ? (int) $l['qty'] : 1 ),
 				'price'      => isset( $l['price'] ) ? max( 0, (float) $l['price'] ) : 0.0,
@@ -439,7 +445,7 @@ class Shopify_Pulse_Abandoned_Sync {
 				if ( ! empty( $sid ) ) {
 					$order = wc_get_order( $order_id );
 					if ( $order ) {
-						$order->update_meta_data( '_sp_cart_fingerprint', hash( 'sha256', $sid . '|' . $session_key ) );
+						$order->update_meta_data( '_aisooq_cart_fingerprint', hash( 'sha256', $sid . '|' . $session_key ) );
 						$order->save();
 					}
 				}
@@ -553,7 +559,7 @@ class Shopify_Pulse_Abandoned_Sync {
 			}
 			$title = isset( $l['title'] ) ? $this->clamp( $l['title'], 255 ) : '';
 			if ( '' === $title ) {
-				$title = __( 'Item', 'shopify-pulse-connector' );
+				$title = __( 'Item', 'aisooq-connector' );
 			}
 			$line = array(
 				'title' => $title,
@@ -644,10 +650,10 @@ class Shopify_Pulse_Abandoned_Sync {
 			return;
 		}
 		if ( function_exists( 'as_has_scheduled_action' )
-			&& as_has_scheduled_action( SHOPIFY_PULSE_ABANDONED_PUSH_ACTION, array( $session_key ), SHOPIFY_PULSE_AS_GROUP ) ) {
+			&& as_has_scheduled_action( AISOOQ_ABANDONED_PUSH_ACTION, array( $session_key ), AISOOQ_AS_GROUP ) ) {
 			return;
 		}
-		as_enqueue_async_action( SHOPIFY_PULSE_ABANDONED_PUSH_ACTION, array( $session_key ), SHOPIFY_PULSE_AS_GROUP );
+		as_enqueue_async_action( AISOOQ_ABANDONED_PUSH_ACTION, array( $session_key ), AISOOQ_AS_GROUP );
 	}
 
 	/** Action Scheduler callback: push one session's cart now. */
@@ -767,18 +773,18 @@ class Shopify_Pulse_Abandoned_Sync {
 	 */
 	public function convert_to_wc_order( $session_key ) {
 		if ( ! function_exists( 'wc_create_order' ) ) {
-			return new WP_Error( 'sp_no_wc', __( 'WooCommerce is not active.', 'shopify-pulse-connector' ) );
+			return new WP_Error( 'aisooq_no_wc', __( 'WooCommerce is not active.', 'aisooq-connector' ) );
 		}
 		$row = $this->get_row( $session_key );
 		if ( ! $row ) {
-			return new WP_Error( 'sp_no_row', __( 'Cart not found.', 'shopify-pulse-connector' ) );
+			return new WP_Error( 'aisooq_no_row', __( 'Cart not found.', 'aisooq-connector' ) );
 		}
 		if ( 'converted' === $row->status && $row->wc_order_id ) {
 			return (int) $row->wc_order_id;
 		}
 		$lines = json_decode( (string) $row->cart_json, true );
 		if ( empty( $lines ) || ! is_array( $lines ) ) {
-			return new WP_Error( 'sp_empty_cart', __( 'This cart has no items to convert.', 'shopify-pulse-connector' ) );
+			return new WP_Error( 'aisooq_empty_cart', __( 'This cart has no items to convert.', 'aisooq-connector' ) );
 		}
 
 		$order = wc_create_order();
@@ -808,7 +814,7 @@ class Shopify_Pulse_Abandoned_Sync {
 				) );
 			} else {
 				$item = new WC_Order_Item_Fee();
-				$item->set_name( ! empty( $l['title'] ) ? (string) $l['title'] : __( 'Item', 'shopify-pulse-connector' ) );
+				$item->set_name( ! empty( $l['title'] ) ? (string) $l['title'] : __( 'Item', 'aisooq-connector' ) );
 				$item->set_amount( $price * $qty );
 				$item->set_total( $price * $qty );
 				$order->add_item( $item );
@@ -841,9 +847,9 @@ class Shopify_Pulse_Abandoned_Sync {
 		if ( $row->currency ) {
 			$order->set_currency( $row->currency );
 		}
-		$order->add_order_note( __( 'Created from an abandoned cart by Shopify Pulse.', 'shopify-pulse-connector' ) );
+		$order->add_order_note( __( 'Created from an abandoned cart by AI Sooq.', 'aisooq-connector' ) );
 		$order->calculate_totals();
-		$order->set_status( 'pending', __( 'Recovered from abandoned cart.', 'shopify-pulse-connector' ) );
+		$order->set_status( 'pending', __( 'Recovered from abandoned cart.', 'aisooq-connector' ) );
 		$order->save();
 
 		$order_id = $order->get_id();

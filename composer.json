@@ -1,6 +1,6 @@
 {
-  "name": "shopify-pulse/wp-connector",
-  "description": "Shopify Pulse Connector — WooCommerce integration test suite.",
+  "name": "aisooq/wp-connector",
+  "description": "AI Sooq Connector — WooCommerce integration test suite.",
   "type": "wordpress-plugin",
   "license": "GPL-2.0-or-later",
   "require": {

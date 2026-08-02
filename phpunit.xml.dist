@@ -8,7 +8,7 @@
   convertWarningsToExceptions="true"
 >
   <testsuites>
-    <testsuite name="Shopify Pulse Connector">
+    <testsuite name="AI Sooq Connector">
       <directory suffix=".php">./tests</directory>
       <exclude>./tests/bootstrap.php</exclude>
     </testsuite>

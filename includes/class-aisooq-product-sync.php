@@ -7,31 +7,31 @@
  * /connect/products, async and hash-gated. Stock is intentionally not sent
  * (WooCommerce stays the stock source).
  *
- * @package ShopifyPulse
+ * @package AISooq
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class Shopify_Pulse_Product_Sync {
+class AI_Sooq_Product_Sync {
 
-	const HASH_META     = '_sp_prod_hash';
-	const PLATFORM_META = '_sp_platform_id';
+	const HASH_META     = '_aisooq_prod_hash';
+	const PLATFORM_META = '_aisooq_platform_id';
 
 	private static $brand_tax = array( 'product_brand', 'pwb-brand', 'pa_brand', 'yith_product_brand' );
 
 	/** True while applying a pulled change, so the product hooks don't echo it back. */
 	private static $suppress = false;
 
-	/** @var Shopify_Pulse_Settings */
+	/** @var AI_Sooq_Settings */
 	private $settings;
-	/** @var Shopify_Pulse_Api_Client */
+	/** @var AI_Sooq_Api_Client */
 	private $api;
-	/** @var Shopify_Pulse_Logger */
+	/** @var AI_Sooq_Logger */
 	private $logger;
 
-	public function __construct( Shopify_Pulse_Settings $settings, Shopify_Pulse_Api_Client $api, Shopify_Pulse_Logger $logger ) {
+	public function __construct( AI_Sooq_Settings $settings, AI_Sooq_Api_Client $api, AI_Sooq_Logger $logger ) {
 		$this->settings = $settings;
 		$this->api      = $api;
 		$this->logger   = $logger;
@@ -45,10 +45,10 @@ class Shopify_Pulse_Product_Sync {
 		if ( 'push' === $dir || 'both' === $dir ) {
 			add_action( 'woocommerce_new_product', array( $this, 'on_product' ), 20, 1 );
 			add_action( 'woocommerce_update_product', array( $this, 'on_product' ), 20, 1 );
-			add_action( SHOPIFY_PULSE_PRODUCT_SYNC_ACTION, array( $this, 'handle_product' ), 10, 1 );
+			add_action( AISOOQ_PRODUCT_SYNC_ACTION, array( $this, 'handle_product' ), 10, 1 );
 		}
 		if ( 'pull' === $dir || 'both' === $dir ) {
-			add_action( SHOPIFY_PULSE_CATALOG_PULL_CRON, array( $this, 'pull' ) );
+			add_action( AISOOQ_CATALOG_PULL_CRON, array( $this, 'pull' ) );
 		}
 	}
 
@@ -59,10 +59,10 @@ class Shopify_Pulse_Product_Sync {
 		$product_id = (int) $product_id;
 		if ( function_exists( 'as_enqueue_async_action' ) ) {
 			if ( function_exists( 'as_has_scheduled_action' )
-				&& as_has_scheduled_action( SHOPIFY_PULSE_PRODUCT_SYNC_ACTION, array( $product_id ), SHOPIFY_PULSE_AS_GROUP ) ) {
+				&& as_has_scheduled_action( AISOOQ_PRODUCT_SYNC_ACTION, array( $product_id ), AISOOQ_AS_GROUP ) ) {
 				return;
 			}
-			as_enqueue_async_action( SHOPIFY_PULSE_PRODUCT_SYNC_ACTION, array( $product_id ), SHOPIFY_PULSE_AS_GROUP );
+			as_enqueue_async_action( AISOOQ_PRODUCT_SYNC_ACTION, array( $product_id ), AISOOQ_AS_GROUP );
 		} else {
 			$this->push_product( $product_id );
 		}
@@ -143,15 +143,15 @@ class Shopify_Pulse_Product_Sync {
 	 */
 	public function sync_one( $product_id ) {
 		if ( ! function_exists( 'wc_get_product' ) ) {
-			return array( 'ok' => false, 'message' => __( 'WooCommerce not available.', 'shopify-pulse-connector' ) );
+			return array( 'ok' => false, 'message' => __( 'WooCommerce not available.', 'aisooq-connector' ) );
 		}
 		$product = wc_get_product( $product_id );
 		if ( ! $product ) {
-			return array( 'ok' => false, 'message' => __( 'Product not found.', 'shopify-pulse-connector' ) );
+			return array( 'ok' => false, 'message' => __( 'Product not found.', 'aisooq-connector' ) );
 		}
 		$payload = $this->build_payload( $product );
 		if ( null === $payload ) {
-			return array( 'ok' => false, 'message' => __( 'Nothing to sync on this product.', 'shopify-pulse-connector' ) );
+			return array( 'ok' => false, 'message' => __( 'Nothing to sync on this product.', 'aisooq-connector' ) );
 		}
 		$res = $this->api->post( '/connect/products', $payload );
 		if ( is_wp_error( $res ) ) {
@@ -165,7 +165,7 @@ class Shopify_Pulse_Product_Sync {
 		return array(
 			'ok'      => true,
 			'id'      => isset( $res['id'] ) ? (string) $res['id'] : '',
-			'message' => __( 'Synced.', 'shopify-pulse-connector' ),
+			'message' => __( 'Synced.', 'aisooq-connector' ),
 		);
 	}
 
@@ -201,7 +201,7 @@ class Shopify_Pulse_Product_Sync {
 		if ( ! empty( $options ) ) {
 			$payload['options'] = $options;
 		}
-		$payload = array_merge( $payload, Shopify_Pulse_Seo::get_post_seo( $product_id ) );
+		$payload = array_merge( $payload, AI_Sooq_Seo::get_post_seo( $product_id ) );
 
 		$images = $this->images( $product );
 		if ( ! empty( $images ) ) {
@@ -374,7 +374,7 @@ class Shopify_Pulse_Product_Sync {
 		if ( ( 'pull' !== $dir && 'both' !== $dir ) || ! function_exists( 'wc_get_product' ) ) {
 			return;
 		}
-		$cursor = get_option( 'sp_prod_pull_cursor', '' );
+		$cursor = get_option( 'aisooq_prod_pull_cursor', '' );
 		$res    = $this->api->get( '/connect/products?limit=50' . ( $cursor ? '&updatedSince=' . rawurlencode( $cursor ) : '' ) );
 		if ( is_wp_error( $res ) ) {
 			$this->logger->error( 'Product pull failed: ' . $res->get_error_message() );
@@ -389,7 +389,7 @@ class Shopify_Pulse_Product_Sync {
 			}
 		}
 		if ( $max && $max !== $cursor ) {
-			update_option( 'sp_prod_pull_cursor', $max, false );
+			update_option( 'aisooq_prod_pull_cursor', $max, false );
 		}
 	}
 
@@ -425,7 +425,7 @@ class Shopify_Pulse_Product_Sync {
 
 		// Last-write-wins.
 		if ( $wc_id ) {
-			$last = get_post_meta( $wc_id, '_sp_prod_platform_updated', true );
+			$last = get_post_meta( $wc_id, '_aisooq_prod_platform_updated', true );
 			if ( $last && $platform_updated && $platform_updated <= $last ) {
 				return;
 			}
@@ -500,14 +500,14 @@ class Shopify_Pulse_Product_Sync {
 	}
 
 	private function stamp_product( $wc_id, $platform_id, $platform_updated, $p ) {
-		Shopify_Pulse_Seo::set_post_seo(
+		AI_Sooq_Seo::set_post_seo(
 			$wc_id,
 			isset( $p['seoTitle'] ) ? $p['seoTitle'] : '',
 			isset( $p['seoDescription'] ) ? $p['seoDescription'] : ''
 		);
 		$this->apply_taxonomy( $wc_id, $p );
 		update_post_meta( $wc_id, self::PLATFORM_META, $platform_id );
-		update_post_meta( $wc_id, '_sp_prod_platform_updated', $platform_updated );
+		update_post_meta( $wc_id, '_aisooq_prod_platform_updated', $platform_updated );
 	}
 
 	/**

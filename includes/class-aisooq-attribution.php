@@ -1,28 +1,28 @@
 <?php
 /**
- * Visitor attribution: loads the front-end tracker (assets/js/sp-attr.js),
+ * Visitor attribution: loads the front-end tracker (assets/js/aisooq-attr.js),
  * then snapshots its cookies onto the order when checkout completes, so a rich
  * first-touch / last-touch / browser-time blob rides along to the platform.
  *
- * The blob is stored on the order as `_sp_attribution` (JSON) and read by the
+ * The blob is stored on the order as `_aisooq_attribution` (JSON) and read by the
  * order mapper. WooCommerce's own `_wc_order_attribution_*` meta is used as a
  * fallback when the JS cookies are absent.
  *
- * @package ShopifyPulse
+ * @package AISooq
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class Shopify_Pulse_Attribution {
+class AI_Sooq_Attribution {
 
-	const META = '_sp_attribution';
+	const META = '_aisooq_attribution';
 
-	/** @var Shopify_Pulse_Settings */
+	/** @var AI_Sooq_Settings */
 	private $settings;
 
-	public function __construct( Shopify_Pulse_Settings $settings ) {
+	public function __construct( AI_Sooq_Settings $settings ) {
 		$this->settings = $settings;
 	}
 
@@ -38,10 +38,10 @@ class Shopify_Pulse_Attribution {
 		}
 		// Header (not footer) so first-touch is recorded on the very first load.
 		wp_enqueue_script(
-			'sp-attr',
-			SHOPIFY_PULSE_URL . 'assets/js/sp-attr.js',
+			'aisooq-attr',
+			AISOOQ_URL . 'assets/js/aisooq-attr.js',
 			array(),
-			SHOPIFY_PULSE_VERSION,
+			AISOOQ_VERSION,
 			false
 		);
 	}
@@ -59,7 +59,7 @@ class Shopify_Pulse_Attribution {
 			}
 		} catch ( \Throwable $e ) {
 			// Attribution is best-effort — never let it break the order.
-			error_log( 'Shopify Pulse attribution snapshot error: ' . $e->getMessage() ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions
+			error_log( 'AI Sooq attribution snapshot error: ' . $e->getMessage() ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions
 		}
 	}
 
@@ -72,12 +72,12 @@ class Shopify_Pulse_Attribution {
 	/** Assemble the rich attribution blob from the tracker cookies + server. */
 	public function build_blob() {
 		$blob = array(
-			'first_touch'  => $this->cookie_json( 'sp_first' ),
-			'last_touch'   => $this->cookie_json( 'sp_last' ),
-			'browser_time' => $this->cookie_json( 'sp_bt' ),
-			'visit_count'  => isset( $_COOKIE['sp_vc'] ) ? absint( $_COOKIE['sp_vc'] ) : 0,
-			'device'       => isset( $_COOKIE['sp_dev'] ) ? sanitize_text_field( wp_unslash( $_COOKIE['sp_dev'] ) ) : '',
-			'language'     => isset( $_COOKIE['sp_lang'] ) ? sanitize_text_field( wp_unslash( $_COOKIE['sp_lang'] ) ) : '',
+			'first_touch'  => $this->cookie_json( 'aisooq_first' ),
+			'last_touch'   => $this->cookie_json( 'aisooq_last' ),
+			'browser_time' => $this->cookie_json( 'aisooq_bt' ),
+			'visit_count'  => absint( self::cookie_raw( 'aisooq_vc' ) ),
+			'device'       => sanitize_text_field( self::cookie_raw( 'aisooq_dev' ) ),
+			'language'     => sanitize_text_field( self::cookie_raw( 'aisooq_lang' ) ),
 			'ip'           => $this->client_ip(),
 			'user_agent'   => isset( $_SERVER['HTTP_USER_AGENT'] ) ? substr( sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ), 0, 512 ) : '',
 			'captured_at'  => current_time( 'c' ),
@@ -101,11 +101,36 @@ class Shopify_Pulse_Attribution {
 		return is_array( $decoded ) ? $decoded : array();
 	}
 
+	/**
+	 * Read a tracker cookie, falling back to the names the tracker wrote under
+	 * the plugin's previous versions.
+	 *
+	 * A visitor who landed before the update is still carrying `sp_*` (or
+	 * `wafi_*`) cookies with their first touch in them. Without this fallback
+	 * the rename would silently reset first-touch attribution and the visit
+	 * counter for every in-flight session. The legacy names can be dropped once
+	 * the longest cookie lifetime (DAYS in the tracker) has rolled over.
+	 *
+	 * @param string $name Current cookie name, e.g. `aisooq_first`.
+	 * @return string Raw cookie value, or '' when none of the names are set.
+	 */
+	private static function cookie_raw( $name ) {
+		$suffix  = substr( $name, strlen( 'aisooq_' ) );
+		$lookups = array( $name, 'sp_' . $suffix, 'wafi_' . $suffix );
+		foreach ( $lookups as $key ) {
+			if ( ! empty( $_COOKIE[ $key ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+				return wp_unslash( $_COOKIE[ $key ] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended,WordPress.Security.ValidatedSanitizedInput
+			}
+		}
+		return '';
+	}
+
 	private function cookie_json( $name ) {
-		if ( empty( $_COOKIE[ $name ] ) ) {
+		$raw = self::cookie_raw( $name );
+		if ( '' === $raw ) {
 			return array();
 		}
-		$decoded = json_decode( wp_unslash( $_COOKIE[ $name ] ), true );
+		$decoded = json_decode( $raw, true );
 		return is_array( $decoded ) ? $this->clean( $decoded, 0 ) : array();
 	}
 

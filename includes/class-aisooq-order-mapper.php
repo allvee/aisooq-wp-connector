@@ -4,14 +4,14 @@
  * (IngestOrderDto). Lines are pushed FREE-TEXT (title/sku/price, no variantId)
  * so ingestion never touches platform inventory — the platform mirrors Woo.
  *
- * @package ShopifyPulse
+ * @package AISooq
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class Shopify_Pulse_Order_Mapper {
+class AI_Sooq_Order_Mapper {
 
 	/**
 	 * @param WC_Order $order
@@ -49,7 +49,7 @@ class Shopify_Pulse_Order_Mapper {
 				$fee_discount += -$amt;
 			} elseif ( $amt > 0 ) {
 				$lines[] = array(
-					'title'    => $fee->get_name() ? $fee->get_name() : __( 'Fee', 'shopify-pulse-connector' ),
+					'title'    => $fee->get_name() ? $fee->get_name() : __( 'Fee', 'aisooq-connector' ),
 					'quantity' => 1,
 					'price'    => $amt,
 				);
@@ -61,7 +61,7 @@ class Shopify_Pulse_Order_Mapper {
 		if ( empty( $lines ) ) {
 			$residual = (float) $order->get_total() - (float) $order->get_total_tax() - (float) $order->get_shipping_total() + $fee_discount;
 			$lines[]  = array(
-				'title'    => __( 'WooCommerce order', 'shopify-pulse-connector' ),
+				'title'    => __( 'WooCommerce order', 'aisooq-connector' ),
 				'quantity' => 1,
 				'price'    => (float) max( 0, round( $residual, 2 ) ),
 			);
@@ -121,7 +121,7 @@ class Shopify_Pulse_Order_Mapper {
 			$payload['shippingLines'] = $shipping_lines;
 		}
 
-		$blob        = Shopify_Pulse_Attribution::get( $order );
+		$blob        = AI_Sooq_Attribution::get( $order );
 		$attribution = self::attribution( $order, $blob );
 		if ( ! empty( $attribution ) ) {
 			$payload['attribution'] = $attribution;
@@ -134,7 +134,7 @@ class Shopify_Pulse_Order_Mapper {
 
 		// Cart fingerprint (stamped at checkout by the abandoned-sync converter)
 		// so the platform can close the abandoned checkout this order recovered.
-		$fingerprint = (string) $order->get_meta( '_sp_cart_fingerprint' );
+		$fingerprint = (string) $order->get_meta( '_aisooq_cart_fingerprint' );
 		if ( '' !== $fingerprint ) {
 			$payload['cartFingerprint'] = $fingerprint;
 		}
@@ -145,7 +145,23 @@ class Shopify_Pulse_Order_Mapper {
 		 * @param array    $payload
 		 * @param WC_Order $order
 		 */
-		return apply_filters( 'shopify_pulse_order_payload', $payload, $order );
+		$payload = apply_filters( 'aisooq_order_payload', $payload, $order );
+
+		/**
+		 * Deprecated alias kept for sites that hooked the filter under the
+		 * plugin's previous names. Runs after the current filter so a site that
+		 * has migrated its code wins. Slated for removal in 3.0.
+		 *
+		 * @deprecated 2.0.0 Use `aisooq_order_payload`.
+		 */
+		if ( has_filter( 'shopify_pulse_order_payload' ) ) {
+			$payload = apply_filters( 'shopify_pulse_order_payload', $payload, $order );
+		}
+		if ( has_filter( 'wafi_connector_order_payload' ) ) {
+			$payload = apply_filters( 'wafi_connector_order_payload', $payload, $order );
+		}
+
+		return $payload;
 	}
 
 	private static function line_items( WC_Order $order ) {
@@ -194,7 +210,7 @@ class Shopify_Pulse_Order_Mapper {
 			/** @var WC_Order_Item_Shipping $item */
 			$method_id   = is_callable( array( $item, 'get_method_id' ) ) ? (string) $item->get_method_id() : '';
 			$instance_id = is_callable( array( $item, 'get_instance_id' ) ) ? (string) $item->get_instance_id() : '';
-			$title       = $item->get_name() ? $item->get_name() : __( 'Shipping', 'shopify-pulse-connector' );
+			$title       = $item->get_name() ? $item->get_name() : __( 'Shipping', 'aisooq-connector' );
 
 			$code = '' !== $method_id
 				? $method_id . ( '' !== $instance_id ? ':' . $instance_id : '' )
@@ -227,7 +243,7 @@ class Shopify_Pulse_Order_Mapper {
 	 * @return array<string,int>
 	 */
 	private static function shipping_map() {
-		$opt = get_option( SHOPIFY_PULSE_OPTION, array() );
+		$opt = get_option( AISOOQ_OPTION, array() );
 		return ( is_array( $opt ) && isset( $opt['shipping_map'] ) && is_array( $opt['shipping_map'] ) )
 			? $opt['shipping_map']
 			: array();

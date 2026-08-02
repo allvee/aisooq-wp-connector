@@ -4,14 +4,14 @@
  * across the common WordPress SEO plugins (Yoast, Rank Math, All in One SEO),
  * so catalog sync can carry `seoTitle` / `seoDescription` in both directions.
  *
- * @package ShopifyPulse
+ * @package AISooq
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class Shopify_Pulse_Seo {
+class AI_Sooq_Seo {
 
 	/**
 	 * Read SEO for a post (product). Returns [] when nothing is set.
