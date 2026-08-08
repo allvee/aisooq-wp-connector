@@ -6,7 +6,7 @@ Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 2.0.0
+Stable tag: 2.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,13 @@ No — one WooCommerce site connects to one AI Sooq store (one OAuth app = one
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 2.1.0 =
+* **Courier ratio checks are saved.** A check on the Abandoned carts screen now stays on the cart until you press Recheck. Previously the result only lived on screen: reloading the page — or even typing in the search box, which redraws the table — reset every checked row back to "Check ratio", and checking again spent another paid BDCourier lookup. The result now survives reloads, filters and searches, and shows when it was last checked.
+* **The full courier breakdown is shown, not just the percentage.** Expand "Breakdown" on a checked cart to see every courier the number has history with — parcels sent, delivered, returned, and the per-courier success rate, with an all-couriers total. A bare "62%" doesn't tell you what to do; seeing that the failures sit with one courier does. This is the same breakdown the AI Sooq admin has always shown.
+* A "no history" answer is recorded too, so a number BDCourier has never seen is not re-queried — and re-charged — on every visit to the worklist.
+* A ratio checked while the shopper was still typing their number is discarded once the completed number lands, instead of being shown against it.
+* Needs the platform-side update that returns the per-courier breakdown. Against an older platform the plugin still saves and shows the headline ratio and parcel count.
 
 = 2.0.0 =
 * **Renamed to AI Sooq Connector.** The plugin is now branded for the AI Sooq platform throughout — plugin name, admin screens, logos and documentation. This is a full rename: the plugin folder, its classes, constants, option keys, order meta, database table, cron hooks and asset files all move from the `shopify-pulse` / `sp_` namespace to `aisooq`.

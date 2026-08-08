@@ -262,6 +262,111 @@ class AI_Sooq_Abandoned_Admin {
 		return array( 'pending', __( 'Pending push', 'aisooq-connector' ), 'warn' );
 	}
 
+	/** Tone class for a delivery-success percent, matching the platform's bands. */
+	private function ratio_tone( $pct ) {
+		return $pct >= 80 ? 'g' : ( $pct >= 60 ? 'a' : 'r' );
+	}
+
+	/**
+	 * The courier cell for one cart: either an unchecked "Check ratio" button,
+	 * or the saved result — headline badge, per-courier breakdown, and when it
+	 * was last checked.
+	 *
+	 * Rendered here rather than in JS so that the cell an operator sees the
+	 * instant a check returns is byte-identical to the one they see after a
+	 * reload or a filter change. {@see ajax_courier()} returns this same markup.
+	 *
+	 * @param object $row
+	 * @param bool   $active Connection is live (a lookup can actually be made).
+	 * @return string
+	 */
+	private function courier_cell( $row, $active ) {
+		if ( empty( $row->phone ) ) {
+			return '';
+		}
+		$snap = $this->abandoned->courier_snapshot( $row );
+
+		ob_start();
+		?>
+		<div class="aisooq-courier" data-phone="<?php echo esc_attr( $row->phone ); ?>">
+			<?php if ( null === $snap ) : ?>
+				<button type="button" class="button-link aisooq-check-courier" <?php disabled( ! $active ); ?>><span class="dashicons dashicons-search"></span> <?php esc_html_e( 'Check ratio', 'aisooq-connector' ); ?></button>
+			<?php else : ?>
+				<?php
+				$checked = $snap['checked_at'] ? human_time_diff( strtotime( $snap['checked_at'] . ' UTC' ) ) : '';
+				$rows    = $snap['couriers'];
+				?>
+				<div class="aisooq-courier-head">
+					<?php if ( null === $snap['ratio'] ) : ?>
+						<span class="aisooq-dim" title="<?php esc_attr_e( 'No BDCourier history for this number, or BDCourier is not configured for this store on the platform.', 'aisooq-connector' ); ?>"><?php esc_html_e( 'No data', 'aisooq-connector' ); ?></span>
+					<?php else : ?>
+						<span class="aisooq-ratio <?php echo esc_attr( $this->ratio_tone( $snap['ratio'] ) ); ?>">
+							<?php echo esc_html( round( $snap['ratio'] ) . '%' ); ?>
+							<?php if ( null !== $snap['parcels'] ) : ?><span class="aisooq-dim">· <?php echo esc_html( $snap['parcels'] ); ?></span><?php endif; ?>
+						</span>
+					<?php endif; ?>
+					<?php if ( $rows ) : ?>
+						<button type="button" class="button-link aisooq-courier-toggle" aria-expanded="false"><?php esc_html_e( 'Breakdown', 'aisooq-connector' ); ?></button>
+					<?php endif; ?>
+					<button type="button" class="button-link aisooq-check-courier" <?php disabled( ! $active ); ?>><?php esc_html_e( 'Recheck', 'aisooq-connector' ); ?></button>
+				</div>
+				<?php if ( $rows ) : ?>
+					<div class="aisooq-courier-detail" hidden>
+						<table class="aisooq-courier-tbl">
+							<thead>
+								<tr>
+									<th><?php esc_html_e( 'Courier', 'aisooq-connector' ); ?></th>
+									<th><?php esc_html_e( 'Total', 'aisooq-connector' ); ?></th>
+									<th><?php esc_html_e( 'Delivered', 'aisooq-connector' ); ?></th>
+									<th><?php esc_html_e( 'Returned', 'aisooq-connector' ); ?></th>
+									<th><?php esc_html_e( 'Rate', 'aisooq-connector' ); ?></th>
+								</tr>
+							</thead>
+							<tbody>
+							<?php foreach ( $rows as $c ) : ?>
+								<tr>
+									<td><?php echo esc_html( '' !== $c['name'] ? $c['name'] : $c['slug'] ); ?></td>
+									<td class="aisooq-mono"><?php echo esc_html( $c['total'] ); ?></td>
+									<td class="aisooq-mono"><?php echo esc_html( $c['success'] ); ?></td>
+									<td class="aisooq-mono"><?php echo esc_html( $c['cancelled'] ); ?></td>
+									<td class="aisooq-mono">
+										<?php if ( null === $c['ratio'] ) : ?>
+											<span class="aisooq-dim">—</span>
+										<?php else : ?>
+											<span class="aisooq-ratio <?php echo esc_attr( $this->ratio_tone( $c['ratio'] ) ); ?>"><?php echo esc_html( round( $c['ratio'] ) . '%' ); ?></span>
+										<?php endif; ?>
+									</td>
+								</tr>
+							<?php endforeach; ?>
+							</tbody>
+							<?php if ( null !== $snap['success'] && null !== $snap['cancelled'] ) : ?>
+							<tfoot>
+								<tr>
+									<td><?php esc_html_e( 'All couriers', 'aisooq-connector' ); ?></td>
+									<td class="aisooq-mono"><?php echo esc_html( null === $snap['parcels'] ? '—' : $snap['parcels'] ); ?></td>
+									<td class="aisooq-mono"><?php echo esc_html( $snap['success'] ); ?></td>
+									<td class="aisooq-mono"><?php echo esc_html( $snap['cancelled'] ); ?></td>
+									<td class="aisooq-mono"><?php echo esc_html( null === $snap['ratio'] ? '—' : round( $snap['ratio'] ) . '%' ); ?></td>
+								</tr>
+							</tfoot>
+							<?php endif; ?>
+						</table>
+					</div>
+				<?php endif; ?>
+				<?php if ( $checked ) : ?>
+					<div class="aisooq-dim aisooq-courier-when">
+						<?php
+						/* translators: %s: human-readable time difference, e.g. "3 hours" */
+						echo esc_html( sprintf( __( 'Checked %s ago', 'aisooq-connector' ), $checked ) );
+						?>
+					</div>
+				<?php endif; ?>
+			<?php endif; ?>
+		</div>
+		<?php
+		return ob_get_clean();
+	}
+
 	/** HPOS-safe order edit URL. */
 	private function order_edit_url( $order_id ) {
 		if ( class_exists( '\Automattic\WooCommerce\Utilities\OrderUtil' )
@@ -306,11 +411,7 @@ class AI_Sooq_Abandoned_Admin {
 							<?php if ( $row->phone ) : ?><span><span class="dashicons dashicons-phone" aria-hidden="true"></span> <?php echo esc_html( $row->phone ); ?></span><br /><?php endif; ?>
 							<?php if ( $row->email ) : ?><span><span class="dashicons dashicons-email" aria-hidden="true"></span> <?php echo esc_html( $row->email ); ?></span><?php endif; ?>
 						</div>
-						<?php if ( $row->phone ) : ?>
-							<div class="aisooq-courier" data-phone="<?php echo esc_attr( $row->phone ); ?>">
-								<button type="button" class="button-link aisooq-check-courier" <?php disabled( ! $active ); ?>><span class="dashicons dashicons-search"></span> <?php esc_html_e( 'Check ratio', 'aisooq-connector' ); ?></button>
-							</div>
-						<?php endif; ?>
+						<?php echo $this->courier_cell( $row, $active ); // phpcs:ignore WordPress.Security.EscapeOutput ?>
 					</div>
 				</td>
 				<td class="aisooq-addr" data-label="<?php esc_attr_e( 'Address', 'aisooq-connector' ); ?>">
@@ -390,18 +491,58 @@ class AI_Sooq_Abandoned_Admin {
 		) );
 	}
 
-	/** Per-row courier delivery-success ratio (platform /connect/courier). */
+	/**
+	 * Per-row courier delivery history (platform `GET /connect/courier`).
+	 *
+	 * Saves the answer onto the cart row before responding, then renders the
+	 * cell from what was actually stored — so the screen shows exactly what a
+	 * reload will show, and can't advertise a result that isn't really there.
+	 *
+	 * If the write doesn't stick (most likely: the schema upgrade that adds the
+	 * courier columns hasn't run yet) this reports a failure rather than quietly
+	 * handing back a "Check ratio" button. Silently reverting would invite the
+	 * operator to click again, and every click is another billed BDCourier
+	 * lookup — the exact waste this whole feature exists to stop.
+	 */
 	public function ajax_courier() {
 		$this->guard_ajax( true );
-		$phone = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
+		$key = isset( $_POST['session_key'] ) ? sanitize_text_field( wp_unslash( $_POST['session_key'] ) ) : '';
+		$row = $this->abandoned->get_row( $key );
+		if ( ! $row ) {
+			wp_send_json_error( array( 'message' => __( 'Cart not found.', 'aisooq-connector' ) ) );
+		}
+		// Always look the number up off the stored row, never off the request:
+		// the phone in the DOM can be a stale render, and this call costs the
+		// merchant a paid BDCourier lookup.
+		$phone = (string) $row->phone;
 		if ( '' === $phone ) {
 			wp_send_json_error( array( 'message' => __( 'No phone on this cart.', 'aisooq-connector' ) ) );
 		}
+
 		$res = AI_Sooq_Plugin::instance()->api()->get( '/connect/courier?phone=' . rawurlencode( $phone ) );
 		if ( is_wp_error( $res ) ) {
 			wp_send_json_error( array( 'message' => $res->get_error_message() ) );
 		}
+		$res = is_array( $res ) ? $res : array();
+
+		// Persist even a "no history" answer, so a number BDCourier has never
+		// seen isn't re-queried on every visit to the worklist.
+		$this->abandoned->save_courier( $key, $phone, $res );
+
+		// Read back rather than trusting the write: this is the same path a page
+		// reload takes, so if the round-trip is broken we find out here.
+		$fresh = $this->abandoned->get_row( $key );
+		if ( ! $fresh || null === $this->abandoned->courier_snapshot( $fresh ) ) {
+			$this->logger->error( 'Courier lookup for cart ' . $key . ' did not persist — run the plugin upgrade so the courier_* columns exist.' );
+			$ratio = isset( $res['successRatio'] ) && is_numeric( $res['successRatio'] ) ? round( (float) $res['successRatio'] ) . '%' : __( 'no data', 'aisooq-connector' );
+			wp_send_json_error( array(
+				/* translators: %s: the delivery-success ratio just looked up, e.g. "76%" */
+				'message' => sprintf( __( 'Looked up %s, but it could not be saved — it would be lost on reload. Deactivate and reactivate AI Sooq Connector to finish the database upgrade, then try again.', 'aisooq-connector' ), $ratio ),
+			) );
+		}
+
 		wp_send_json_success( array(
+			'html'         => $this->courier_cell( $fresh, $this->settings->is_active() && $this->settings->get( 'enable_abandoned' ) ),
 			'successRatio' => isset( $res['successRatio'] ) ? $res['successRatio'] : null,
 			'totalParcel'  => isset( $res['totalParcel'] ) ? $res['totalParcel'] : null,
 		) );
@@ -732,6 +873,17 @@ class AI_Sooq_Abandoned_Admin {
 				.aisooq-cust{font-weight:600}
 				.aisooq-contact{color:var(--muted);font-size:12px;margin-top:2px;line-height:1.5}
 				.aisooq-courier{margin-top:4px}
+				.aisooq-courier-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+				.aisooq-courier-head .button-link{font-size:11px;text-decoration:none}
+				.aisooq-courier-when{font-size:11px;margin-top:2px}
+				.aisooq-courier-detail{margin-top:6px;border:1px solid var(--bd);border-radius:8px;overflow:hidden;background:#fbfbfc}
+				.aisooq-courier-detail[hidden]{display:none}
+				.aisooq-courier-tbl{width:100%;border-collapse:collapse;font-size:12px}
+				.aisooq-courier-tbl th,.aisooq-courier-tbl td{padding:5px 8px;text-align:left;border-bottom:1px solid #f0f0f1;white-space:nowrap}
+				.aisooq-courier-tbl th{font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:600;background:#f6f7f7}
+				.aisooq-courier-tbl td:not(:first-child),.aisooq-courier-tbl th:not(:first-child){text-align:right}
+				.aisooq-courier-tbl tfoot td{font-weight:600;border-bottom:0;border-top:1px solid var(--bd);background:#f6f7f7}
+				.aisooq-courier-tbl .aisooq-ratio{font-size:11px;padding:1px 6px}
 				.aisooq-mono{font-variant-numeric:tabular-nums}
 				.aisooq-actions-cell{text-align:right;white-space:nowrap}
 				.aisooq-menu-wrap{position:relative;display:inline-block}
@@ -930,8 +1082,6 @@ class AI_Sooq_Abandoned_Admin {
 				'confirmBulk'=> __( 'Apply "%1$s" to %2$d selected cart(s)?', 'aisooq-connector' ),
 				'detailsTitle'=> __( 'Cart details', 'aisooq-connector' ),
 				'close'      => __( 'Close', 'aisooq-connector' ),
-				'noRatio'    => __( 'No data', 'aisooq-connector' ),
-				'noRatioHint'=> __( 'No BDCourier history for this number, or BDCourier is not configured for this store on the platform.', 'aisooq-connector' ),
 			) ); ?>;
 			function post( data ) {
 				data.append( 'nonce', nonce );
@@ -989,6 +1139,54 @@ class AI_Sooq_Abandoned_Admin {
 						if ( m !== except ) { m.hidden = true; var b = m.parentNode.querySelector( '.aisooq-menu-btn' ); if ( b ) { b.setAttribute( 'aria-expanded', 'false' ); } }
 					} );
 				}
+					/**
+					 * Bind the courier controls inside `scope`.
+					 *
+					 * Scoped rather than global because a check replaces only its own
+					 * cell — re-binding the whole table there would stack a second
+					 * listener on every other row, and the next click would fire two
+					 * (paid) lookups.
+					 */
+					function bindCourier( scope ) {
+						// Show / hide the saved per-courier breakdown.
+						Array.prototype.forEach.call( scope.querySelectorAll( '.aisooq-courier-toggle' ), function ( btn ) {
+							btn.addEventListener( 'click', function () {
+								var wrap = btn.closest( '.aisooq-courier' );
+								var box = wrap ? wrap.querySelector( '.aisooq-courier-detail' ) : null;
+								if ( ! box ) { return; }
+								box.hidden = ! box.hidden;
+								btn.setAttribute( 'aria-expanded', box.hidden ? 'false' : 'true' );
+							} );
+						} );
+						// Check / recheck. The server saves the result and hands back the
+						// rendered cell, so what shows here is what a reload renders —
+						// the result can no longer be a screen-only artefact.
+						Array.prototype.forEach.call( scope.querySelectorAll( '.aisooq-check-courier' ), function ( btn ) {
+							btn.addEventListener( 'click', function () {
+								var wrap = btn.closest( '.aisooq-courier' );
+								var tr = btn.closest( 'tr' );
+								var key = tr ? tr.getAttribute( 'data-key' ) : '';
+								var original = btn.innerHTML;
+								btn.disabled = true; btn.textContent = '…';
+								post( fd( 'aisooq_abandoned_courier', { session_key: key } ) ).then( function ( j ) {
+									if ( j && j.success && j.data.html && wrap && wrap.parentNode ) {
+										var tmp = document.createElement( 'div' );
+										tmp.innerHTML = j.data.html;
+										var fresh = tmp.firstElementChild;
+										if ( fresh ) {
+											wrap.parentNode.replaceChild( fresh, wrap );
+											bindCourier( fresh );
+											return;
+										}
+									}
+									btn.disabled = false;
+									btn.innerHTML = original;
+									window.alert( ( j && j.data && j.data.message ) ? j.data.message : strings.failed );
+								} ).catch( function () { btn.disabled = false; btn.innerHTML = original; window.alert( strings.failed ); } );
+							} );
+						} );
+					}
+
 				function bindRows() {
 					Array.prototype.forEach.call( rowsBody.querySelectorAll( '.aisooq-cb' ), function ( c ) { c.addEventListener( 'change', updateBulkCount ); } );
 					Array.prototype.forEach.call( rowsBody.querySelectorAll( '.aisooq-menu-btn' ), function ( btn ) {
@@ -1001,27 +1199,7 @@ class AI_Sooq_Abandoned_Admin {
 							btn.setAttribute( 'aria-expanded', willOpen ? 'true' : 'false' );
 						} );
 					} );
-				Array.prototype.forEach.call( rowsBody.querySelectorAll( '.aisooq-check-courier' ), function ( btn ) {
-					btn.addEventListener( 'click', function () {
-						var wrap = btn.closest( '.aisooq-courier' );
-						var phone = wrap ? wrap.getAttribute( 'data-phone' ) : '';
-						btn.disabled = true; btn.textContent = '…';
-						post( fd( 'aisooq_abandoned_courier', { phone: phone } ) ).then( function ( j ) {
-							if ( j && j.success && j.data.successRatio !== null && j.data.successRatio !== undefined ) {
-								var r = Math.round( j.data.successRatio );
-								var cls = r >= 80 ? 'g' : ( r >= 60 ? 'a' : 'r' );
-								wrap.innerHTML = '<span class="aisooq-ratio ' + cls + '">' + r + '%' + ( j.data.totalParcel != null ? ' · ' + j.data.totalParcel : '' ) + '</span>';
-							} else if ( j && j.success ) {
-								// Reached the platform, but it has no ratio (unknown number, or
-								// BDCourier isn't set up for this store there — the key lives on
-								// the platform, not the plugin).
-								wrap.innerHTML = '<span class="aisooq-dim" title="' + strings.noRatioHint + '">' + strings.noRatio + '</span>';
-							} else {
-								btn.disabled = false; btn.innerHTML = '<span class="dashicons dashicons-search"></span> ' + ( ( j && j.data && j.data.message ) ? j.data.message : strings.failed );
-							}
-						} ).catch( function () { btn.disabled = false; btn.textContent = strings.failed; } );
-					} );
-				} );
+					bindCourier( rowsBody );
 				Array.prototype.forEach.call( rowsBody.querySelectorAll( '.aisooq-act' ), function ( btn ) {
 					btn.addEventListener( 'click', function () {
 						var tr = btn.closest( 'tr' );

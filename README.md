@@ -36,7 +36,7 @@ AI Sooq Connector links a single WooCommerce store to the AI Sooq platform. It k
 
 **Orders** — Every order, paid or incomplete, is mirrored to the platform for unified reporting. Sync is idempotent (deduplicated on the WooCommerce order id) and runs through Action Scheduler with backoff retry and a payload-hash skip, so unchanged orders never re-send. Order lines are free-text and never touch platform inventory. Optional, off-by-default status sync-back reconciles WooCommerce status from the platform (forward-only).
 
-**Abandoned carts** — Idle carts are captured to a table and swept every 15 minutes by WP-Cron (threshold configurable), then sent to the platform with a stable fingerprint. Captured rows are garbage-collected after 30 days.
+**Abandoned carts** — Idle carts are captured to a table and swept every 15 minutes by WP-Cron (threshold configurable), then sent to the platform with a stable fingerprint. Captured rows are garbage-collected after 30 days. The worklist can look up a shopper's BDCourier delivery history per row: the headline success ratio plus the per-courier breakdown behind it. That lookup is **billed on the platform**, so the answer is stored on the cart row and stands until an operator presses Recheck — reloads, filters and searches never discard it, and never trigger a second charge.
 
 **Analytics** — Server-side `Purchase` and `CompleteRegistration` events fire from WooCommerce; browser `PageView`, `ViewContent`, `AddToCart`, and `InitiateCheckout` are relayed through a same-site AJAX proxy. The platform fans events out to Meta CAPI, TikTok, and GA4. Purchases are deduped by the platform on order id.
 
