@@ -286,11 +286,22 @@ class AI_Sooq_Abandoned_Admin {
 		}
 		$snap = $this->abandoned->courier_snapshot( $row );
 
+		// A disabled button with no explanation on it reads as broken. The
+		// lookup needs a live platform connection, so when the connection is
+		// paused the control says so on itself rather than relying on the
+		// operator connecting it to the notice at the top of the screen.
+		$why = $active
+			? __( 'Look up this number\'s courier delivery history (BDCourier, via the platform)', 'aisooq-connector' )
+			: __( 'Connection is paused — activate it in AI Sooq → Settings to check courier history', 'aisooq-connector' );
+
 		ob_start();
 		?>
 		<div class="aisooq-courier" data-phone="<?php echo esc_attr( $row->phone ); ?>">
 			<?php if ( null === $snap ) : ?>
-				<button type="button" class="button-link aisooq-check-courier" <?php disabled( ! $active ); ?>><span class="dashicons dashicons-search"></span> <?php esc_html_e( 'Check ratio', 'aisooq-connector' ); ?></button>
+				<button type="button" class="button-link aisooq-check-courier" title="<?php echo esc_attr( $why ); ?>" <?php disabled( ! $active ); ?>><span class="dashicons dashicons-search"></span> <?php esc_html_e( 'Check ratio', 'aisooq-connector' ); ?></button>
+				<?php if ( ! $active ) : ?>
+					<span class="aisooq-courier-why"><?php esc_html_e( 'connection paused', 'aisooq-connector' ); ?></span>
+				<?php endif; ?>
 			<?php else : ?>
 				<?php
 				$checked = $snap['checked_at'] ? human_time_diff( strtotime( $snap['checked_at'] . ' UTC' ) ) : '';
@@ -308,7 +319,10 @@ class AI_Sooq_Abandoned_Admin {
 					<?php if ( $rows ) : ?>
 						<button type="button" class="button-link aisooq-courier-toggle" aria-expanded="false"><?php esc_html_e( 'Breakdown', 'aisooq-connector' ); ?></button>
 					<?php endif; ?>
-					<button type="button" class="button-link aisooq-check-courier" <?php disabled( ! $active ); ?>><?php esc_html_e( 'Recheck', 'aisooq-connector' ); ?></button>
+					<button type="button" class="button-link aisooq-check-courier" title="<?php echo esc_attr( $why ); ?>" <?php disabled( ! $active ); ?>><?php esc_html_e( 'Recheck', 'aisooq-connector' ); ?></button>
+					<?php if ( ! $active ) : ?>
+						<span class="aisooq-courier-why"><?php esc_html_e( 'connection paused', 'aisooq-connector' ); ?></span>
+					<?php endif; ?>
 				</div>
 				<?php if ( $rows ) : ?>
 					<div class="aisooq-courier-detail" hidden>
@@ -876,6 +890,8 @@ class AI_Sooq_Abandoned_Admin {
 				.aisooq-courier-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 				.aisooq-courier-head .button-link{font-size:11px;text-decoration:none}
 				.aisooq-courier-when{font-size:11px;margin-top:2px}
+				.aisooq-courier-why{font-size:11px;color:var(--warn);margin-left:6px;font-style:italic}
+				.aisooq-check-courier[disabled]{opacity:.45;cursor:not-allowed}
 				.aisooq-courier-detail{margin-top:6px;border:1px solid var(--bd);border-radius:8px;overflow:hidden;background:#fbfbfc}
 				.aisooq-courier-detail[hidden]{display:none}
 				.aisooq-courier-tbl{width:100%;border-collapse:collapse;font-size:12px}

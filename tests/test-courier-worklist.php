@@ -270,6 +270,18 @@ class Test_Courier_Worklist extends WP_Ajax_UnitTestCase {
 		$this->assertStringNotContainsString( 'Breakdown', $html, 'No breakdown button when there is nothing to break down.' );
 	}
 
+	public function test_a_paused_connection_explains_the_dead_recheck_button_too() {
+		$key = $this->make_cart();
+		$this->stub_api( $this->api_payload() );
+		$this->post_check( $key );
+
+		$html = $this->render( false ); // checked cart, connection now paused
+
+		$this->assertStringContainsString( 'Recheck', $html );
+		$this->assertStringContainsString( 'connection paused', $html,
+			'A checked cart whose Recheck is disabled needs the same explanation as an unchecked one.' );
+	}
+
 	public function test_a_paused_connection_still_shows_the_saved_result() {
 		$key = $this->make_cart();
 		$this->stub_api( $this->api_payload() );
@@ -279,6 +291,28 @@ class Test_Courier_Worklist extends WP_Ajax_UnitTestCase {
 
 		$this->assertStringContainsString( '76%', $html, 'Saved data is local — pausing must not hide it.' );
 		$this->assertStringContainsString( 'disabled', $html, 'But a new lookup cannot be made.' );
+	}
+
+	public function test_a_paused_connection_says_why_the_button_is_dead() {
+		$this->make_cart();
+
+		$html = $this->render( false ); // connection paused
+
+		$this->assertStringContainsString( 'connection paused', $html,
+			'A disabled Check ratio button must say why, or it just reads as broken.' );
+		$this->assertStringContainsString( 'Connection is paused', $html,
+			'The button itself should carry the explanation as a title.' );
+		$this->assertMatchesRegularExpression( '/aisooq-check-courier[^>]*disabled/', $html );
+	}
+
+	public function test_a_live_connection_offers_the_lookup_without_a_warning() {
+		$this->make_cart();
+
+		$html = $this->render( true );
+
+		$this->assertStringNotContainsString( 'connection paused', $html );
+		$this->assertStringContainsString( 'courier delivery history', $html,
+			'An enabled button should explain what it will do.' );
 	}
 
 	public function test_a_cart_with_no_phone_has_no_courier_control() {
