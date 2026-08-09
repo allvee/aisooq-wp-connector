@@ -54,6 +54,7 @@ require_once AISOOQ_DIR . 'includes/class-aisooq-attribution.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-order-mapper.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-order-sync.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-abandoned-sync.php';
+require_once AISOOQ_DIR . 'includes/class-aisooq-order-courier.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-abandoned-admin.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-block-beacon.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-analytics.php';
