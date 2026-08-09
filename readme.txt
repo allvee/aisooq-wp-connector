@@ -6,7 +6,7 @@ Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 2.0.0
+Stable tag: 2.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,20 @@ No — one WooCommerce site connects to one AI Sooq store (one OAuth app = one
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 2.2.0 =
+* **Courier history is checked automatically when an order comes in.** Turn on "Look up courier history automatically on every new order" (AI Sooq → Settings → Fraud & courier) and every order with a phone number gets its BDCourier delivery history looked up in the background, with the result in a new **Courier** column on WooCommerce → Orders and a **Courier history** box on the order screen — the full per-courier breakdown, not just a percentage. Nobody has to press a button per order to know whether to dispatch or call first.
+* Off by default, because each lookup is billed to your store. The setting says so where you switch it on.
+* Checked once per number and kept until you press **Recheck**. A "no history" answer is stored too, so an unknown number is not re-queried on every screen load. Edit an order's billing phone and the old answer is discarded rather than shown against the new number.
+* The lookup runs on the background queue, so it never sits between a shopper pressing "place order" and seeing their confirmation.
+* **The settings screen is now organised into sections.** Connection, Sync, Fraud & courier, Checkout messages, Shipping and Advanced, instead of one long form — with a "Find a setting" box that searches every section at once, a Save button that follows you down the page, and a warning if you try to leave with unsaved changes. Settings that only apply when another switch is on are dimmed and say which one. Nothing moved out of the plugin; everything is where it was, grouped by the job it belongs to.
+
+= 2.1.0 =
+* **Courier ratio checks are saved.** A check on the Abandoned carts screen now stays on the cart until you press Recheck. Previously the result only lived on screen: reloading the page — or even typing in the search box, which redraws the table — reset every checked row back to "Check ratio", and checking again spent another paid BDCourier lookup. The result now survives reloads, filters and searches, and shows when it was last checked.
+* **The full courier breakdown is shown, not just the percentage.** Expand "Breakdown" on a checked cart to see every courier the number has history with — parcels sent, delivered, returned, and the per-courier success rate, with an all-couriers total. A bare "62%" doesn't tell you what to do; seeing that the failures sit with one courier does. This is the same breakdown the AI Sooq admin has always shown.
+* A "no history" answer is recorded too, so a number BDCourier has never seen is not re-queried — and re-charged — on every visit to the worklist.
+* A ratio checked while the shopper was still typing their number is discarded once the completed number lands, instead of being shown against it.
+* Needs the platform-side update that returns the per-courier breakdown. Against an older platform the plugin still saves and shows the headline ratio and parcel count.
 
 = 2.0.0 =
 * **Renamed to AI Sooq Connector.** The plugin is now branded for the AI Sooq platform throughout — plugin name, admin screens, logos and documentation. This is a full rename: the plugin folder, its classes, constants, option keys, order meta, database table, cron hooks and asset files all move from the `shopify-pulse` / `sp_` namespace to `aisooq`.

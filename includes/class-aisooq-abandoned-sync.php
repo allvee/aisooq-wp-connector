@@ -751,6 +751,128 @@ class AI_Sooq_Abandoned_Sync {
 		);
 	}
 
+	/**
+	 * Persist a courier delivery-history lookup onto the cart row.
+	 *
+	 * The lookup costs the merchant a paid BDCourier call on the platform, so
+	 * the answer is kept until an operator explicitly re-checks — it must
+	 * survive a page reload, a filter change, and a re-render of the worklist.
+	 *
+	 * Deliberately does NOT touch `updated_at`: that column orders the worklist
+	 * and defines the sweep/resync working set, and an operator reading a ratio
+	 * is not cart activity. Bumping it would shuffle a cart to the top of the
+	 * list just for being looked at.
+	 *
+	 * The phone that was checked is stored alongside the result. The beacon
+	 * rewrites `phone` as the shopper types, so a ratio fetched against a
+	 * half-entered number must not later be shown as if it described the
+	 * corrected one — {@see courier_snapshot()} discards it on mismatch.
+	 *
+	 * @param string $session_key
+	 * @param string $phone   The phone the lookup was made against.
+	 * @param array  $payload Decoded `GET /connect/courier` response.
+	 * @return bool
+	 */
+	public function save_courier( $session_key, $phone, array $payload ) {
+		if ( empty( $session_key ) ) {
+			return false;
+		}
+		$ratio   = isset( $payload['successRatio'] ) && is_numeric( $payload['successRatio'] ) ? (float) $payload['successRatio'] : null;
+		$parcels = isset( $payload['totalParcel'] ) && is_numeric( $payload['totalParcel'] ) ? (int) $payload['totalParcel'] : null;
+
+		$detail = array(
+			'phone'     => (string) $phone,
+			'success'   => isset( $payload['successParcel'] ) && is_numeric( $payload['successParcel'] ) ? (int) $payload['successParcel'] : null,
+			'cancelled' => isset( $payload['cancelledParcel'] ) && is_numeric( $payload['cancelledParcel'] ) ? (int) $payload['cancelledParcel'] : null,
+			'couriers'  => array(),
+		);
+		// `couriers[]` arrived with the platform build that widened
+		// /connect/courier. Against an older platform it is simply absent, and
+		// the row still stores (and later renders) the headline figures.
+		if ( ! empty( $payload['couriers'] ) && is_array( $payload['couriers'] ) ) {
+			foreach ( $payload['couriers'] as $c ) {
+				if ( ! is_array( $c ) ) {
+					continue;
+				}
+				$detail['couriers'][] = array(
+					'slug'      => isset( $c['slug'] ) ? $this->clamp( (string) $c['slug'], 40 ) : '',
+					'name'      => isset( $c['name'] ) ? $this->clamp( (string) $c['name'], 60 ) : '',
+					'total'     => isset( $c['total'] ) ? (int) $c['total'] : 0,
+					'success'   => isset( $c['success'] ) ? (int) $c['success'] : 0,
+					'cancelled' => isset( $c['cancelled'] ) ? (int) $c['cancelled'] : 0,
+					'ratio'     => isset( $c['ratio'] ) && is_numeric( $c['ratio'] ) ? round( (float) $c['ratio'], 2 ) : null,
+				);
+			}
+		}
+
+		global $wpdb;
+		return false !== $wpdb->update( // phpcs:ignore WordPress.DB
+			self::table_name(),
+			array(
+				'courier_ratio'      => $ratio,
+				'courier_parcels'    => $parcels,
+				'courier_json'       => wp_json_encode( $detail ),
+				'courier_checked_at' => current_time( 'mysql', true ),
+			),
+			array( 'session_key' => $session_key )
+		);
+	}
+
+	/**
+	 * Read a saved courier lookup back off a cart row for rendering.
+	 *
+	 * Returns null when the cart has never been checked, or when the stored
+	 * result belongs to a phone number the cart no longer carries — in both
+	 * cases the worklist should offer a fresh check rather than a stale answer.
+	 *
+	 * @param object $row
+	 * @return array|null { ratio, parcels, success, cancelled, couriers[], checked_at }
+	 */
+	public function courier_snapshot( $row ) {
+		if ( ! $row || empty( $row->courier_checked_at ) ) {
+			return null;
+		}
+		$detail = json_decode( (string) $row->courier_json, true );
+		$detail = is_array( $detail ) ? $detail : array();
+
+		// Stale-by-phone guard: the number moved on since the lookup.
+		$checked_phone = isset( $detail['phone'] ) ? (string) $detail['phone'] : '';
+		if ( '' !== $checked_phone && $checked_phone !== (string) $row->phone ) {
+			return null;
+		}
+
+		// Re-type every field on the way out. JSON has no int/float distinction,
+		// so a whole-number ratio saved as 90.0 decodes as int 90 while 76.5
+		// decodes as float — the renderer should not have to care which. This
+		// also fills any key an older or truncated payload is missing, so the
+		// breakdown table can index fields without guarding each one.
+		$couriers = array();
+		if ( isset( $detail['couriers'] ) && is_array( $detail['couriers'] ) ) {
+			foreach ( $detail['couriers'] as $c ) {
+				if ( ! is_array( $c ) ) {
+					continue;
+				}
+				$couriers[] = array(
+					'slug'      => isset( $c['slug'] ) ? (string) $c['slug'] : '',
+					'name'      => isset( $c['name'] ) ? (string) $c['name'] : '',
+					'total'     => isset( $c['total'] ) ? (int) $c['total'] : 0,
+					'success'   => isset( $c['success'] ) ? (int) $c['success'] : 0,
+					'cancelled' => isset( $c['cancelled'] ) ? (int) $c['cancelled'] : 0,
+					'ratio'     => isset( $c['ratio'] ) && is_numeric( $c['ratio'] ) ? (float) $c['ratio'] : null,
+				);
+			}
+		}
+
+		return array(
+			'ratio'      => null === $row->courier_ratio ? null : (float) $row->courier_ratio,
+			'parcels'    => null === $row->courier_parcels ? null : (int) $row->courier_parcels,
+			'success'    => isset( $detail['success'] ) && null !== $detail['success'] ? (int) $detail['success'] : null,
+			'cancelled'  => isset( $detail['cancelled'] ) && null !== $detail['cancelled'] ? (int) $detail['cancelled'] : null,
+			'couriers'   => $couriers,
+			'checked_at' => (string) $row->courier_checked_at,
+		);
+	}
+
 	/** Delete one captured cart from the local worklist (local-only). */
 	public function delete_cart( $session_key ) {
 		if ( empty( $session_key ) ) {

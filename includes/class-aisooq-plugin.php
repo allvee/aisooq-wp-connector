@@ -29,6 +29,8 @@ class AI_Sooq_Plugin {
 	private $order_sync;
 	/** @var AI_Sooq_Abandoned_Sync */
 	private $abandoned_sync;
+	/** @var AI_Sooq_Order_Courier */
+	private $order_courier;
 	/** @var AI_Sooq_Abandoned_Admin */
 	private $abandoned_admin;
 	/** @var AI_Sooq_Block_Beacon */
@@ -71,6 +73,7 @@ class AI_Sooq_Plugin {
 		$this->attribution    = new AI_Sooq_Attribution( $this->settings );
 		$this->order_sync     = new AI_Sooq_Order_Sync( $this->settings, $this->api, $this->logger );
 		$this->abandoned_sync  = new AI_Sooq_Abandoned_Sync( $this->settings, $this->api, $this->logger );
+		$this->order_courier   = new AI_Sooq_Order_Courier( $this->settings, $this->api, $this->logger );
 		$this->abandoned_admin = new AI_Sooq_Abandoned_Admin( $this->settings, $this->abandoned_sync, $this->logger );
 		$this->block_beacon    = new AI_Sooq_Block_Beacon( $this->settings, $this->abandoned_sync, $this->logger );
 		$this->analytics      = new AI_Sooq_Analytics( $this->settings, $this->api, $this->logger );
@@ -92,6 +95,7 @@ class AI_Sooq_Plugin {
 		// operator can review captured carts even while the connection is paused
 		// (Resync itself is gated on an active connection inside the handler).
 		$this->abandoned_admin->register();
+		$this->order_courier->register();
 
 		if ( $this->settings->is_active() ) {
 			$this->order_sync->register();
@@ -123,6 +127,10 @@ class AI_Sooq_Plugin {
 	}
 
 	/** @return AI_Sooq_Order_Sync */
+	public function order_courier() {
+		return $this->order_courier;
+	}
+
 	public function order_sync() {
 		return $this->order_sync;
 	}

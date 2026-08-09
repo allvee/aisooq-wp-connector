@@ -371,3 +371,380 @@ body[class*="page_aisooq-abandoned"] {
 		transition-duration: .001ms !important;
 	}
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+ * Settings screen layout
+ *
+ * These rules used to be a <style> block inside render_page(). They live here
+ * now for the reason stated at the top of this file: this sheet is the single
+ * source of truth for the plugin's admin look, and a second copy of the base
+ * layout inside PHP guarantees the two drift.
+ * ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Hero ───────────────────────────────────────────────────────────────── */
+.wrap.aisooq .aisooq-hero {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	flex-wrap: wrap;
+	padding: 16px 20px;
+	margin: 16px 0;
+}
+.wrap.aisooq .aisooq-hero__sub { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+.wrap.aisooq .aisooq-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.wrap.aisooq .aisooq-sync-group {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+	padding: 4px 8px;
+	border: 1px solid var(--bd);
+	border-radius: 8px;
+}
+.wrap.aisooq .aisooq-sync-label { font-size: 12px; font-weight: 600; color: var(--muted); }
+.wrap.aisooq .aisooq-sync-group .button { padding: 0 8px; }
+.wrap.aisooq .aisooq-result { font-size: 13px; }
+.wrap.aisooq .aisooq-result.is-pending { color: var(--muted); }
+.wrap.aisooq .aisooq-result.is-ok { color: var(--ok); font-weight: 600; }
+.wrap.aisooq .aisooq-result.is-err { color: var(--err); font-weight: 600; }
+
+/* ── KPI strip ──────────────────────────────────────────────────────────── */
+.wrap.aisooq .aisooq-kpis {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+	gap: 14px;
+	margin: 0 0 22px;
+}
+.wrap.aisooq .aisooq-kpi { border-left: 3px solid var(--pri); padding: 14px 16px; }
+.wrap.aisooq .aisooq-kpi.warn { border-left-color: var(--warn); }
+.wrap.aisooq .aisooq-kpi.err { border-left-color: var(--err); }
+.wrap.aisooq .aisooq-kpi__label {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	color: var(--muted);
+	font-weight: 600;
+}
+.wrap.aisooq .aisooq-kpi__label .dashicons { font-size: 15px; width: 15px; height: 15px; color: var(--pri); }
+.wrap.aisooq .aisooq-kpi__num {
+	font-size: 26px;
+	font-weight: 700;
+	line-height: 1.15;
+	margin-top: 7px;
+	font-variant-numeric: tabular-nums;
+}
+.wrap.aisooq .aisooq-kpi__sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* ── Setup guide ────────────────────────────────────────────────────────── */
+.wrap.aisooq .aisooq-help {
+	background: var(--card);
+	border: 1px solid var(--bd);
+	border-radius: var(--radius);
+	padding: 6px 16px;
+	margin: 0 0 16px;
+}
+.wrap.aisooq .aisooq-help summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
+
+/* ── Tab strip ──────────────────────────────────────────────────────────────
+ * Hidden until the script that drives it has run, so a broken or blocked
+ * script never leaves a row of dead buttons above a page that is already
+ * showing every panel anyway. */
+.wrap.aisooq .aisooq-tabbar { display: none; }
+.wrap.aisooq.aisooq-has-tabs .aisooq-tabbar {
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: 12px;
+	margin: 0 0 16px;
+	border-bottom: 1px solid var(--bd);
+}
+/* The tab row scrolls sideways on its own. The find box is deliberately NOT a
+ * flex item inside it: as one, its intrinsic width fought the nowrap scroll
+ * container and pushed the whole document wider than the phone. */
+.wrap.aisooq .aisooq-tabs {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex-wrap: wrap;
+	min-width: 0;
+}
+.wrap.aisooq .aisooq-tab {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	/* 44px min target — a settings tab is a primary control, not a link. */
+	min-height: 44px;
+	padding: 0 14px;
+	border: 1px solid transparent;
+	border-bottom: 0;
+	border-radius: 8px 8px 0 0;
+	background: transparent;
+	color: var(--muted);
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+	position: relative;
+	bottom: -1px;
+	transition: color .15s ease, background-color .15s ease;
+}
+.wrap.aisooq .aisooq-tab:hover { color: var(--pri); background: rgba(8, 41, 76, .05); }
+.wrap.aisooq .aisooq-tab .dashicons { font-size: 17px; width: 17px; height: 17px; }
+.wrap.aisooq .aisooq-tab.is-active {
+	background: var(--card);
+	border-color: var(--bd);
+	color: var(--pri);
+}
+/* The gold underline is the only accent that says "you are here" — it reads at
+ * a glance even where the 1px border edges don't. */
+.wrap.aisooq .aisooq-tab.is-active::after {
+	content: '';
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: -1px;
+	height: 3px;
+	background: var(--hl);
+	border-radius: 3px 3px 0 0;
+}
+.wrap.aisooq .aisooq-tab__count {
+	min-width: 18px;
+	padding: 0 5px;
+	border-radius: 999px;
+	background: var(--hl);
+	color: #3d2c00;
+	font-size: 11px;
+	line-height: 18px;
+	text-align: center;
+	font-variant-numeric: tabular-nums;
+}
+
+/* ── Find a setting ─────────────────────────────────────────────────────── */
+.wrap.aisooq .aisooq-find {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	flex: 0 1 auto;
+	min-width: 0;
+	padding: 0 10px;
+	min-height: 36px;
+	border: 1px solid var(--bd);
+	border-radius: 999px;
+	background: var(--card);
+	margin-bottom: 6px;
+}
+.wrap.aisooq .aisooq-find .dashicons { color: var(--muted); font-size: 16px; width: 16px; height: 16px; }
+.wrap.aisooq .aisooq-find input {
+	border: 0;
+	box-shadow: none;
+	background: transparent;
+	min-width: 180px;
+	padding: 0;
+	margin: 0;
+	font-size: 13px;
+}
+.wrap.aisooq .aisooq-find input:focus { box-shadow: none; outline: 0; }
+.wrap.aisooq .aisooq-find:focus-within { border-color: var(--pri); box-shadow: 0 0 0 2px rgba(8, 41, 76, .12); }
+.wrap.aisooq .aisooq-nores {
+	margin: 0 0 16px;
+	padding: 14px 16px;
+	background: var(--card);
+	border: 1px dashed var(--bd);
+	border-radius: var(--radius);
+	color: var(--muted);
+}
+
+/* ── Panels ─────────────────────────────────────────────────────────────── */
+.wrap.aisooq .aisooq-panels { display: grid; gap: 16px; }
+.wrap.aisooq .aisooq-panel:focus { outline: 0; }
+.wrap.aisooq .aisooq-panel[hidden] { display: none; }
+/* Fields hold prose. Full browser width is unreadable, so cap the measure
+ * rather than letting inputs stretch across a 1600px monitor. */
+.wrap.aisooq .aisooq-panel .aisooq-card__body { max-width: 60rem; }
+
+.wrap.aisooq .aisooq-field { margin: 0 0 20px; }
+.wrap.aisooq .aisooq-field:last-child { margin-bottom: 0; }
+.wrap.aisooq .aisooq-field[hidden] { display: none; }
+.wrap.aisooq .aisooq-field > label.h,
+.wrap.aisooq .aisooq-field > span.h { display: block; font-weight: 600; margin-bottom: 6px; }
+.wrap.aisooq .aisooq-field .description { margin: 6px 0 0; }
+.wrap.aisooq .aisooq-field input[type=url],
+.wrap.aisooq .aisooq-field input[type=text],
+.wrap.aisooq .aisooq-field input[type=password],
+.wrap.aisooq .aisooq-field input[type=search],
+.wrap.aisooq .aisooq-field textarea,
+.wrap.aisooq .aisooq-field select { width: 100%; max-width: 100%; }
+.wrap.aisooq .aisooq-field input.small-text { width: 5.5em; }
+.wrap.aisooq .aisooq-check { display: block; margin: 0 0 8px; }
+.wrap.aisooq .aisooq-check:last-child { margin-bottom: 0; }
+.wrap.aisooq .aisooq-inline { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.wrap.aisooq .aisooq-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.wrap.aisooq .aisooq-row > input { flex: 1 1 180px; width: auto; }
+.wrap.aisooq .aisooq-checkgrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+	gap: 2px 12px;
+}
+.wrap.aisooq .aisooq-entity select { max-width: 22rem; }
+.wrap.aisooq .aisooq-rule { border: 0; border-top: 1px solid var(--bd); margin: 24px 0 16px; }
+.wrap.aisooq .aisooq-subhead {
+	margin: 0 0 4px;
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: .05em;
+	color: var(--muted);
+}
+.wrap.aisooq .aisooq-subnote { margin: 0 0 16px; }
+.wrap.aisooq .aisooq-cost { display: flex; align-items: flex-start; gap: 5px; color: var(--warn); }
+.wrap.aisooq .aisooq-cost .dashicons { font-size: 16px; width: 16px; height: 16px; flex: 0 0 auto; }
+
+/* Dependent field: dimmed so it reads as "no effect right now", never removed
+ * and never disabled — you can still come here to change it. */
+.wrap.aisooq .aisooq-field.is-inactive { opacity: .55; }
+.wrap.aisooq .aisooq-field.is-inactive:focus-within { opacity: 1; }
+.wrap.aisooq .aisooq-dep-note { font-style: italic; color: var(--warn); }
+
+/* ── Save bar ───────────────────────────────────────────────────────────────
+ * Sticky: the form is tall enough that a bottom-of-page button means scrolling
+ * back to commit a one-checkbox change. */
+.wrap.aisooq .aisooq-savebar {
+	position: sticky;
+	bottom: 0;
+	z-index: 10;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex-wrap: wrap;
+	margin: 16px 0 0;
+	padding: 12px 16px;
+	background: var(--card);
+	border: 1px solid var(--bd);
+	border-radius: var(--radius);
+	box-shadow: 0 -2px 10px rgba(8, 41, 76, .06);
+}
+.wrap.aisooq .aisooq-dirty {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--warn);
+}
+/* An author `display` beats the UA sheet's `[hidden]{display:none}`, so every
+ * element this file gives a display value to must opt back out of it — or the
+ * script's `hidden = true` silently does nothing. */
+.wrap.aisooq [hidden] { display: none !important; }
+.wrap.aisooq .aisooq-dirty::before {
+	content: '';
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--hl);
+}
+.wrap.aisooq .aisooq-savebar .description { margin: 0; }
+
+/* ── Focus ──────────────────────────────────────────────────────────────── */
+.wrap.aisooq a:focus-visible,
+.wrap.aisooq button:focus-visible,
+.wrap.aisooq input:focus-visible,
+.wrap.aisooq select:focus-visible,
+.wrap.aisooq textarea:focus-visible,
+.wrap.aisooq [tabindex]:focus-visible {
+	outline: 2px solid var(--pri);
+	outline-offset: 1px;
+	border-radius: 4px;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 782px) {
+	.wrap.aisooq .aisooq-hero { flex-direction: column; align-items: flex-start; }
+	/* Stack: a search box you have to scroll sideways to reach is not a search
+	 * box. It gets its own full-width row above the tabs. */
+	.wrap.aisooq.aisooq-has-tabs .aisooq-tabbar { flex-direction: column-reverse; align-items: stretch; gap: 8px; }
+	/* stretch already fills the column; an explicit 100% adds the parent padding on top and overflows */
+	.wrap.aisooq .aisooq-find { margin-bottom: 0; }
+	.wrap.aisooq .aisooq-find input { min-width: 0; flex: 1 1 auto; }
+}
+@media (max-width: 600px) {
+	.wrap.aisooq .aisooq-hero { padding: 14px; }
+	.wrap.aisooq .aisooq-actions { width: 100%; }
+	.wrap.aisooq .aisooq-sync-group { width: 100%; justify-content: flex-start; }
+	.wrap.aisooq .aisooq-sync-group .button { flex: 1 1 auto; }
+	.wrap.aisooq .aisooq-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+	.wrap.aisooq .aisooq-kpi__num { font-size: 22px; }
+	/* Tabs go horizontally scrollable rather than wrapping to four rows and
+	 * pushing the form off the first screen. */
+	.wrap.aisooq.aisooq-has-tabs .aisooq-tabs {
+		flex-wrap: nowrap;
+		overflow-x: auto;
+		scrollbar-width: none;
+	}
+	.wrap.aisooq.aisooq-has-tabs .aisooq-tabs::-webkit-scrollbar { display: none; }
+	.wrap.aisooq .aisooq-find { min-height: 40px; }
+	.wrap.aisooq .aisooq-tab { flex: 0 0 auto; padding: 0 11px; }
+	.wrap.aisooq .aisooq-tab span:not(.dashicons):not(.aisooq-tab__count) { font-size: 12.5px; }
+	.wrap.aisooq .aisooq-checkgrid { grid-template-columns: 1fr; }
+	.wrap.aisooq .aisooq-savebar { padding: 10px 12px; }
+	.wrap.aisooq .aisooq-savebar .description { flex-basis: 100%; font-size: 12px; }
+}
+@media (max-width: 400px) {
+	.wrap.aisooq .aisooq-kpis { grid-template-columns: 1fr; }
+}
+
+/* ── Connection panel (store identity + granted scopes) ─────────────────── */
+.wrap.aisooq .aisooq-conn { padding: 16px 18px; margin: 0 0 16px; }
+.wrap.aisooq .aisooq-conn__top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.wrap.aisooq .aisooq-conn__avatar {
+	width: 40px;
+	height: 40px;
+	border-radius: 10px;
+	background: var(--pri);
+	color: var(--pri-fg);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: 700;
+	font-size: 18px;
+	flex: 0 0 auto;
+}
+.wrap.aisooq .aisooq-conn__name { font-size: 16px; font-weight: 700; line-height: 1.2; }
+.wrap.aisooq .aisooq-conn__meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 16px;
+	margin-top: 10px;
+	font-size: 12.5px;
+	color: var(--muted);
+}
+.wrap.aisooq .aisooq-conn__meta b { font-weight: 600; }
+.wrap.aisooq .aisooq-perms { margin-top: 14px; border-top: 1px solid var(--bd); padding-top: 12px; }
+.wrap.aisooq .aisooq-perms__h {
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: .05em;
+	margin: 0 0 8px;
+}
+.wrap.aisooq .aisooq-perms__grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+	gap: 8px;
+}
+.wrap.aisooq .aisooq-perm { border: 1px solid var(--bd); border-radius: 8px; padding: 8px 10px; }
+.wrap.aisooq .aisooq-perm__name { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; }
+.wrap.aisooq .aisooq-perm__name .dashicons { font-size: 16px; width: 16px; height: 16px; color: var(--pri); }
+.wrap.aisooq .aisooq-perm__acts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.wrap.aisooq .aisooq-act-badge {
+	font-size: 10.5px;
+	font-weight: 600;
+	padding: 2px 7px;
+	border-radius: 999px;
+	text-transform: capitalize;
+}
+.wrap.aisooq .aisooq-act-badge.read { background: #e4eff5; color: #1a5c82; }
+.wrap.aisooq .aisooq-act-badge.write { background: #fbf0dd; color: #97620a; }
+.wrap.aisooq .aisooq-act-badge.other { background: #e8edf4; color: #5a6b80; }
