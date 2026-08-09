@@ -104,9 +104,14 @@ class AI_Sooq_Abandoned_Admin {
 
 		$funnel = $wpdb->get_results( // phpcs:ignore WordPress.DB
 			"SELECT COALESCE(NULLIF(furthest_step, ''), 'unknown') AS step, COUNT(*) AS n
-			 FROM {$t} WHERE status = 'active' AND {$reachable} GROUP BY step ORDER BY n DESC",
+			 FROM {$t} WHERE status = 'active' AND {$reachable} GROUP BY step",
 			ARRAY_A
 		);
+		// Sort by the order a shopper actually moves through checkout, not by
+		// size. Ordered by count it is not a funnel at all — it was rendering
+		// "Address, Payment, Contact, Review", which is nobody's journey and is
+		// why the panel read as meaningless.
+		$funnel = self::order_funnel( $funnel );
 
 		$total     = (int) ( $row['total'] ?? 0 );
 		$recovered = (int) ( $row['recovered'] ?? 0 );
@@ -234,6 +239,57 @@ class AI_Sooq_Abandoned_Admin {
 	}
 
 	/** Currency-format a number using the store's WooCommerce currency symbol. */
+	/**
+	 * Checkout steps, in the order a shopper meets them.
+	 *
+	 * `furthest_step` records the last one a cart got to, so read down the list
+	 * to see how far people get before they stop.
+	 */
+	public static function funnel_steps() {
+		return array(
+			'contact' => array(
+				'label' => __( 'Stopped at contact', 'aisooq-connector' ),
+				'hint'  => __( 'Started checkout, nothing else filled in', 'aisooq-connector' ),
+			),
+			'address' => array(
+				'label' => __( 'Stopped at address', 'aisooq-connector' ),
+				'hint'  => __( 'Knows where it should go — worth a call', 'aisooq-connector' ),
+			),
+			'payment' => array(
+				'label' => __( 'Stopped at payment', 'aisooq-connector' ),
+				'hint'  => __( 'One tap from ordering', 'aisooq-connector' ),
+			),
+			'review'  => array(
+				'label' => __( 'Stopped at review', 'aisooq-connector' ),
+				'hint'  => __( 'Everything filled in and still stopped', 'aisooq-connector' ),
+			),
+			'unknown' => array(
+				'label' => __( 'Never checked out', 'aisooq-connector' ),
+				'hint'  => __( 'Cart built, checkout never opened', 'aisooq-connector' ),
+			),
+		);
+	}
+
+	/** Reorder a funnel result set into checkout order. */
+	public static function order_funnel( $rows ) {
+		$rows  = is_array( $rows ) ? $rows : array();
+		$order = array_keys( self::funnel_steps() );
+		$by    = array();
+		foreach ( $rows as $r ) {
+			$by[ (string) $r['step'] ] = $r;
+		}
+		$out = array();
+		foreach ( $order as $step ) {
+			if ( isset( $by[ $step ] ) ) {
+				$out[] = $by[ $step ];
+				unset( $by[ $step ] );
+			}
+		}
+		// Anything the plugin does not know about keeps its place at the end
+		// rather than being dropped — a future checkout step must not vanish.
+		return array_merge( $out, array_values( $by ) );
+	}
+
 	private function money( $n, $currency = '' ) {
 		$symbol = '';
 		if ( function_exists( 'get_woocommerce_currency_symbol' ) ) {
@@ -987,20 +1043,41 @@ class AI_Sooq_Abandoned_Admin {
 				<div class="aisooq-kpi"><div class="aisooq-kpi__label"><?php esc_html_e( 'Open value', 'aisooq-connector' ); ?></div><div class="aisooq-kpi__num aisooq-mono"><?php echo esc_html( $this->money( $k['open_value'], $currency ) ); ?></div><div class="aisooq-kpi__sub"><?php echo esc_html( sprintf( __( 'avg %s', 'aisooq-connector' ), $this->money( $k['avg_open'], $currency ) ) ); ?></div></div>
 			</div>
 
-			<?php if ( ! empty( $k['funnel'] ) ) : ?>
-			<div class="aisooq-panel">
-				<div class="aisooq-panel__head"><?php esc_html_e( 'Where open carts drop off', 'aisooq-connector' ); ?></div>
-				<div class="aisooq-panel__body">
-					<div class="aisooq-funnel">
-						<?php foreach ( $k['funnel'] as $ff ) : $n = (int) $ff['n']; $pct = $max_step > 0 ? round( $n / $max_step * 100 ) : 0; ?>
-							<div class="aisooq-funnel__row">
-								<span><?php echo esc_html( ucfirst( (string) $ff['step'] ) ); ?></span>
-								<span class="aisooq-funnel__track"><span class="aisooq-funnel__bar" style="width:<?php echo esc_attr( max( 3, $pct ) ); ?>%"></span></span>
-								<span class="aisooq-mono" style="text-align:right;"><?php echo esc_html( number_format_i18n( $n ) ); ?></span>
-							</div>
-						<?php endforeach; ?>
+			<?php
+			if ( ! empty( $k['funnel'] ) ) :
+				$steps    = self::funnel_steps();
+				$open_tot = 0;
+				foreach ( $k['funnel'] as $ff ) {
+					$open_tot += (int) $ff['n'];
+				}
+				$worst = null;
+				foreach ( $k['funnel'] as $ff ) {
+					if ( null === $worst || (int) $ff['n'] > (int) $worst['n'] ) {
+						$worst = $ff;
+					}
+				}
+				?>
+			<?php // Same card row as the KPIs above, in checkout order. The list of
+			      // carts is the working surface of this screen; this is context,
+			      // and context does not get to push the work below the fold. ?>
+			<div class="aisooq-kpis aisooq-kpis--funnel">
+				<?php
+				foreach ( $k['funnel'] as $ff ) :
+					$step = (string) $ff['step'];
+					$n    = (int) $ff['n'];
+					$pct  = $open_tot > 0 ? round( $n / $open_tot * 100 ) : 0;
+					$meta = isset( $steps[ $step ] ) ? $steps[ $step ] : array( 'label' => ucfirst( $step ), 'hint' => '' );
+					?>
+					<div class="aisooq-kpi<?php echo ( $worst && $step === (string) $worst['step'] ) ? ' warn' : ''; ?>"
+						title="<?php echo esc_attr( $meta['hint'] ); ?>">
+						<div class="aisooq-kpi__label"><?php echo esc_html( $meta['label'] ); ?></div>
+						<div class="aisooq-kpi__num"><?php echo esc_html( number_format_i18n( $n ) ); ?></div>
+						<div class="aisooq-kpi__sub">
+							<?php /* translators: %s: percentage of open carts */ ?>
+							<?php echo esc_html( sprintf( __( '%s%% of open', 'aisooq-connector' ), number_format_i18n( $pct ) ) ); ?>
+						</div>
 					</div>
-				</div>
+				<?php endforeach; ?>
 			</div>
 			<?php endif; ?>
 

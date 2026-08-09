@@ -748,3 +748,18 @@ body[class*="page_aisooq-abandoned"] {
 .wrap.aisooq .aisooq-act-badge.read { background: #e4eff5; color: #1a5c82; }
 .wrap.aisooq .aisooq-act-badge.write { background: #fbf0dd; color: #97620a; }
 .wrap.aisooq .aisooq-act-badge.other { background: #e8edf4; color: #5a6b80; }
+
+/* ── Abandoned-cart funnel ────────────────────────────────────────────────
+ * The same card row as the KPIs above, in checkout order. Secondary weight on
+ * purpose: this is context for the list below it, and the list is what an
+ * operator came to work through — it must not be pushed off the first screen.
+ */
+.wrap.aisooq-ab .aisooq-kpis--funnel {
+	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+	gap: 10px;
+	margin-top: -6px;
+}
+.wrap.aisooq-ab .aisooq-kpis--funnel .aisooq-kpi { padding: 10px 12px; }
+.wrap.aisooq-ab .aisooq-kpis--funnel .aisooq-kpi__num { font-size: 20px; margin-top: 3px; }
+.wrap.aisooq-ab .aisooq-kpis--funnel .aisooq-kpi__label { font-size: 10.5px; }
+.wrap.aisooq-ab .aisooq-kpis--funnel .aisooq-kpi__sub { font-size: 11px; }

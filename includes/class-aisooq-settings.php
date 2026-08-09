@@ -147,6 +147,29 @@ class AI_Sooq_Settings {
 		return (bool) $this->get( 'active' );
 	}
 
+	/**
+	 * The connected store's profile, as the platform last reported it.
+	 *
+	 * Cached from `/connect/ping` — name, contact, currency, and the storefront
+	 * choices the owner made in AI Sooq admin (currently the Bengali typeface).
+	 * Public because a theme legitimately needs it: the alternative is a theme
+	 * reaching into this plugin's private option, which breaks the moment the
+	 * option's shape changes.
+	 *
+	 * @param string|null $key Dot-free key to read, or null for the whole array.
+	 * @return mixed
+	 */
+	public static function store_profile( $key = null, $default = null ) {
+		$status = get_option( self::STATUS_OPTION, array() );
+		$store  = ( is_array( $status ) && isset( $status['store'] ) && is_array( $status['store'] ) )
+			? $status['store']
+			: array();
+		if ( null === $key ) {
+			return $store;
+		}
+		return array_key_exists( $key, $store ) ? $store[ $key ] : $default;
+	}
+
 	/** Last successful verify result (sid, scopes, time) or empty. */
 	public function status() {
 		$s = get_option( self::STATUS_OPTION, array() );
