@@ -42,6 +42,8 @@ AI Sooq Connector links a single WooCommerce store to the AI Sooq platform. It k
 
 **Fraud screening** — Checkouts are screened through the platform's 4-layer engine (phone/name/address heuristics, IP-velocity auto-block, courier delivery-history gate). You choose the action — block, hold, or flag. Screening **fails open**: if the API is unreachable, checkout proceeds. Works with both Classic and Block (Store API) checkout.
 
+**Courier history on orders** — Opt in and every new order with a phone number has its BDCourier delivery history looked up in the background, shown as a **Courier** column on WooCommerce → Orders and a breakdown box on the order screen. Off by default: each lookup is billed on the platform, so it is stored on the order and stands until an operator presses **Recheck**, a "no history" answer included. Changing an order's billing phone discards the answer rather than showing it against a different number.
+
 **Attribution** — First-touch and last-touch data (landing page, referrer, traffic source, UTM parameters, `gclid`/`fbclid`), client browser time (hour range, weekday, month, timezone), device, and visit count are attached to each order as the `app:woocommerce/attribution` metafield on the platform.
 
 **Customer sync** — Two-way push and pull with last-write-wins, matched by email or phone. Direction is switchable: two-way, push-only, or pull-only.
@@ -178,7 +180,10 @@ The **AI Sooq** settings page gives you:
 - **Active master switch** — pauses every sync at once while preserving all settings.
 - **Verify connection** — validates credentials and the OAuth handshake.
 - **Sync now** — backfills recent orders on demand.
-- **Quick-setup guide** panel, per-feature toggles and direction selects, the order-status push filter, the fraud action selector, and the debug-logging toggle.
+- **Quick-setup guide** panel and the KPI strip (orders synced, queue depth, failures, carts pushed, products, customers).
+- **Six sections** — Connection, Sync, Fraud & courier, Checkout messages, Shipping and Advanced — with a **Find a setting** box that searches all of them at once and counts matches per section, a Save button that stays in reach while you scroll, and an unsaved-changes warning.
+
+  The sections are a view layer only. Every field stays in the page and posts on every save, so a save made from one section can never clear a setting in another — and with JavaScript off the tab strip simply never appears and the page is the plain long form it has always been. A setting that only bites while another switch is on is dimmed and says which one, rather than disappearing.
 
 ## Architecture
 
@@ -192,6 +197,7 @@ includes/
 ├── class-aisooq-order-sync.php      Order hooks → Action Scheduler → /connect/orders
 ├── class-aisooq-status-poller.php   Poll → reconcile WC status (forward-only)
 ├── class-aisooq-abandoned-sync.php  Capture table + idle-cart sweep
+├── class-aisooq-order-courier.php   Auto courier lookup on new orders + orders column
 ├── class-aisooq-attribution.php     Visitor tracker → order metafield
 ├── class-aisooq-analytics.php       Server Purchase + browser event proxy
 ├── class-aisooq-fraud.php           Checkout screen → block / hold / flag
