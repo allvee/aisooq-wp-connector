@@ -56,6 +56,7 @@ class AI_Sooq_Order_Courier {
 		add_action( self::ACTION, array( $this, 'run_check' ), 10, 1 );
 
 		add_action( 'wp_ajax_aisooq_order_courier_recheck', array( $this, 'ajax_recheck' ) );
+		add_action( 'wp_ajax_aisooq_order_courier_detail', array( $this, 'ajax_detail' ) );
 		add_action( 'add_meta_boxes', array( $this, 'add_meta_box' ) );
 
 		// A column on the orders list: the whole point is seeing risk across the
@@ -354,7 +355,21 @@ class AI_Sooq_Order_Courier {
 							<?php esc_html_e( 'No history', 'aisooq-connector' ); ?>
 						</span>
 					<?php else : ?>
-						<?php echo self::ratio_bar( $snap['ratio'], $snap['parcels'] ); // phpcs:ignore WordPress.Security.EscapeOutput -- ratio_bar() escapes. ?>
+						<?php
+						// The orders list gets the bar and nothing else. That column
+						// is one of a dozen competing for width, and "25 parcels" /
+						// "Checked 3 hours ago" is detail nobody reads while
+						// scanning rows — it only pushes the bar narrower. Both
+						// still show in the order's own panel, where there is room.
+						echo self::ratio_bar( $snap['ratio'], $detailed ? $snap['parcels'] : null ); // phpcs:ignore WordPress.Security.EscapeOutput -- ratio_bar() escapes.
+						?>
+					<?php endif; ?>
+					<?php if ( ! $detailed ) : ?>
+						<button type="button" class="button button-small aisooq-ordc-eye"
+							title="<?php esc_attr_e( 'See the full courier history and this customer\'s past orders', 'aisooq-connector' ); ?>"
+							aria-label="<?php esc_attr_e( 'See the full courier history', 'aisooq-connector' ); ?>">
+							<span class="dashicons dashicons-visibility" aria-hidden="true"></span>
+						</button>
 					<?php endif; ?>
 					<button type="button" class="button button-small aisooq-ordc-check" title="<?php echo esc_attr( $why ); ?>" <?php disabled( ! $active ); ?>>
 						<?php esc_html_e( 'Recheck', 'aisooq-connector' ); ?>
@@ -378,8 +393,8 @@ class AI_Sooq_Order_Courier {
 							<tr>
 								<td><?php echo esc_html( '' !== $c['name'] ? $c['name'] : $c['slug'] ); ?></td>
 								<td><?php echo esc_html( $c['total'] ); ?></td>
-								<td><?php echo esc_html( $c['success'] ); ?></td>
-								<td><?php echo esc_html( $c['cancelled'] ); ?></td>
+								<td class="aisooq-num-ok"><?php echo esc_html( $c['success'] ); ?></td>
+								<td class="aisooq-num-err"><?php echo esc_html( $c['cancelled'] ); ?></td>
 							</tr>
 						<?php endforeach; ?>
 						</tbody>
@@ -387,7 +402,25 @@ class AI_Sooq_Order_Courier {
 					</div>
 				<?php endif; ?>
 
-				<?php if ( $checked ) : ?>
+				<?php
+				$hist = $detailed ? $this->customer_history( $order ) : null;
+				if ( $hist && $hist['total'] > 0 ) :
+					?>
+					<div class="aisooq-ordc-hist">
+						<strong><?php echo esc_html( sprintf( _n( '%s past order here', '%s past orders here', $hist['total'], 'aisooq-connector' ), number_format_i18n( $hist['total'] ) ) ); ?></strong>
+						<span class="aisooq-num-ok"><?php echo esc_html( sprintf( __( '%s kept', 'aisooq-connector' ), number_format_i18n( $hist['completed'] ) ) ); ?></span>
+						<span class="aisooq-num-err"><?php echo esc_html( sprintf( __( '%s cancelled', 'aisooq-connector' ), number_format_i18n( $hist['cancelled'] ) ) ); ?></span>
+						<?php if ( $hist['spent'] > 0 ) : ?>
+							<span class="aisooq-dim"><?php echo wp_kses_post( wc_price( $hist['spent'] ) ); ?></span>
+						<?php endif; ?>
+					</div>
+				<?php elseif ( $detailed && null !== $hist ) : ?>
+					<div class="aisooq-ordc-hist aisooq-dim">
+						<?php esc_html_e( 'First order from this customer.', 'aisooq-connector' ); ?>
+					</div>
+				<?php endif; ?>
+
+				<?php if ( $detailed && $checked ) : ?>
 					<div class="aisooq-dim aisooq-ordc-when">
 						<?php
 						/* translators: %s: human-readable time difference */
@@ -469,7 +502,38 @@ class AI_Sooq_Order_Courier {
 			.aisooq-ordc-tbl th,.aisooq-ordc-tbl td{padding:4px 6px;border-bottom:1px solid #f0f0f1;text-align:left;white-space:nowrap}
 			.aisooq-ordc-tbl th{font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:#646970;background:#f6f7f7}
 			.aisooq-ordc-tbl td:not(:first-child),.aisooq-ordc-tbl th:not(:first-child){text-align:right}
+			/* Delivered vs returned, told by colour as well as position — the
+			   two columns are adjacent integers and the eye needs a cue about
+			   which way is good. */
+			.aisooq-ordc-tbl td.aisooq-num-ok{color:#00844a;font-weight:600}
+			.aisooq-ordc-tbl td.aisooq-num-err{color:#b32d2e;font-weight:600}
 			.aisooq-ordc-check[disabled]{opacity:.45;cursor:not-allowed}
+			/* Eye button: icon-only, so it needs an explicit square rather than
+			   WP's text-button padding, or the glyph sits off-centre. */
+			.aisooq-ordc-eye{display:inline-flex;align-items:center;justify-content:center;
+				width:28px;min-width:28px;height:28px;padding:0}
+			.aisooq-ordc-eye .dashicons{width:16px;height:16px;font-size:16px;line-height:16px}
+			.aisooq-ordc-hist{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;margin-top:8px;
+				padding-top:8px;border-top:1px solid #f0f0f1;font-size:12px}
+			/* Popup. A plain overlay rather than <dialog>, which Safari only got
+			   in 15.4 — a merchant on an older iPad would get no popup at all. */
+			.aisooq-modal{position:fixed;inset:0;z-index:100050;display:flex;align-items:center;
+				justify-content:center;padding:16px;background:rgba(0,0,0,.5)}
+			.aisooq-modal-box{background:#fff;border-radius:8px;max-width:520px;width:100%;
+				max-height:85vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+			.aisooq-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;
+				padding:12px 16px;border-bottom:1px solid #dcdcde;position:sticky;top:0;background:#fff}
+			.aisooq-modal-head h2{margin:0;font-size:14px;line-height:1.4}
+			.aisooq-modal-x{background:none;border:0;cursor:pointer;font-size:20px;line-height:1;
+				padding:4px 8px;color:#646970;min-height:32px;min-width:32px}
+			.aisooq-modal-body{padding:16px}
+			/* On a phone it becomes a bottom sheet — a centred dialog with a
+			   scrolling table is unusable one-handed. */
+			@media (max-width:600px){
+				.aisooq-modal{align-items:flex-end;padding:0}
+				.aisooq-modal-box{max-width:none;border-radius:12px 12px 0 0;max-height:92vh}
+				.aisooq-modal-x{min-height:40px;min-width:40px;font-size:24px}
+			}
 			.aisooq-dim{color:#646970}
 			/* Touch + narrow screens. WP admin drops to a single column at 782px
 			   and the orders table becomes stacked cards, so the bar has to own
@@ -492,6 +556,70 @@ class AI_Sooq_Order_Courier {
 			var nonce = <?php echo wp_json_encode( wp_create_nonce( self::NONCE ) ); ?>;
 			var busy  = <?php echo wp_json_encode( __( 'Checking…', 'aisooq-connector' ) ); ?>;
 			var failed = <?php echo wp_json_encode( __( 'Check failed', 'aisooq-connector' ) ); ?>;
+			var loading = <?php echo wp_json_encode( __( 'Loading…', 'aisooq-connector' ) ); ?>;
+			var closeLbl = <?php echo wp_json_encode( __( 'Close', 'aisooq-connector' ) ); ?>;
+
+			var modal = null;
+			function closeModal() {
+				if ( ! modal ) { return; }
+				modal.remove();
+				modal = null;
+				document.removeEventListener( 'keydown', onKey );
+			}
+			function onKey( e ) { if ( 'Escape' === e.key ) { closeModal(); } }
+			function openModal( title, html ) {
+				closeModal();
+				modal = document.createElement( 'div' );
+				modal.className = 'aisooq-modal';
+				modal.setAttribute( 'role', 'dialog' );
+				modal.setAttribute( 'aria-modal', 'true' );
+				var box = document.createElement( 'div' );
+				box.className = 'aisooq-modal-box';
+				var head = document.createElement( 'div' );
+				head.className = 'aisooq-modal-head';
+				var h = document.createElement( 'h2' );
+				h.textContent = title;
+				var x = document.createElement( 'button' );
+				x.type = 'button';
+				x.className = 'aisooq-modal-x';
+				x.setAttribute( 'aria-label', closeLbl );
+				x.innerHTML = '&times;';
+				x.addEventListener( 'click', closeModal );
+				head.appendChild( h );
+				head.appendChild( x );
+				var body = document.createElement( 'div' );
+				body.className = 'aisooq-modal-body';
+				body.innerHTML = html;
+				box.appendChild( head );
+				box.appendChild( body );
+				modal.appendChild( box );
+				// Backdrop closes; a click inside must not.
+				modal.addEventListener( 'click', function ( ev ) { if ( ev.target === modal ) { closeModal(); } } );
+				document.body.appendChild( modal );
+				document.addEventListener( 'keydown', onKey );
+				x.focus();
+			}
+
+			// Eye: show what is already stored. No lookup, so no charge.
+			document.addEventListener( 'click', function ( e ) {
+				var eye = e.target.closest ? e.target.closest( '.aisooq-ordc-eye' ) : null;
+				if ( ! eye ) { return; }
+				e.preventDefault();
+				var wrap = eye.closest( '.aisooq-ordc' );
+				if ( ! wrap ) { return; }
+				openModal( loading, '' );
+				var body = new FormData();
+				body.append( 'action', 'aisooq_order_courier_detail' );
+				body.append( 'nonce', nonce );
+				body.append( 'order_id', wrap.dataset.order );
+				fetch( ajaxurl, { method: 'POST', credentials: 'same-origin', body: body } )
+					.then( function ( r ) { return r.json(); } )
+					.then( function ( j ) {
+						if ( j && j.success ) { openModal( j.data.title, j.data.html ); }
+						else { openModal( failed, '' ); }
+					} )
+					.catch( function () { openModal( failed, '' ); } );
+			} );
 
 			// Delegated: the orders list redraws rows on filter, and a bound
 			// handler would be lost on every redraw.
@@ -571,5 +699,140 @@ class AI_Sooq_Order_Courier {
 
 		$detailed = ! empty( $_POST['detailed'] );
 		wp_send_json_success( array( 'html' => $this->cell( $fresh, $detailed ) ) );
+	}
+
+	/**
+	 * The stored detail, for the eye button's popup.
+	 *
+	 * Deliberately does NOT look anything up: every BDCourier call is billed,
+	 * and opening a panel to read a number you already paid for must not buy it
+	 * again. Recheck is the only thing that spends money, and it is a separate,
+	 * explicit press.
+	 */
+	public function ajax_detail() {
+		check_ajax_referer( self::NONCE, 'nonce' );
+		if ( ! current_user_can( 'edit_shop_orders' ) && ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'aisooq-connector' ) ), 403 );
+		}
+		$order_id = isset( $_POST['order_id'] ) ? absint( $_POST['order_id'] ) : 0;
+		$order    = $order_id ? wc_get_order( $order_id ) : null;
+		if ( ! $order ) {
+			wp_send_json_error( array( 'message' => __( 'Order not found.', 'aisooq-connector' ) ) );
+		}
+		wp_send_json_success(
+			array(
+				'html'  => $this->cell( $order, true ),
+				/* translators: %s: order number */
+				'title' => sprintf( __( 'Order #%s — courier history', 'aisooq-connector' ), $order->get_order_number() ),
+			)
+		);
+	}
+
+	/**
+	 * How this customer has behaved at THIS shop, alongside their behaviour
+	 * across the courier network.
+	 *
+	 * The BDCourier ratio describes a phone number nationally; it says nothing
+	 * about whether this particular shop has been paid by this particular
+	 * person before. A 55% national ratio reads very differently when the
+	 * customer has taken four parcels from you and refused none — which is
+	 * exactly the call an operator is making when they look at a COD order.
+	 *
+	 * Matched on billing e-mail first (stable, and what WooCommerce indexes),
+	 * falling back to the phone, so guest checkouts still resolve. The current
+	 * order is excluded — it is not part of its own history.
+	 */
+	/** Are orders stored in WooCommerce's own tables (HPOS) rather than posts? */
+	private static function hpos_enabled() {
+		return class_exists( '\Automattic\WooCommerce\Utilities\OrderUtil' )
+			&& \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled();
+	}
+
+	/**
+	 * Order ids carrying this billing phone, on the legacy post store.
+	 *
+	 * Direct SQL because that store rejects both `billing_phone` and
+	 * `meta_query`, and there is no other way to ask it the question. Bounded
+	 * and prepared; the phone is the only input.
+	 */
+	private static function order_ids_by_phone( $phone, $exclude_id ) {
+		global $wpdb;
+		$ids = $wpdb->get_col( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->prepare(
+				"SELECT pm.post_id
+				   FROM {$wpdb->postmeta} pm
+				   JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+				  WHERE pm.meta_key = '_billing_phone'
+				    AND pm.meta_value = %s
+				    AND p.post_type = 'shop_order'
+				    AND p.ID <> %d
+				  ORDER BY p.post_date DESC
+				  LIMIT 100",
+				$phone,
+				(int) $exclude_id
+			)
+		);
+		return array_map( 'intval', (array) $ids );
+	}
+
+	public function customer_history( WC_Order $order ) {
+		$email = trim( (string) $order->get_billing_email() );
+		$phone = trim( (string) $order->get_billing_phone() );
+		if ( '' === $email && '' === $phone ) {
+			return null;
+		}
+
+		$args = array(
+			'limit'   => 100,
+			'return'  => 'objects',
+			'exclude' => array( $order->get_id() ),
+			'status'  => array_keys( wc_get_order_statuses() ),
+			'orderby' => 'date',
+			'order'   => 'DESC',
+		);
+
+		if ( '' !== $email ) {
+			$args['billing_email'] = $email;
+		} else {
+			// Phone-only is the common case here, not an edge: Bangladeshi
+			// checkouts frequently collect no e-mail at all.
+			//
+			// How to ask depends on where orders live. HPOS understands
+			// `billing_phone`; the legacy post store does NOT, and does not
+			// accept `meta_query` either — it answers a _doing_it_wrong notice
+			// and then returns EVERY order, which would report a first-time
+			// buyer as a regular. So that store is queried by id, resolved
+			// from postmeta first.
+			if ( self::hpos_enabled() ) {
+				$args['billing_phone'] = $phone;
+			} else {
+				$ids = self::order_ids_by_phone( $phone, $order->get_id() );
+				if ( ! $ids ) {
+					return array( 'total' => 0, 'completed' => 0, 'cancelled' => 0, 'spent' => 0.0 );
+				}
+				$args['include'] = $ids;
+			}
+		}
+
+		$orders = wc_get_orders( $args );
+		if ( ! is_array( $orders ) || ! $orders ) {
+			return array( 'total' => 0, 'completed' => 0, 'cancelled' => 0, 'spent' => 0.0 );
+		}
+
+		$out = array( 'total' => 0, 'completed' => 0, 'cancelled' => 0, 'spent' => 0.0 );
+		foreach ( $orders as $o ) {
+			if ( ! is_a( $o, 'WC_Order' ) ) {
+				continue;
+			}
+			$out['total']++;
+			$status = $o->get_status();
+			if ( in_array( $status, array( 'completed', 'processing' ), true ) ) {
+				$out['completed']++;
+				$out['spent'] += (float) $o->get_total();
+			} elseif ( in_array( $status, array( 'cancelled', 'refunded', 'failed' ), true ) ) {
+				$out['cancelled']++;
+			}
+		}
+		return $out;
 	}
 }

@@ -85,11 +85,34 @@ class Test_Order_Courier extends WP_Ajax_UnitTestCase {
 		}, 10, 3 );
 	}
 
-	private function make_order( $phone = '+8801712345678' ) {
+	/**
+	 * @param string|array $args Phone (the original signature), or overrides:
+	 *                           billing_phone / billing_email / status / total.
+	 */
+	private function make_order( $args = '+8801712345678' ) {
+		if ( is_string( $args ) ) {
+			$args = array( 'billing_phone' => $args );
+		}
+		$args = wp_parse_args(
+			$args,
+			array(
+				'billing_phone' => '+8801712345678',
+				'billing_email' => '',
+				'status'        => 'processing',
+				'total'         => 0,
+			)
+		);
+
 		$order = new WC_Order();
 		$order->set_billing_first_name( 'Karim' );
-		$order->set_billing_phone( $phone );
-		$order->set_status( 'processing' );
+		$order->set_billing_phone( $args['billing_phone'] );
+		if ( '' !== $args['billing_email'] ) {
+			$order->set_billing_email( $args['billing_email'] );
+		}
+		if ( $args['total'] ) {
+			$order->set_total( (string) $args['total'] );
+		}
+		$order->set_status( $args['status'] );
 		$order->save();
 		return $order;
 	}
@@ -264,6 +287,72 @@ class Test_Order_Courier extends WP_Ajax_UnitTestCase {
 		// the number the operator must be able to read.
 		$this->assertStringContainsString( 'aisooq-ratio err outside', AI_Sooq_Order_Courier::ratio_bar( 6.0 ) );
 		$this->assertStringContainsString( 'aisooq-ratio ok inside', AI_Sooq_Order_Courier::ratio_bar( 93.0 ) );
+	}
+
+	public function test_the_orders_list_shows_the_bar_alone_and_the_panel_shows_the_detail() {
+		$order = $this->make_order();
+		$this->stub_api( $this->api_payload() );
+		$this->courier->run_check( $order->get_id() );
+		$order = $this->reload( $order );
+
+		// Orders list: the column competes with a dozen others for width, so
+		// it carries the bar and the action, nothing else.
+		$list = $this->courier->cell( $order, false );
+		$this->assertStringContainsString( 'aisooq-ratio', $list );
+		$this->assertStringContainsString( '76%', $list );
+		$this->assertStringContainsString( 'Recheck', $list );
+		$this->assertStringNotContainsString( 'parcels', $list );
+		$this->assertStringNotContainsString( 'Checked', $list );
+
+		// The order's own panel has room for the whole picture.
+		$panel = $this->courier->cell( $order, true );
+		$this->assertStringContainsString( 'parcels', $panel );
+		$this->assertStringContainsString( 'Checked', $panel );
+	}
+
+	public function test_delivered_and_returned_counts_are_coloured_apart() {
+		$order = $this->make_order();
+		$this->stub_api( $this->api_payload() );
+		$this->courier->run_check( $order->get_id() );
+
+		$panel = $this->courier->cell( $this->reload( $order ), true );
+		// Two adjacent integers; colour is what says which way is good.
+		$this->assertStringContainsString( 'aisooq-num-ok', $panel );
+		$this->assertStringContainsString( 'aisooq-num-err', $panel );
+	}
+
+	public function test_the_list_offers_an_eye_and_the_panel_does_not() {
+		$order = $this->make_order();
+		$this->stub_api( $this->api_payload() );
+		$this->courier->run_check( $order->get_id() );
+		$order = $this->reload( $order );
+
+		$this->assertStringContainsString( 'aisooq-ordc-eye', $this->courier->cell( $order, false ) );
+		// The panel already IS the detail; an eye there would open itself.
+		$this->assertStringNotContainsString( 'aisooq-ordc-eye', $this->courier->cell( $order, true ) );
+	}
+
+	// ── Past orders from this customer ──────────────────────────────────────
+
+	public function test_customer_history_counts_kept_and_cancelled_orders() {
+		$email = 'repeat@example.com';
+		$this->make_order( array( 'billing_email' => $email, 'status' => 'completed' ) );
+		$this->make_order( array( 'billing_email' => $email, 'status' => 'completed' ) );
+		$this->make_order( array( 'billing_email' => $email, 'status' => 'cancelled' ) );
+		$current = $this->make_order( array( 'billing_email' => $email, 'status' => 'processing' ) );
+
+		$hist = $this->courier->customer_history( $current );
+
+		// Three past orders — the current one is not part of its own history.
+		$this->assertSame( 3, $hist['total'] );
+		$this->assertSame( 2, $hist['completed'] );
+		$this->assertSame( 1, $hist['cancelled'] );
+	}
+
+	public function test_a_first_time_customer_has_no_history() {
+		$order = $this->make_order( array( 'billing_email' => 'brand-new@example.com' ) );
+		$hist  = $this->courier->customer_history( $order );
+		$this->assertSame( 0, $hist['total'] );
 	}
 
 	public function test_the_bar_clamps_nonsense_input() {
