@@ -215,13 +215,13 @@ class Test_Order_Courier extends WP_Ajax_UnitTestCase {
 		$order = $this->make_order();
 		$before = $this->courier->cell( $order );
 		$this->assertStringContainsString( 'Check courier history', $before );
-		$this->assertStringNotContainsString( 'aisooq-ordc-badge', $before );
+		$this->assertStringNotContainsString( 'aisooq-ratio', $before );
 
 		$this->stub_api( $this->api_payload() );
 		$this->courier->run_check( $order->get_id() );
 
 		$after = $this->courier->cell( $this->reload( $order ) );
-		$this->assertStringContainsString( 'aisooq-ordc-badge', $after );
+		$this->assertStringContainsString( 'aisooq-ratio', $after );
 		$this->assertStringContainsString( '76%', $after );
 		$this->assertStringContainsString( 'Recheck', $after );
 		$this->assertStringNotContainsString( 'Check courier history', $after, 'A checked order must not re-offer a paid lookup.' );
@@ -232,6 +232,45 @@ class Test_Order_Courier extends WP_Ajax_UnitTestCase {
 		$this->assertSame( 'warn', AI_Sooq_Order_Courier::tone( 70.0 ) );
 		$this->assertSame( 'err', AI_Sooq_Order_Courier::tone( 41.0 ) );
 		$this->assertSame( 'muted', AI_Sooq_Order_Courier::tone( null ) );
+	}
+
+	// ── The ratio bar ───────────────────────────────────────────────────────
+
+	public function test_the_bar_fills_to_the_ratio_and_carries_the_figure() {
+		$html = AI_Sooq_Order_Courier::ratio_bar( 76.0, 25 );
+
+		$this->assertStringContainsString( 'width:76%', $html );
+		$this->assertStringContainsString( '>76%<', $html, 'The figure has to be on the bar, not only in the tooltip.' );
+		$this->assertStringContainsString( '25 parcels', $html );
+		// Screen readers get the value, not just a coloured rectangle.
+		$this->assertStringContainsString( 'role="progressbar"', $html );
+		$this->assertStringContainsString( 'aria-valuenow="76"', $html );
+	}
+
+	public function test_the_bar_runs_green_to_red_across_the_range() {
+		// Hue 0 is red and 120 is green, so the hue must climb with the ratio.
+		preg_match( '/hsl\((\d+)/', AI_Sooq_Order_Courier::ratio_bar( 0.0 ), $low );
+		preg_match( '/hsl\((\d+)/', AI_Sooq_Order_Courier::ratio_bar( 50.0 ), $mid );
+		preg_match( '/hsl\((\d+)/', AI_Sooq_Order_Courier::ratio_bar( 100.0 ), $high );
+
+		$this->assertSame( 0, (int) $low[1], '0% is red.' );
+		$this->assertSame( 120, (int) $high[1], '100% is green.' );
+		$this->assertGreaterThan( (int) $low[1], (int) $mid[1] );
+		$this->assertLessThan( (int) $high[1], (int) $mid[1] );
+	}
+
+	public function test_a_low_ratio_puts_the_figure_outside_the_fill() {
+		// A 6% fill is far too short to hold "6%" — and a low ratio is exactly
+		// the number the operator must be able to read.
+		$this->assertStringContainsString( 'aisooq-ratio err outside', AI_Sooq_Order_Courier::ratio_bar( 6.0 ) );
+		$this->assertStringContainsString( 'aisooq-ratio ok inside', AI_Sooq_Order_Courier::ratio_bar( 93.0 ) );
+	}
+
+	public function test_the_bar_clamps_nonsense_input() {
+		// The upstream figure is not ours; a bar wider than its track would
+		// spill over neighbouring cells.
+		$this->assertStringContainsString( 'width:100%', AI_Sooq_Order_Courier::ratio_bar( 140.0 ) );
+		$this->assertStringContainsString( 'width:0%', AI_Sooq_Order_Courier::ratio_bar( -12.0 ) );
 	}
 
 	public function test_a_paused_connection_disables_the_button_and_says_why() {

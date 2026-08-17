@@ -232,6 +232,66 @@ class AI_Sooq_Order_Courier {
 		return $ratio >= 80 ? 'ok' : ( $ratio >= 60 ? 'warn' : 'err' );
 	}
 
+	/**
+	 * The delivery-success ratio as a filled bar with the figure on it.
+	 *
+	 * A bar rather than a bare number because this value is read in a hurry,
+	 * one row at a time, to answer "do I trust this COD order?" — a length is
+	 * comparable at a glance in a way that 72% next to 68% is not.
+	 *
+	 * Colour runs continuously from red at 0 to green at 100 (hue 0→120), not
+	 * in three steps: the three-tone badge put 79% and 61% in the same bucket
+	 * while 80% and 79% looked unrelated, which is exactly backwards for a
+	 * threshold operators tune by feel. The tone class is still emitted so the
+	 * existing ok/warn/err styling and any CSS overrides keep working.
+	 *
+	 * Below ~32% the fill is too short to hold the label, so the figure moves
+	 * outside it — inside it would either overflow the fill or be clipped, and
+	 * a low ratio is precisely the case you must be able to read.
+	 */
+	public static function ratio_bar( $ratio, $parcels = null ) {
+		$pct  = max( 0, min( 100, (float) $ratio ) );
+		$hue  = (int) round( $pct * 1.2 );
+		$fill = sprintf( 'hsl(%d 62%% 38%%)', $hue );
+		$pos  = $pct >= 32 ? 'inside' : 'outside';
+		$tone = self::tone( $ratio );
+
+		$label = null === $parcels
+			/* translators: %s: delivery success percentage */
+			? sprintf( __( 'Courier delivery success %s%%', 'aisooq-connector' ), round( $pct ) )
+			: sprintf(
+				/* translators: 1: success percentage, 2: number of past parcels */
+				__( 'Courier delivery success %1$s%% over %2$s parcels', 'aisooq-connector' ),
+				round( $pct ),
+				$parcels
+			);
+
+		ob_start();
+		?>
+		<div class="aisooq-ratio <?php echo esc_attr( $tone . ' ' . $pos ); ?>">
+			<div class="aisooq-ratio-track" role="progressbar"
+				aria-valuemin="0" aria-valuemax="100"
+				aria-valuenow="<?php echo esc_attr( round( $pct ) ); ?>"
+				aria-label="<?php echo esc_attr( $label ); ?>">
+				<div class="aisooq-ratio-fill" style="width:<?php echo esc_attr( $pct ); ?>%;background:<?php echo esc_attr( $fill ); ?>"></div>
+				<span class="aisooq-ratio-val"><?php echo esc_html( round( $pct ) . '%' ); ?></span>
+			</div>
+			<?php if ( null !== $parcels ) : ?>
+				<span class="aisooq-ratio-meta">
+					<?php
+					printf(
+						/* translators: %s: number of parcels */
+						esc_html( _n( '%s parcel', '%s parcels', (int) $parcels, 'aisooq-connector' ) ),
+						esc_html( $parcels )
+					);
+					?>
+				</span>
+			<?php endif; ?>
+		</div>
+		<?php
+		return ob_get_clean();
+	}
+
 	/* ── Order screen ────────────────────────────────────────────────────── */
 
 	public function add_meta_box() {
@@ -294,14 +354,9 @@ class AI_Sooq_Order_Courier {
 							<?php esc_html_e( 'No history', 'aisooq-connector' ); ?>
 						</span>
 					<?php else : ?>
-						<span class="aisooq-ordc-badge <?php echo esc_attr( $tone ); ?>">
-							<?php echo esc_html( round( $snap['ratio'] ) . '%' ); ?>
-							<?php if ( null !== $snap['parcels'] ) : ?>
-								<span class="aisooq-dim">· <?php echo esc_html( $snap['parcels'] ); ?></span>
-							<?php endif; ?>
-						</span>
+						<?php echo self::ratio_bar( $snap['ratio'], $snap['parcels'] ); // phpcs:ignore WordPress.Security.EscapeOutput -- ratio_bar() escapes. ?>
 					<?php endif; ?>
-					<button type="button" class="button-link aisooq-ordc-check" title="<?php echo esc_attr( $why ); ?>" <?php disabled( ! $active ); ?>>
+					<button type="button" class="button button-small aisooq-ordc-check" title="<?php echo esc_attr( $why ); ?>" <?php disabled( ! $active ); ?>>
 						<?php esc_html_e( 'Recheck', 'aisooq-connector' ); ?>
 					</button>
 					<?php if ( ! $active ) : ?>
@@ -310,6 +365,7 @@ class AI_Sooq_Order_Courier {
 				</div>
 
 				<?php if ( $detailed && $snap['couriers'] ) : ?>
+					<div class="aisooq-ordc-scroll">
 					<table class="aisooq-ordc-tbl">
 						<thead><tr>
 							<th><?php esc_html_e( 'Courier', 'aisooq-connector' ); ?></th>
@@ -328,6 +384,7 @@ class AI_Sooq_Order_Courier {
 						<?php endforeach; ?>
 						</tbody>
 					</table>
+					</div>
 				<?php endif; ?>
 
 				<?php if ( $checked ) : ?>
@@ -390,19 +447,45 @@ class AI_Sooq_Order_Courier {
 		?>
 		<style>
 			.aisooq-ordc-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-			.aisooq-ordc-badge{display:inline-flex;align-items:center;gap:4px;font-weight:600;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid}
-			.aisooq-ordc-badge.ok{background:#edfaef;color:#00844a;border-color:#00844a33}
-			.aisooq-ordc-badge.warn{background:#fcf5e6;color:#996800;border-color:#99680033}
-			.aisooq-ordc-badge.err{background:#fcebea;color:#b32d2e;border-color:#b32d2e33}
-			.aisooq-ordc-badge.muted{background:#f0f0f1;color:#646970;border-color:#dcdcde}
+			/* The ratio bar. min-width keeps it readable in the orders-list
+			   column; flex:1 lets it use the width of a metabox. */
+			.aisooq-ratio{display:flex;align-items:center;gap:6px;min-width:120px;flex:1 1 120px;max-width:260px}
+			.aisooq-ratio-track{position:relative;flex:1 1 auto;height:18px;border-radius:999px;background:#f0f0f1;
+				border:1px solid #dcdcde;overflow:hidden;min-width:74px}
+			.aisooq-ratio-fill{position:absolute;inset:0 auto 0 0;border-radius:999px 0 0 999px;transition:width .25s ease}
+			.aisooq-ratio-val{position:absolute;top:0;line-height:18px;font-size:11px;font-weight:700;font-variant-numeric:tabular-nums}
+			/* Wide enough to sit on the fill: white on the colour. Too narrow:
+			   outside it, dark on the track, so a low ratio stays legible. */
+			.aisooq-ratio.inside .aisooq-ratio-val{right:auto;left:0;width:100%;text-align:center;color:#fff;
+				text-shadow:0 1px 1px rgba(0,0,0,.28)}
+			.aisooq-ratio.outside .aisooq-ratio-val{right:6px;color:#1d2327}
+			.aisooq-ratio-meta{font-size:11px;color:#646970;white-space:nowrap}
 			.aisooq-ordc-why{font-size:11px;color:#996800;font-style:italic}
 			.aisooq-ordc-when{font-size:11px;margin-top:3px;color:#646970}
-			.aisooq-ordc-tbl{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+			/* The per-courier breakdown can exceed a narrow metabox, so it
+			   scrolls on its own rather than stretching the whole panel. */
+			.aisooq-ordc-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:8px}
+			.aisooq-ordc-tbl{width:100%;border-collapse:collapse;font-size:12px;min-width:260px}
 			.aisooq-ordc-tbl th,.aisooq-ordc-tbl td{padding:4px 6px;border-bottom:1px solid #f0f0f1;text-align:left;white-space:nowrap}
 			.aisooq-ordc-tbl th{font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:#646970;background:#f6f7f7}
 			.aisooq-ordc-tbl td:not(:first-child),.aisooq-ordc-tbl th:not(:first-child){text-align:right}
 			.aisooq-ordc-check[disabled]{opacity:.45;cursor:not-allowed}
 			.aisooq-dim{color:#646970}
+			/* Touch + narrow screens. WP admin drops to a single column at 782px
+			   and the orders table becomes stacked cards, so the bar has to own
+			   the row width and the button needs a real tap target (WCAG 2.5.5
+			   asks 44px; WP's own small button is 26px high). */
+			@media (max-width:782px){
+				.aisooq-ratio{max-width:none;flex-basis:100%}
+				.aisooq-ratio-track{height:22px}
+				.aisooq-ratio-val{line-height:22px;font-size:12px}
+				.aisooq-ordc-head{gap:10px}
+				.aisooq-ordc-check.button{min-height:36px;padding:0 14px;line-height:34px}
+				.aisooq-ordc-tbl th,.aisooq-ordc-tbl td{padding:8px 6px}
+			}
+			@media (pointer:coarse){
+				.aisooq-ordc-check.button{min-height:36px}
+			}
 		</style>
 		<script>
 		( function () {
