@@ -6,7 +6,7 @@ Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 2.5.0
+Stable tag: 2.6.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,14 @@ No — one WooCommerce site connects to one AI Sooq store (one OAuth app = one
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 2.6.0 =
+* **The Courier column now leads with the numbers.** Every order row shows parcels sent, delivered and returned, followed by how many orders that customer has placed at *your* shop before — then the success bar underneath. The bar alone could not say how much evidence was behind it: 100% over one parcel and 100% over forty look identical and are a completely different decision.
+* A customer with no previous order here is marked **first** rather than shown a zero, because "0 orders" reads as a data problem and "first" reads as a fact.
+* **The eye opens the breakdown with each courier's logo**, so a row reads like the courier's own dashboard instead of a list of names. Steadfast, Pathao, RedX, Paperfly, eCourier, Sundarban and CarryBee ship with artwork; anything else — BDCourier adds couriers without notice — gets a coloured initial tile rather than a broken image.
+* **Built for a phone.** On the stacked orders list the figures get larger, the eye becomes a 40px tap target, and the breakdown table scrolls on its own instead of stretching the row. The popup is a bottom sheet under 600px.
+* No extra BDCourier calls: every figure comes from the answer already stored on the order. Only **Recheck** spends money, as before.
+* **A courier check no longer comes back empty when BDCourier is down.** The platform now falls back to Steadfast's own fraud check, and failing that to your shop's own delivery outcomes for that number. Both are narrower than the national picture, so the column says which one you are looking at — a 100% built from three of your own parcels is not the same evidence as 100% across every courier in the country.
 
 = 2.2.0 =
 * **Courier history is checked automatically when an order comes in.** Turn on "Look up courier history automatically on every new order" (AI Sooq → Settings → Fraud & courier) and every order with a phone number gets its BDCourier delivery history looked up in the background, with the result in a new **Courier** column on WooCommerce → Orders and a **Courier history** box on the order screen — the full per-courier breakdown, not just a percentage. Nobody has to press a button per order to know whether to dispatch or call first.

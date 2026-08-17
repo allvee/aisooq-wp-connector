@@ -289,25 +289,179 @@ class Test_Order_Courier extends WP_Ajax_UnitTestCase {
 		$this->assertStringContainsString( 'aisooq-ratio ok inside', AI_Sooq_Order_Courier::ratio_bar( 93.0 ) );
 	}
 
-	public function test_the_orders_list_shows_the_bar_alone_and_the_panel_shows_the_detail() {
+	public function test_the_orders_list_shows_the_tally_and_the_bar_and_the_panel_adds_the_rest() {
 		$order = $this->make_order();
 		$this->stub_api( $this->api_payload() );
 		$this->courier->run_check( $order->get_id() );
 		$order = $this->reload( $order );
 
-		// Orders list: the column competes with a dozen others for width, so
-		// it carries the bar and the action, nothing else.
+		// The orders list carries the tally and the bar. The bar alone cannot
+		// say how much evidence is behind it — 100% over one parcel and 100%
+		// over forty are the same bar and a different decision.
 		$list = $this->courier->cell( $order, false );
+		$this->assertStringContainsString( 'aisooq-ordc-counts', $list );
 		$this->assertStringContainsString( 'aisooq-ratio', $list );
 		$this->assertStringContainsString( '76%', $list );
 		$this->assertStringContainsString( 'Recheck', $list );
-		$this->assertStringNotContainsString( 'parcels', $list );
+		// Still not the per-courier table or the timestamp — that is what the
+		// eye is for.
+		$this->assertStringNotContainsString( 'aisooq-ordc-tbl', $list );
 		$this->assertStringNotContainsString( 'Checked', $list );
 
 		// The order's own panel has room for the whole picture.
 		$panel = $this->courier->cell( $order, true );
-		$this->assertStringContainsString( 'parcels', $panel );
+		$this->assertStringContainsString( 'aisooq-ordc-tbl', $panel );
 		$this->assertStringContainsString( 'Checked', $panel );
+	}
+
+	// ── The tally: sent | delivered | returned | past orders here ───────────
+
+	public function test_the_tally_carries_all_four_figures() {
+		// 25 parcels, 19 delivered, 6 returned — see api_payload().
+		$email = 'regular@example.com';
+		$this->make_order( array( 'billing_email' => $email, 'status' => 'completed' ) );
+		$order = $this->make_order( array( 'billing_email' => $email ) );
+
+		$this->stub_api( $this->api_payload() );
+		$this->courier->run_check( $order->get_id() );
+		$list = $this->courier->cell( $this->reload( $order ), false );
+
+		$this->assertMatchesRegularExpression( '/aisooq-pill total[^>]*>\s*25\s*</', $list );
+		$this->assertMatchesRegularExpression( '/aisooq-pill ok[^>]*>\s*19\s*</', $list );
+		$this->assertMatchesRegularExpression( '/aisooq-pill err[^>]*>\s*6\s*</', $list );
+		// The fourth figure is a different kind of fact: this shop's own history
+		// with the customer, which the national ratio knows nothing about.
+		$this->assertMatchesRegularExpression( '/aisooq-pill mine[^>]*>\s*1 order\s*</', $list );
+	}
+
+	public function test_a_first_time_buyer_is_marked_as_such_rather_than_shown_a_zero() {
+		$order = $this->make_order( array( 'billing_email' => 'brandnew@example.com' ) );
+		$this->stub_api( $this->api_payload() );
+		$this->courier->run_check( $order->get_id() );
+
+		$list = $this->courier->cell( $this->reload( $order ), false );
+		// "0 orders" reads as a data problem; "first" reads as a fact.
+		$this->assertStringContainsString( 'aisooq-pill first', $list );
+		$this->assertStringNotContainsString( 'aisooq-pill mine', $list );
+	}
+
+	public function test_the_count_on_the_row_agrees_with_the_panel_it_opens() {
+		$email = 'agree@example.com';
+		$this->make_order( array( 'billing_email' => $email, 'status' => 'completed' ) );
+		$this->make_order( array( 'billing_email' => $email, 'status' => 'cancelled' ) );
+		$this->make_order( array( 'billing_email' => $email, 'status' => 'processing' ) );
+		$order = $this->make_order( array( 'billing_email' => $email ) );
+
+		// The two were written apart once; a row saying "2 orders" beside a
+		// panel listing three is the bug this pins down.
+		$this->assertSame(
+			$this->courier->customer_history( $order )['total'],
+			$this->courier->customer_order_count( $order )
+		);
+		$this->assertSame( 3, $this->courier->customer_order_count( $order ) );
+	}
+
+	public function test_the_count_holds_up_when_the_order_carries_only_a_phone() {
+		// Bangladeshi checkouts frequently collect no e-mail at all, and the
+		// legacy post store answers a meta_query with EVERY order — which would
+		// report a first-time buyer as a regular.
+		$phone = '+8801999888777';
+		$this->make_order( array( 'billing_phone' => $phone, 'status' => 'completed' ) );
+		$order = $this->make_order( array( 'billing_phone' => $phone ) );
+
+		$this->assertSame( 1, $this->courier->customer_order_count( $order ) );
+
+		$stranger = $this->make_order( array( 'billing_phone' => '+8801000000001' ) );
+		$this->assertSame( 0, $this->courier->customer_order_count( $stranger ) );
+	}
+
+	// ── Courier brand marks ─────────────────────────────────────────────────
+
+	public function test_the_panel_shows_each_courier_with_its_logo() {
+		$order = $this->make_order();
+		$this->stub_api( $this->api_payload() );
+		$this->courier->run_check( $order->get_id() );
+
+		$panel = $this->courier->cell( $this->reload( $order ), true );
+		$this->assertStringContainsString( 'aisooq-cmark', $panel );
+		// The name stays alongside the mark — for a screen reader, and for a
+		// courier we ship no artwork for.
+		$this->assertStringContainsString( 'aisooq-ordc-cname', $panel );
+	}
+
+	public function test_an_unknown_courier_falls_back_to_a_monogram_not_a_broken_image() {
+		// BDCourier adds couriers without telling anyone.
+		$mark = AI_Sooq_Order_Courier::courier_mark( 'brandnewcourier' );
+		$this->assertStringContainsString( 'aisooq-cmark', $mark );
+		$this->assertStringNotContainsString( '<img', $mark );
+		$this->assertStringContainsString( '>B<', $mark );
+
+		$brand = AI_Sooq_Order_Courier::brand_of( 'brandnewcourier' );
+		$this->assertSame( 'Brandnewcourier', $brand['label'] );
+	}
+
+	public function test_a_known_courier_keeps_its_own_colours() {
+		$this->assertSame( 'Steadfast', AI_Sooq_Order_Courier::brand_of( 'steadfast' )['label'] );
+		$this->assertSame( 'RX', AI_Sooq_Order_Courier::brand_of( 'redx' )['mono'] );
+		// Slugs arrive lowercase from BDCourier, but a stray case must not
+		// silently drop a courier to the grey fallback.
+		$this->assertSame( 'Pathao', AI_Sooq_Order_Courier::brand_of( 'PATHAO' )['label'] );
+	}
+
+	// ── Which upstream answered ─────────────────────────────────────────────
+
+	public function test_a_normal_lookup_says_nothing_about_its_source() {
+		$order = $this->make_order();
+		$this->stub_api( $this->api_payload() );
+		$this->courier->run_check( $order->get_id() );
+
+		// BDCourier sends no `source`, and a note on every row would be noise.
+		$this->assertStringNotContainsString( 'aisooq-ordc-src', $this->courier->cell( $this->reload( $order ), false ) );
+	}
+
+	public function test_a_fallback_answer_says_where_it_came_from() {
+		$order   = $this->make_order();
+		$payload = $this->api_payload();
+
+		// The platform fell back to Steadfast because BDCourier was down. The
+		// figures are real but narrower, and an operator who is not told cannot
+		// know which they are looking at.
+		$payload['source'] = 'steadfast_fraud_check';
+		$this->stub_api( $payload );
+		$this->courier->run_check( $order->get_id() );
+		$order = $this->reload( $order );
+
+		$this->assertStringContainsString( 'Steadfast only', $this->courier->cell( $order, false ) );
+		$this->assertStringContainsString( 'national lookup was unavailable', $this->courier->cell( $order, true ) );
+	}
+
+	public function test_a_ratio_from_our_own_deliveries_is_labelled_as_such() {
+		$order   = $this->make_order();
+		$payload = $this->api_payload();
+		$payload['source'] = 'platform_orders';
+		$this->stub_api( $payload );
+		$this->courier->run_check( $order->get_id() );
+
+		$this->assertStringContainsString( 'Your orders only', $this->courier->cell( $this->reload( $order ), false ) );
+	}
+
+	public function test_an_unrecognised_source_is_ignored_rather_than_printed_raw() {
+		$order   = $this->make_order();
+		$payload = $this->api_payload();
+		// A newer platform could add a source this plugin build has no wording
+		// for. Showing the raw slug to a merchant is worse than showing nothing.
+		$payload['source'] = 'some_future_source';
+		$this->stub_api( $payload );
+		$this->courier->run_check( $order->get_id() );
+
+		$cell = $this->courier->cell( $this->reload( $order ), false );
+		$this->assertStringNotContainsString( 'some_future_source', $cell );
+		$this->assertStringNotContainsString( 'aisooq-ordc-src', $cell );
+	}
+
+	public function test_a_courier_mark_escapes_a_hostile_name() {
+		$mark = AI_Sooq_Order_Courier::courier_mark( 'redx', '"><script>alert(1)</script>' );
+		$this->assertStringNotContainsString( '<script>', $mark );
 	}
 
 	public function test_delivered_and_returned_counts_are_coloured_apart() {

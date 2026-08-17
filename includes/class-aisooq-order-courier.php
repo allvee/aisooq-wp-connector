@@ -146,6 +146,15 @@ class AI_Sooq_Order_Courier {
 		$detail = array(
 			'success'   => isset( $payload['successParcel'] ) && is_numeric( $payload['successParcel'] ) ? (int) $payload['successParcel'] : null,
 			'cancelled' => isset( $payload['cancelledParcel'] ) && is_numeric( $payload['cancelledParcel'] ) ? (int) $payload['cancelledParcel'] : null,
+			// Which upstream answered. Absent on a normal BDCourier reply; set
+			// when the platform fell back because BDCourier was down. Kept
+			// because the two are not interchangeable evidence — a ratio from
+			// one courier's own parcels, or from this shop's own deliveries,
+			// supports a different decision from a national one, and an
+			// operator who is not told cannot know which they are looking at.
+			'source'    => isset( $payload['source'] ) && is_string( $payload['source'] )
+				? substr( $payload['source'], 0, 40 )
+				: null,
 			'couriers'  => array(),
 		);
 		if ( ! empty( $payload['couriers'] ) && is_array( $payload['couriers'] ) ) {
@@ -220,8 +229,85 @@ class AI_Sooq_Order_Courier {
 			'parcels'    => ( '' === $parcels || null === $parcels ) ? null : (int) $parcels,
 			'success'    => isset( $detail['success'] ) && null !== $detail['success'] ? (int) $detail['success'] : null,
 			'cancelled'  => isset( $detail['cancelled'] ) && null !== $detail['cancelled'] ? (int) $detail['cancelled'] : null,
+			'source'     => isset( $detail['source'] ) && is_string( $detail['source'] ) && '' !== $detail['source']
+				? $detail['source']
+				: null,
 			'couriers'   => $couriers,
 			'checked_at' => $checked,
+		);
+	}
+
+	/**
+	 * Courier brand marks, mirroring the platform console's `courier-chip.tsx`
+	 * so the same parcel looks the same in both places.
+	 *
+	 * `logo` is a file under assets/img/couriers/. Where we have no artwork the
+	 * monogram box stands in — a coloured tile with the courier's initials,
+	 * which is still recognisable at a glance in a list and never renders as a
+	 * broken image. Upgrading a courier from monogram to real logo is dropping
+	 * the file in and adding `logo` here.
+	 *
+	 * BDCourier returns lowercase slugs; keep the keys lowercase.
+	 */
+	const COURIER_BRAND = array(
+		'steadfast' => array( 'label' => 'Steadfast', 'mono' => 'SF', 'bg' => '#e7f0fb', 'fg' => '#14539a', 'logo' => 'steadfast.svg' ),
+		'pathao'    => array( 'label' => 'Pathao',    'mono' => 'P',  'bg' => '#fdeaef', 'fg' => '#b21f45', 'logo' => 'pathao.svg' ),
+		'redx'      => array( 'label' => 'RedX',      'mono' => 'RX', 'bg' => '#fdeaea', 'fg' => '#b32d2e', 'logo' => 'redx.svg' ),
+		'paperfly'  => array( 'label' => 'Paperfly',  'mono' => 'Pf', 'bg' => '#e8f4fd', 'fg' => '#12628f', 'logo' => 'paperfly.svg' ),
+		'ecourier'  => array( 'label' => 'eCourier',  'mono' => 'eC', 'bg' => '#e6f6ee', 'fg' => '#00844a', 'logo' => 'ecourier.svg' ),
+		'sundarban' => array( 'label' => 'Sundarban', 'mono' => 'Sb', 'bg' => '#e5f5f4', 'fg' => '#0f6f6a', 'logo' => 'sundarban.jpg' ),
+		'carrybee'  => array( 'label' => 'CarryBee',  'mono' => 'CB', 'bg' => '#fdf3e0', 'fg' => '#8a5a00', 'logo' => 'carrybee.png' ),
+		'parceldex' => array( 'label' => 'ParcelDex', 'mono' => 'Px', 'bg' => '#ecebfb', 'fg' => '#3f38a8', 'logo' => '' ),
+	);
+
+	/**
+	 * Brand record for a slug. An unknown courier — BDCourier adds them without
+	 * telling anyone — falls back to a neutral tile with its first letter and a
+	 * tidied-up name, so it appears sensibly instead of blank.
+	 */
+	public static function brand_of( $slug ) {
+		$slug = strtolower( trim( (string) $slug ) );
+		if ( isset( self::COURIER_BRAND[ $slug ] ) ) {
+			return self::COURIER_BRAND[ $slug ];
+		}
+		return array(
+			'label' => '' === $slug ? __( 'Unknown courier', 'aisooq-connector' ) : ucfirst( $slug ),
+			'mono'  => '' === $slug ? '?' : strtoupper( substr( $slug, 0, 1 ) ),
+			'bg'    => '#f0f0f1',
+			'fg'    => '#646970',
+			'logo'  => '',
+		);
+	}
+
+	/**
+	 * The courier's logo, or its monogram tile when we ship no artwork for it.
+	 *
+	 * @param string $slug BDCourier courier slug.
+	 * @param string $name Name as the API gave it, used when the slug is unknown.
+	 */
+	public static function courier_mark( $slug, $name = '' ) {
+		$b     = self::brand_of( $slug );
+		$label = '' !== trim( (string) $name ) ? trim( (string) $name ) : $b['label'];
+
+		// Guarded on the constants so the mark still renders (as a monogram) in
+		// a unit test, where the plugin bootstrap has not run.
+		if ( '' !== $b['logo'] && defined( 'AISOOQ_URL' ) && defined( 'AISOOQ_DIR' ) ) {
+			$file = AISOOQ_DIR . 'assets/img/couriers/' . $b['logo'];
+			if ( file_exists( $file ) ) {
+				return sprintf(
+					'<span class="aisooq-cmark has-logo"><img src="%s" alt="%s" loading="lazy" decoding="async" /></span>',
+					esc_url( AISOOQ_URL . 'assets/img/couriers/' . $b['logo'] ),
+					esc_attr( $label )
+				);
+			}
+		}
+
+		return sprintf(
+			'<span class="aisooq-cmark" style="background:%s;color:%s" title="%s" aria-hidden="true">%s</span>',
+			esc_attr( $b['bg'] ),
+			esc_attr( $b['fg'] ),
+			esc_attr( $label ),
+			esc_html( $b['mono'] )
 		);
 	}
 
@@ -349,6 +435,64 @@ class AI_Sooq_Order_Courier {
 				$tone    = self::tone( $snap['ratio'] );
 				$checked = $snap['checked_at'] ? human_time_diff( strtotime( $snap['checked_at'] . ' UTC' ) ) : '';
 				?>
+				<?php
+				/*
+				 * The tally, above the bar: parcels sent | delivered | returned |
+				 * past orders at THIS shop.
+				 *
+				 * The bar answers "how often does this number take delivery"; it
+				 * cannot say how much evidence is behind it. 100% over one parcel
+				 * and 100% over forty are the same bar and a completely different
+				 * decision, so the counts have to be on the row, not one click
+				 * away in a panel nobody opens while scanning.
+				 *
+				 * The fourth figure is deliberately a different kind of number —
+				 * how this customer has behaved HERE, which the national ratio
+				 * knows nothing about. A 55% number who has taken four parcels
+				 * from you and refused none is not a 55% risk to you.
+				 */
+				$mine = $this->customer_order_count( $order );
+				?>
+				<div class="aisooq-ordc-counts">
+					<?php if ( null !== $snap['parcels'] ) : ?>
+						<span class="aisooq-pill total" title="<?php esc_attr_e( 'Parcels this number has been sent, across all couriers', 'aisooq-connector' ); ?>">
+							<?php echo esc_html( number_format_i18n( $snap['parcels'] ) ); ?>
+						</span>
+					<?php endif; ?>
+					<?php if ( null !== $snap['success'] ) : ?>
+						<span class="aisooq-pill ok" title="<?php esc_attr_e( 'Delivered', 'aisooq-connector' ); ?>">
+							<?php echo esc_html( number_format_i18n( $snap['success'] ) ); ?>
+						</span>
+					<?php endif; ?>
+					<?php if ( null !== $snap['cancelled'] ) : ?>
+						<span class="aisooq-pill err" title="<?php esc_attr_e( 'Returned / refused', 'aisooq-connector' ); ?>">
+							<?php echo esc_html( number_format_i18n( $snap['cancelled'] ) ); ?>
+						</span>
+					<?php endif; ?>
+					<?php if ( $mine ) : ?>
+						<span class="aisooq-pill mine" title="<?php esc_attr_e( 'Orders this customer has placed at this shop before', 'aisooq-connector' ); ?>">
+							<?php
+							printf(
+								/* translators: %s: number of past orders at this shop */
+								esc_html( _n( '%s order', '%s orders', (int) $mine, 'aisooq-connector' ) ),
+								esc_html( number_format_i18n( $mine ) )
+							);
+							?>
+						</span>
+					<?php elseif ( 0 === $mine ) : ?>
+						<span class="aisooq-pill first" title="<?php esc_attr_e( 'No previous order at this shop', 'aisooq-connector' ); ?>">
+							<?php esc_html_e( 'first', 'aisooq-connector' ); ?>
+						</span>
+					<?php endif; ?>
+					<?php if ( ! $detailed ) : ?>
+						<button type="button" class="button-link aisooq-ordc-eye"
+							title="<?php esc_attr_e( 'See the full courier history and this customer\'s past orders', 'aisooq-connector' ); ?>"
+							aria-label="<?php esc_attr_e( 'See the full courier history', 'aisooq-connector' ); ?>">
+							<span class="dashicons dashicons-visibility" aria-hidden="true"></span>
+						</button>
+					<?php endif; ?>
+				</div>
+
 				<div class="aisooq-ordc-head">
 					<?php if ( null === $snap['ratio'] ) : ?>
 						<span class="aisooq-dim" title="<?php esc_attr_e( 'No BDCourier history for this number, or BDCourier is not configured for this store.', 'aisooq-connector' ); ?>">
@@ -356,20 +500,10 @@ class AI_Sooq_Order_Courier {
 						</span>
 					<?php else : ?>
 						<?php
-						// The orders list gets the bar and nothing else. That column
-						// is one of a dozen competing for width, and "25 parcels" /
-						// "Checked 3 hours ago" is detail nobody reads while
-						// scanning rows — it only pushes the bar narrower. Both
-						// still show in the order's own panel, where there is room.
-						echo self::ratio_bar( $snap['ratio'], $detailed ? $snap['parcels'] : null ); // phpcs:ignore WordPress.Security.EscapeOutput -- ratio_bar() escapes.
+						// The parcel count moved into the pills above, so the bar
+						// carries only the figure in both places now.
+						echo self::ratio_bar( $snap['ratio'] ); // phpcs:ignore WordPress.Security.EscapeOutput -- ratio_bar() escapes.
 						?>
-					<?php endif; ?>
-					<?php if ( ! $detailed ) : ?>
-						<button type="button" class="button button-small aisooq-ordc-eye"
-							title="<?php esc_attr_e( 'See the full courier history and this customer\'s past orders', 'aisooq-connector' ); ?>"
-							aria-label="<?php esc_attr_e( 'See the full courier history', 'aisooq-connector' ); ?>">
-							<span class="dashicons dashicons-visibility" aria-hidden="true"></span>
-						</button>
 					<?php endif; ?>
 					<button type="button" class="button button-small aisooq-ordc-check" title="<?php echo esc_attr( $why ); ?>" <?php disabled( ! $active ); ?>>
 						<?php esc_html_e( 'Recheck', 'aisooq-connector' ); ?>
@@ -390,11 +524,20 @@ class AI_Sooq_Order_Courier {
 						</tr></thead>
 						<tbody>
 						<?php foreach ( $snap['couriers'] as $c ) : ?>
+							<?php $label = '' !== $c['name'] ? $c['name'] : self::brand_of( $c['slug'] )['label']; ?>
 							<tr>
-								<td><?php echo esc_html( '' !== $c['name'] ? $c['name'] : $c['slug'] ); ?></td>
-								<td><?php echo esc_html( $c['total'] ); ?></td>
-								<td class="aisooq-num-ok"><?php echo esc_html( $c['success'] ); ?></td>
-								<td class="aisooq-num-err"><?php echo esc_html( $c['cancelled'] ); ?></td>
+								<td class="aisooq-ordc-courier">
+									<?php
+									// The logo does the recognising; the name is
+									// there for a screen reader and for a courier
+									// we ship no artwork for.
+									echo self::courier_mark( $c['slug'], $label ); // phpcs:ignore WordPress.Security.EscapeOutput -- courier_mark() escapes.
+									?>
+									<span class="aisooq-ordc-cname"><?php echo esc_html( $label ); ?></span>
+								</td>
+								<td><?php echo esc_html( number_format_i18n( $c['total'] ) ); ?></td>
+								<td class="aisooq-num-ok"><?php echo esc_html( number_format_i18n( $c['success'] ) ); ?></td>
+								<td class="aisooq-num-err"><?php echo esc_html( number_format_i18n( $c['cancelled'] ) ); ?></td>
 							</tr>
 						<?php endforeach; ?>
 						</tbody>
@@ -418,6 +561,42 @@ class AI_Sooq_Order_Courier {
 					<div class="aisooq-ordc-hist aisooq-dim">
 						<?php esc_html_e( 'First order from this customer.', 'aisooq-connector' ); ?>
 					</div>
+				<?php endif; ?>
+
+				<?php
+				/*
+				 * Say so when the figures did NOT come from the national lookup.
+				 * BDCourier goes down; the platform then falls back to Steadfast's
+				 * own fraud check, and failing that to this shop's own delivery
+				 * outcomes. Both are narrower — a 100% built from three of your
+				 * own parcels is not the same evidence as 100% over forty across
+				 * every courier — and an operator who is not told cannot know
+				 * which they are looking at.
+				 */
+				$src = $snap['source'];
+				if ( $src ) :
+					$note = 'steadfast_fraud_check' === $src
+						? __( 'From Steadfast only — the national lookup was unavailable.', 'aisooq-connector' )
+						: ( 'platform_orders' === $src
+							? __( 'From your own deliveries — the national lookup was unavailable.', 'aisooq-connector' )
+							: '' );
+					?>
+					<?php if ( '' !== $note ) : ?>
+						<div class="aisooq-ordc-src" title="<?php echo esc_attr( $note ); ?>">
+							<span class="dashicons dashicons-info-outline" aria-hidden="true"></span>
+							<?php if ( $detailed ) : ?>
+								<?php echo esc_html( $note ); ?>
+							<?php else : ?>
+								<?php
+								echo esc_html(
+									'steadfast_fraud_check' === $src
+										? __( 'Steadfast only', 'aisooq-connector' )
+										: __( 'Your orders only', 'aisooq-connector' )
+								);
+								?>
+							<?php endif; ?>
+						</div>
+					<?php endif; ?>
 				<?php endif; ?>
 
 				<?php if ( $detailed && $checked ) : ?>
@@ -480,6 +659,34 @@ class AI_Sooq_Order_Courier {
 		?>
 		<style>
 			.aisooq-ordc-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+			/* ── The tally row ──────────────────────────────────────────────
+			   sent | delivered | returned | past orders here, then the eye.
+			   Tabular figures so the columns of numbers line up down the list
+			   instead of jittering row to row. */
+			.aisooq-ordc-counts{display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-bottom:4px}
+			.aisooq-pill{position:relative;display:inline-flex;align-items:center;justify-content:center;
+				min-width:22px;padding:1px 7px;border-radius:999px;font-size:12px;font-weight:600;
+				line-height:18px;font-variant-numeric:tabular-nums;white-space:nowrap}
+			/* A hairline between the figures. Without it three adjacent numbers
+			   read as one, and "16 16 0" is genuinely ambiguous at a glance.
+			   Drawn in the gap to the pill's left — the pill is position:relative
+			   so this lands beside it, not inside it. */
+			.aisooq-pill + .aisooq-pill::before{content:"";position:absolute;left:-6px;top:50%;
+				transform:translateY(-50%);width:1px;height:12px;background:#c3c4c7}
+			.aisooq-pill.total{background:#e7f0fb;color:#14539a}
+			.aisooq-pill.ok{background:#e6f6ee;color:#00844a}
+			.aisooq-pill.err{background:#fdeaea;color:#b32d2e}
+			/* Past orders HERE is a different kind of fact from the three courier
+			   figures beside it, so it gets its own hue rather than reusing one. */
+			.aisooq-pill.mine{background:#f1ecfd;color:#5a2ca0}
+			.aisooq-pill.first{background:#f0f0f1;color:#646970;font-weight:500}
+			/* ── Courier brand mark ────────────────────────────────────────── */
+			.aisooq-cmark{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
+				width:34px;height:20px;border-radius:4px;font-size:10px;font-weight:700;overflow:hidden}
+			.aisooq-cmark.has-logo{background:#fff;border:1px solid #e0e0e0;padding:1px}
+			.aisooq-cmark img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+			.aisooq-ordc-courier{display:flex;align-items:center;gap:6px}
+			.aisooq-ordc-cname{overflow:hidden;text-overflow:ellipsis}
 			/* The ratio bar. min-width keeps it readable in the orders-list
 			   column; flex:1 lets it use the width of a metabox. */
 			.aisooq-ratio{display:flex;align-items:center;gap:6px;min-width:120px;flex:1 1 120px;max-width:260px}
@@ -494,6 +701,11 @@ class AI_Sooq_Order_Courier {
 			.aisooq-ratio.outside .aisooq-ratio-val{right:6px;color:#1d2327}
 			.aisooq-ratio-meta{font-size:11px;color:#646970;white-space:nowrap}
 			.aisooq-ordc-why{font-size:11px;color:#996800;font-style:italic}
+			/* Amber, not red: the number is real and usable, it is just drawn
+			   from a narrower source than usual. */
+			.aisooq-ordc-src{display:flex;align-items:center;gap:4px;margin-top:3px;
+				font-size:11px;color:#996800;line-height:1.35}
+			.aisooq-ordc-src .dashicons{width:14px;height:14px;font-size:14px;line-height:14px;flex:0 0 auto}
 			.aisooq-ordc-when{font-size:11px;margin-top:3px;color:#646970}
 			/* The per-courier breakdown can exceed a narrow metabox, so it
 			   scrolls on its own rather than stretching the whole panel. */
@@ -508,11 +720,16 @@ class AI_Sooq_Order_Courier {
 			.aisooq-ordc-tbl td.aisooq-num-ok{color:#00844a;font-weight:600}
 			.aisooq-ordc-tbl td.aisooq-num-err{color:#b32d2e;font-weight:600}
 			.aisooq-ordc-check[disabled]{opacity:.45;cursor:not-allowed}
-			/* Eye button: icon-only, so it needs an explicit square rather than
-			   WP's text-button padding, or the glyph sits off-centre. */
+			/* Eye: icon-only, so it needs an explicit box rather than WP's
+			   text-button padding, or the glyph sits off-centre. It sits on the
+			   tally row now and reads as an affordance beside the figures, not
+			   as a second grey button competing with Recheck — hence button-link
+			   rather than .button. */
 			.aisooq-ordc-eye{display:inline-flex;align-items:center;justify-content:center;
-				width:28px;min-width:28px;height:28px;padding:0}
-			.aisooq-ordc-eye .dashicons{width:16px;height:16px;font-size:16px;line-height:16px}
+				width:26px;min-width:26px;height:26px;padding:0;border-radius:4px;
+				color:#2271b1;text-decoration:none;cursor:pointer}
+			.aisooq-ordc-eye:hover,.aisooq-ordc-eye:focus{background:#f0f6fc;color:#135e96}
+			.aisooq-ordc-eye .dashicons{width:18px;height:18px;font-size:18px;line-height:18px}
 			.aisooq-ordc-hist{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;margin-top:8px;
 				padding-top:8px;border-top:1px solid #f0f0f1;font-size:12px}
 			/* Popup. A plain overlay rather than <dialog>, which Safari only got
@@ -546,9 +763,33 @@ class AI_Sooq_Order_Courier {
 				.aisooq-ordc-head{gap:10px}
 				.aisooq-ordc-check.button{min-height:36px;padding:0 14px;line-height:34px}
 				.aisooq-ordc-tbl th,.aisooq-ordc-tbl td{padding:8px 6px}
+				/* The tally is the part a phone user reads first, so it gets
+				   bigger figures and a real tap target on the eye — 26px is
+				   under the 44px WCAG 2.5.5 asks for on touch. */
+				.aisooq-ordc-counts{gap:13px;margin-bottom:6px}
+				.aisooq-pill{font-size:13px;line-height:22px;padding:1px 9px;min-width:26px}
+				.aisooq-pill + .aisooq-pill::before{left:-7px;height:14px}
+				.aisooq-ordc-eye{width:40px;min-width:40px;height:40px;margin-left:auto}
+				.aisooq-ordc-eye .dashicons{width:20px;height:20px;font-size:20px;line-height:20px}
+			}
+			/* WP stacks the orders table into cards below 782px and hands each
+			   cell the full row width. Without this the tally wraps mid-figure
+			   and the column label collides with the pills. */
+			@media (max-width:600px){
+				.aisooq-ordc{width:100%}
+				.aisooq-ordc-counts{width:100%}
+				.aisooq-cmark{width:38px;height:22px}
+			}
+			/* Smallest phones: let the figures wrap onto a second line rather
+			   than shrink below readable, and keep the eye reachable. */
+			@media (max-width:400px){
+				.aisooq-ordc-counts{gap:10px}
+				.aisooq-pill{font-size:12px;padding:1px 7px}
+				.aisooq-ordc-check.button{width:100%;text-align:center}
 			}
 			@media (pointer:coarse){
 				.aisooq-ordc-check.button{min-height:36px}
+				.aisooq-ordc-eye{width:40px;min-width:40px;height:40px}
 			}
 		</style>
 		<script>
@@ -775,7 +1016,57 @@ class AI_Sooq_Order_Courier {
 		return array_map( 'intval', (array) $ids );
 	}
 
-	public function customer_history( WC_Order $order ) {
+	/**
+	 * How many past orders this customer has here — the number alone.
+	 *
+	 * Split out from customer_history() because the orders LIST now shows it on
+	 * every row, and hydrating up to 100 WC_Order objects per row to arrive at
+	 * one integer would be the single most expensive thing on that screen.
+	 * `return => 'ids'` keeps the same query and the same HPOS/legacy handling
+	 * without instantiating anything.
+	 *
+	 * Memoised per request: the list renders one cell per row, and a shop where
+	 * the same customer has several pending orders would otherwise repeat an
+	 * identical query for each of them.
+	 *
+	 * @return int|null null when the order carries neither e-mail nor phone.
+	 */
+	public function customer_order_count( WC_Order $order ) {
+		static $memo = array();
+
+		$args = $this->history_query_args( $order, 'ids' );
+		if ( null === $args ) {
+			return null;
+		}
+		// Keyed on what actually varies the answer. The current order is
+		// excluded from its own history, so it belongs in the key too.
+		$key = md5( wp_json_encode( $args ) );
+		if ( array_key_exists( $key, $memo ) ) {
+			return $memo[ $key ];
+		}
+
+		if ( array() === $args ) {
+			$memo[ $key ] = 0;
+			return 0;
+		}
+
+		$ids          = wc_get_orders( $args );
+		$memo[ $key ] = is_array( $ids ) ? count( $ids ) : 0;
+		return $memo[ $key ];
+	}
+
+	/**
+	 * The `wc_get_orders` arguments that mean "this customer's other orders".
+	 *
+	 * Shared by the count and the full history so the two can never disagree
+	 * about who the customer is — they were written apart once and the list
+	 * would have said "2 orders" next to a panel listing three.
+	 *
+	 * @param string $return 'objects' or 'ids'.
+	 * @return array|null Empty array = definitively no past orders (skip the
+	 *                    query); null = no identifier to match on at all.
+	 */
+	private function history_query_args( WC_Order $order, $return = 'objects' ) {
 		$email = trim( (string) $order->get_billing_email() );
 		$phone = trim( (string) $order->get_billing_phone() );
 		if ( '' === $email && '' === $phone ) {
@@ -784,7 +1075,7 @@ class AI_Sooq_Order_Courier {
 
 		$args = array(
 			'limit'   => 100,
-			'return'  => 'objects',
+			'return'  => $return,
 			'exclude' => array( $order->get_id() ),
 			'status'  => array_keys( wc_get_order_statuses() ),
 			'orderby' => 'date',
@@ -793,25 +1084,37 @@ class AI_Sooq_Order_Courier {
 
 		if ( '' !== $email ) {
 			$args['billing_email'] = $email;
-		} else {
-			// Phone-only is the common case here, not an edge: Bangladeshi
-			// checkouts frequently collect no e-mail at all.
-			//
-			// How to ask depends on where orders live. HPOS understands
-			// `billing_phone`; the legacy post store does NOT, and does not
-			// accept `meta_query` either — it answers a _doing_it_wrong notice
-			// and then returns EVERY order, which would report a first-time
-			// buyer as a regular. So that store is queried by id, resolved
-			// from postmeta first.
-			if ( self::hpos_enabled() ) {
-				$args['billing_phone'] = $phone;
-			} else {
-				$ids = self::order_ids_by_phone( $phone, $order->get_id() );
-				if ( ! $ids ) {
-					return array( 'total' => 0, 'completed' => 0, 'cancelled' => 0, 'spent' => 0.0 );
-				}
-				$args['include'] = $ids;
-			}
+			return $args;
+		}
+
+		// Phone-only is the common case here, not an edge: Bangladeshi
+		// checkouts frequently collect no e-mail at all.
+		//
+		// How to ask depends on where orders live. HPOS understands
+		// `billing_phone`; the legacy post store does NOT, and does not accept
+		// `meta_query` either — it answers a _doing_it_wrong notice and then
+		// returns EVERY order, which would report a first-time buyer as a
+		// regular. So that store is queried by id, resolved from postmeta first.
+		if ( self::hpos_enabled() ) {
+			$args['billing_phone'] = $phone;
+			return $args;
+		}
+
+		$ids = self::order_ids_by_phone( $phone, $order->get_id() );
+		if ( ! $ids ) {
+			return array();
+		}
+		$args['include'] = $ids;
+		return $args;
+	}
+
+	public function customer_history( WC_Order $order ) {
+		$args = $this->history_query_args( $order, 'objects' );
+		if ( null === $args ) {
+			return null;
+		}
+		if ( array() === $args ) {
+			return array( 'total' => 0, 'completed' => 0, 'cancelled' => 0, 'spent' => 0.0 );
 		}
 
 		$orders = wc_get_orders( $args );
