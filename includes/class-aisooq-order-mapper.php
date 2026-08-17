@@ -91,6 +91,24 @@ class AI_Sooq_Order_Mapper {
 			'note'             => $order->get_customer_note() ?: null,
 		);
 
+		// When the shopper actually placed the order, as a UTC instant.
+		//
+		// Without this the platform can only stamp the moment the push arrived,
+		// which dates an entire backfill of past orders to the hour the plugin
+		// was installed — every sales report, cohort and date filter over there
+		// then collapses onto that one afternoon.
+		//
+		// `get_date_created()` returns a WC_DateTime in the SITE's timezone;
+		// `setTimezone( UTC )` before formatting converts the instant rather
+		// than relabelling it, so a Dhaka shop's 18:06 goes out as 12:06Z and
+		// comes back as 18:06 Dhaka — not 18:06Z / midnight local.
+		$created = $order->get_date_created();
+		if ( $created ) {
+			$utc = clone $created;
+			$utc->setTimezone( new DateTimeZone( 'UTC' ) );
+			$payload['placedAt'] = $utc->format( 'Y-m-d\TH:i:s\Z' );
+		}
+
 		// Negative-fee discount (gift card / store credit) as an order-level
 		// manual discount — the connector suppresses platform auto-discounts, so
 		// this is the only discount stacked on the mirror.

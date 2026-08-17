@@ -49,6 +49,35 @@ class Test_Order_Mapper extends WP_UnitTestCase {
 		$this->assertSame( 'paid', $payload['financialStatus'] );
 	}
 
+	/**
+	 * The platform stamps its own createdAt when the push carries no date, so a
+	 * backfill of past orders would otherwise all land on the install date.
+	 * placedAt must be the order's real creation instant, expressed in UTC.
+	 */
+	public function test_placed_at_is_the_orders_creation_time_in_utc() {
+		$order = $this->make_cod_order( 'processing' );
+		$order->set_date_created( '2026-07-02T14:31:05+06:00' ); // Dhaka wall clock
+		$order->save();
+
+		$payload = AI_Sooq_Order_Mapper::map( wc_get_order( $order->get_id() ), true );
+
+		$this->assertArrayHasKey( 'placedAt', $payload );
+		// Converted, not relabelled: 14:31 +06:00 is 08:31Z.
+		$this->assertSame( '2026-07-02T08:31:05Z', $payload['placedAt'] );
+	}
+
+	public function test_placed_at_round_trips_back_to_the_same_local_time() {
+		$order = $this->make_cod_order( 'processing' );
+		$order->set_date_created( '2026-07-02T14:31:05+06:00' );
+		$order->save();
+
+		$payload = AI_Sooq_Order_Mapper::map( wc_get_order( $order->get_id() ), true );
+		$back    = new DateTime( $payload['placedAt'] );
+		$back->setTimezone( new DateTimeZone( 'Asia/Dhaka' ) );
+
+		$this->assertSame( '2026-07-02 14:31:05', $back->format( 'Y-m-d H:i:s' ) );
+	}
+
 	public function test_authoritative_total_and_line_reconstruction() {
 		$order   = $this->make_cod_order( 'processing', 2, 500 ); // subtotal 1000
 		$payload = AI_Sooq_Order_Mapper::map( $order, false );
