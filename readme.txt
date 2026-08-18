@@ -6,7 +6,7 @@ Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 2.6.0
+Stable tag: 2.6.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,13 @@ No — one WooCommerce site connects to one AI Sooq store (one OAuth app = one
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 2.6.1 =
+* **The Courier column is laid out to be read down a list, and takes less width doing it.** The figures sit on one line separated by colons, the bar goes underneath them, and the two controls sit under that — so the eye runs figures → quantity → action instead of hunting across a wrapped row.
+* **The bar now shows the split, not just the headline.** Delivered runs from the left, returned continues straight on in a contrasting tone, and the track shows through for anything still in transit. A 70% with a long returned band is a different parcel from a 70% with three still moving, and that was invisible before.
+* Both tones are deliberately muted rather than pure red and green — this column is read all day, and saturated pairs are tiring side by side. The percentage stays on the bar and the figures stay in labelled pills, so nothing depends on colour alone.
+* **Recheck is an icon now**, paired with the eye. As text it was the widest thing in the column while being the least-used control in it. Both keep their names for screen readers, and both are 40px targets on touch.
+* The same layout is now used on the abandoned-cart worklist, so a delivery ratio does not read as two different measurements on two screens.
 
 = 2.6.0 =
 * **The Courier column now leads with the numbers.** Every order row shows parcels sent, delivered and returned, followed by how many orders that customer has placed at *your* shop before — then the success bar underneath. The bar alone could not say how much evidence was behind it: 100% over one parcel and 100% over forty look identical and are a completely different decision.

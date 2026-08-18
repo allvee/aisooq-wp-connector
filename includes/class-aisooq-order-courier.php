@@ -336,22 +336,58 @@ class AI_Sooq_Order_Courier {
 	 * outside it — inside it would either overflow the fill or be clipped, and
 	 * a low ratio is precisely the case you must be able to read.
 	 */
-	public static function ratio_bar( $ratio, $parcels = null ) {
+	public static function ratio_bar( $ratio, $parcels = null, $success = null, $cancelled = null ) {
 		$pct  = max( 0, min( 100, (float) $ratio ) );
 		$hue  = (int) round( $pct * 1.2 );
 		$fill = sprintf( 'hsl(%d 62%% 38%%)', $hue );
 		$pos  = $pct >= 32 ? 'inside' : 'outside';
 		$tone = self::tone( $ratio );
 
-		$label = null === $parcels
+		/*
+		 * When the delivered/returned split is known the bar shows it directly:
+		 * green for what landed, red for what came back, and the track showing
+		 * through for anything still moving. One length then answers both "how
+		 * often does this number take delivery" and "how much of the rest
+		 * actually bounced" — a 70% with 30% red is a different parcel from a
+		 * 70% with nothing red and three still in transit.
+		 *
+		 * Colour is never the only carrier: the figure stays on the bar, the
+		 * counts sit in their own labelled pills beside it, and the aria-label
+		 * spells the whole thing out.
+		 */
+		$segmented = null !== $success && null !== $cancelled && $parcels > 0;
+		$okPct     = $segmented ? max( 0, min( 100, ( (int) $success / (int) $parcels ) * 100 ) ) : 0;
+		$errPct    = $segmented ? max( 0, min( 100 - $okPct, ( (int) $cancelled / (int) $parcels ) * 100 ) ) : 0;
+		// Round the right end only when the two segments actually reach it;
+		// otherwise the red would look finished while parcels are still moving.
+		$filled = $okPct + $errPct;
+		// Where the figure can be read. Centred and white while it sits over a
+		// segment; once most of the bar is bare track it moves right and turns
+		// dark, so a low ratio — the one you most need to read — stays legible.
+		if ( $segmented ) {
+			$pos = $filled >= 55 ? 'inside' : 'outside';
+		}
+
+		if ( $segmented ) {
+			$label = sprintf(
+				/* translators: 1: success percentage, 2: delivered count, 3: returned count, 4: total parcels */
+				__( 'Courier delivery success %1$s%% — %2$s delivered, %3$s returned, of %4$s parcels', 'aisooq-connector' ),
+				round( $pct ),
+				$success,
+				$cancelled,
+				$parcels
+			);
+		} elseif ( null === $parcels ) {
 			/* translators: %s: delivery success percentage */
-			? sprintf( __( 'Courier delivery success %s%%', 'aisooq-connector' ), round( $pct ) )
-			: sprintf(
+			$label = sprintf( __( 'Courier delivery success %s%%', 'aisooq-connector' ), round( $pct ) );
+		} else {
+			$label = sprintf(
 				/* translators: 1: success percentage, 2: number of past parcels */
 				__( 'Courier delivery success %1$s%% over %2$s parcels', 'aisooq-connector' ),
 				round( $pct ),
 				$parcels
 			);
+		}
 
 		ob_start();
 		?>
@@ -360,10 +396,26 @@ class AI_Sooq_Order_Courier {
 				aria-valuemin="0" aria-valuemax="100"
 				aria-valuenow="<?php echo esc_attr( round( $pct ) ); ?>"
 				aria-label="<?php echo esc_attr( $label ); ?>">
-				<div class="aisooq-ratio-fill" style="width:<?php echo esc_attr( $pct ); ?>%;background:<?php echo esc_attr( $fill ); ?>"></div>
+				<?php if ( $segmented ) : ?>
+					<div class="aisooq-ratio-fill is-ok<?php echo $errPct <= 0 && $filled >= 99.5 ? ' is-full' : ''; ?>" style="width:<?php echo esc_attr( $okPct ); ?>%"></div>
+					<?php if ( $errPct > 0 ) : ?>
+						<div class="aisooq-ratio-fill is-err<?php echo $filled >= 99.5 ? ' is-full' : ''; ?>" style="left:<?php echo esc_attr( $okPct ); ?>%;width:<?php echo esc_attr( $errPct ); ?>%"></div>
+					<?php endif; ?>
+				<?php else : ?>
+					<div class="aisooq-ratio-fill" style="width:<?php echo esc_attr( $pct ); ?>%;background:<?php echo esc_attr( $fill ); ?>"></div>
+				<?php endif; ?>
 				<span class="aisooq-ratio-val"><?php echo esc_html( round( $pct ) . '%' ); ?></span>
 			</div>
-			<?php if ( null !== $parcels ) : ?>
+			<?php
+			/*
+			 * The parcel total is only spelled out when the caller has no other
+			 * way to show it. Once the figures are on their own line above, a
+			 * "25 parcels" beside the bar repeats the first pill and takes width
+			 * the bar could have used — which is exactly what it did in the real
+			 * orders list.
+			 */
+			?>
+			<?php if ( null !== $parcels && ! $segmented ) : ?>
 				<span class="aisooq-ratio-meta">
 					<?php
 					printf(
@@ -453,6 +505,7 @@ class AI_Sooq_Order_Courier {
 				 */
 				$mine = $this->customer_order_count( $order );
 				?>
+				<div class="aisooq-ordc-row">
 				<div class="aisooq-ordc-counts">
 					<?php if ( null !== $snap['parcels'] ) : ?>
 						<span class="aisooq-pill total" title="<?php esc_attr_e( 'Parcels this number has been sent, across all couriers', 'aisooq-connector' ); ?>">
@@ -484,33 +537,49 @@ class AI_Sooq_Order_Courier {
 							<?php esc_html_e( 'first', 'aisooq-connector' ); ?>
 						</span>
 					<?php endif; ?>
-					<?php if ( ! $detailed ) : ?>
-						<button type="button" class="button-link aisooq-ordc-eye"
-							title="<?php esc_attr_e( 'See the full courier history and this customer\'s past orders', 'aisooq-connector' ); ?>"
-							aria-label="<?php esc_attr_e( 'See the full courier history', 'aisooq-connector' ); ?>">
-							<span class="dashicons dashicons-visibility" aria-hidden="true"></span>
-						</button>
-					<?php endif; ?>
 				</div>
 
-				<div class="aisooq-ordc-head">
 					<?php if ( null === $snap['ratio'] ) : ?>
-						<span class="aisooq-dim" title="<?php esc_attr_e( 'No BDCourier history for this number, or BDCourier is not configured for this store.', 'aisooq-connector' ); ?>">
+						<span class="aisooq-dim aisooq-ordc-nohist" title="<?php esc_attr_e( 'No BDCourier history for this number, or BDCourier is not configured for this store.', 'aisooq-connector' ); ?>">
 							<?php esc_html_e( 'No history', 'aisooq-connector' ); ?>
 						</span>
 					<?php else : ?>
 						<?php
-						// The parcel count moved into the pills above, so the bar
-						// carries only the figure in both places now.
-						echo self::ratio_bar( $snap['ratio'] ); // phpcs:ignore WordPress.Security.EscapeOutput -- ratio_bar() escapes.
+						// Delivered/returned are passed so the bar can show the
+						// split in place rather than only the headline figure.
+						echo self::ratio_bar( $snap['ratio'], $snap['parcels'], $snap['success'], $snap['cancelled'] ); // phpcs:ignore WordPress.Security.EscapeOutput -- ratio_bar() escapes.
 						?>
 					<?php endif; ?>
-					<button type="button" class="button button-small aisooq-ordc-check" title="<?php echo esc_attr( $why ); ?>" <?php disabled( ! $active ); ?>>
-						<?php esc_html_e( 'Recheck', 'aisooq-connector' ); ?>
-					</button>
-					<?php if ( ! $active ) : ?>
-						<span class="aisooq-ordc-why"><?php esc_html_e( 'connection paused', 'aisooq-connector' ); ?></span>
-					<?php endif; ?>
+
+					<?php
+					/*
+					 * Both controls are icons on their own row under the bar.
+					 * As text they were the widest things in the column while
+					 * being the least-used controls in it, and the figures are
+					 * what the column exists to show. Icon-only demands a name
+					 * for anyone not seeing it, so the words survive in
+					 * aria-label and title — which is also where the "why" copy
+					 * explains a paused connection.
+					 */
+					?>
+					<div class="aisooq-ordc-actions">
+						<?php if ( ! $detailed ) : ?>
+							<button type="button" class="button-link aisooq-ordc-eye aisooq-ordc-icon"
+								title="<?php esc_attr_e( 'See the full courier history and this customer\'s past orders', 'aisooq-connector' ); ?>"
+								aria-label="<?php esc_attr_e( 'See the full courier history', 'aisooq-connector' ); ?>">
+								<span class="dashicons dashicons-visibility" aria-hidden="true"></span>
+							</button>
+						<?php endif; ?>
+						<button type="button" class="button-link aisooq-ordc-check aisooq-ordc-icon"
+							title="<?php echo esc_attr( $why ); ?>"
+							aria-label="<?php esc_attr_e( 'Recheck courier history', 'aisooq-connector' ); ?>"
+							<?php disabled( ! $active ); ?>>
+							<span class="dashicons dashicons-update" aria-hidden="true"></span>
+						</button>
+						<?php if ( ! $active ) : ?>
+							<span class="aisooq-ordc-why"><?php esc_html_e( 'connection paused', 'aisooq-connector' ); ?></span>
+						<?php endif; ?>
+					</div>
 				</div>
 
 				<?php if ( $detailed && $snap['couriers'] ) : ?>
@@ -663,22 +732,32 @@ class AI_Sooq_Order_Courier {
 			   sent | delivered | returned | past orders here, then the eye.
 			   Tabular figures so the columns of numbers line up down the list
 			   instead of jittering row to row. */
-			.aisooq-ordc-counts{display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-bottom:4px}
+			/* Three stacked rows: the figures, the bar they describe, then the
+			   controls. Reading order matches decision order — what happened,
+			   how it looks as a quantity, what you can do about it — and the
+			   bar gets the column's full width instead of competing with
+			   buttons for it. */
+			.aisooq-ordc-row{display:flex;flex-direction:column;align-items:stretch;gap:5px;min-width:0}
+			/* The figures stay on ONE line. Wrapping them mid-set turns four
+			   related numbers into two unrelated pairs. */
+			.aisooq-ordc-counts{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;min-width:0}
+			.aisooq-pill{flex:0 0 auto}
+			.aisooq-ordc-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 			.aisooq-pill{position:relative;display:inline-flex;align-items:center;justify-content:center;
-				min-width:22px;padding:1px 7px;border-radius:999px;font-size:12px;font-weight:600;
-				line-height:18px;font-variant-numeric:tabular-nums;white-space:nowrap}
+				min-width:18px;padding:0 6px;border-radius:999px;font-size:11px;font-weight:600;
+				line-height:17px;font-variant-numeric:tabular-nums;white-space:nowrap}
 			/* A hairline between the figures. Without it three adjacent numbers
 			   read as one, and "16 16 0" is genuinely ambiguous at a glance.
 			   Drawn in the gap to the pill's left — the pill is position:relative
 			   so this lands beside it, not inside it. */
-			.aisooq-pill + .aisooq-pill::before{content:"";position:absolute;left:-6px;top:50%;
-				transform:translateY(-50%);width:1px;height:12px;background:#c3c4c7}
-			.aisooq-pill.total{background:#e7f0fb;color:#14539a}
-			.aisooq-pill.ok{background:#e6f6ee;color:#00844a}
-			.aisooq-pill.err{background:#fdeaea;color:#b32d2e}
+			.aisooq-pill + .aisooq-pill::before{content:":";position:absolute;left:-6px;top:50%;
+				transform:translateY(-50%);color:#8c8f94;font-weight:600;line-height:1}
+			.aisooq-pill.total{background:#e9f0f8;color:#2c5c8f}
+			.aisooq-pill.ok{background:#e8f3ec;color:#2f6b45}
+			.aisooq-pill.err{background:#f7ece9;color:#964a3f}
 			/* Past orders HERE is a different kind of fact from the three courier
 			   figures beside it, so it gets its own hue rather than reusing one. */
-			.aisooq-pill.mine{background:#f1ecfd;color:#5a2ca0}
+			.aisooq-pill.mine{background:#efeafa;color:#55389c}
 			.aisooq-pill.first{background:#f0f0f1;color:#646970;font-weight:500}
 			/* ── Courier brand mark ────────────────────────────────────────── */
 			.aisooq-cmark{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
@@ -689,11 +768,26 @@ class AI_Sooq_Order_Courier {
 			.aisooq-ordc-cname{overflow:hidden;text-overflow:ellipsis}
 			/* The ratio bar. min-width keeps it readable in the orders-list
 			   column; flex:1 lets it use the width of a metabox. */
-			.aisooq-ratio{display:flex;align-items:center;gap:6px;min-width:120px;flex:1 1 120px;max-width:260px}
-			.aisooq-ratio-track{position:relative;flex:1 1 auto;height:18px;border-radius:999px;background:#f0f0f1;
-				border:1px solid #dcdcde;overflow:hidden;min-width:74px}
-			.aisooq-ratio-fill{position:absolute;inset:0 auto 0 0;border-radius:999px 0 0 999px;transition:width .25s ease}
-			.aisooq-ratio-val{position:absolute;top:0;line-height:18px;font-size:11px;font-weight:700;font-variant-numeric:tabular-nums}
+			.aisooq-ratio{display:flex;align-items:center;gap:6px;width:100%;min-width:56px;max-width:168px}
+			.aisooq-ratio-track{position:relative;flex:1 1 auto;height:16px;border-radius:999px;background:#f0f0f1;
+				border:1px solid #dcdcde;overflow:hidden;min-width:56px}
+			/* Custom easing rather than a stock `ease`: the fill settles instead
+			   of arriving, which reads as a value being measured. */
+			.aisooq-ratio-fill{position:absolute;top:0;bottom:0;left:0;
+				transition:width .35s cubic-bezier(.32,.72,0,1)}
+			/* Delivered from the left, returned continuing straight on from it,
+			   the track showing through for anything still in transit. */
+			.aisooq-ratio-fill.is-ok{background:#45805a;border-radius:999px 0 0 999px}
+			.aisooq-ratio-fill.is-err{background:#a85a4e}
+			/* Nothing still moving: the segments reach the end, so round it off.
+			   Set from PHP rather than :last-of-type, which would round the red
+			   even when parcels are still in transit and the bar is unfinished. */
+			.aisooq-ratio-fill.is-full{border-radius:999px}
+			.aisooq-ratio-fill.is-err.is-full{border-radius:0 999px 999px 0}
+			@media (prefers-reduced-motion:reduce){
+				.aisooq-ratio-fill{transition:none}
+			}
+			.aisooq-ratio-val{position:absolute;top:0;line-height:16px;font-size:10px;font-weight:700;font-variant-numeric:tabular-nums}
 			/* Wide enough to sit on the fill: white on the colour. Too narrow:
 			   outside it, dark on the track, so a low ratio stays legible. */
 			.aisooq-ratio.inside .aisooq-ratio-val{right:auto;left:0;width:100%;text-align:center;color:#fff;
@@ -719,17 +813,28 @@ class AI_Sooq_Order_Courier {
 			   which way is good. */
 			.aisooq-ordc-tbl td.aisooq-num-ok{color:#00844a;font-weight:600}
 			.aisooq-ordc-tbl td.aisooq-num-err{color:#b32d2e;font-weight:600}
-			.aisooq-ordc-check[disabled]{opacity:.45;cursor:not-allowed}
+			/* Recheck + eye share one icon-button shape so the pair reads as a
+			   set. touch-action kills the 300ms double-tap delay on the phones
+			   this list is mostly read on. */
+			/* Two class names deep on purpose: WP's `.wp-core-ui .button-link`
+			   underlines its link-buttons, and a single-class rule loses to it —
+			   which drew a stray underline under the icon. */
+			.aisooq-ordc .aisooq-ordc-icon{display:inline-flex;align-items:center;justify-content:center;
+				width:24px;min-width:24px;height:24px;padding:0;border-radius:4px;flex:0 0 auto;
+				color:#2271b1;text-decoration:none;cursor:pointer;touch-action:manipulation;
+				transition:background-color .18s cubic-bezier(.32,.72,0,1),color .18s cubic-bezier(.32,.72,0,1)}
+			.aisooq-ordc .aisooq-ordc-icon:hover:not([disabled]){background:#f0f6fc;color:#135e96}
+			.aisooq-ordc .aisooq-ordc-icon:focus-visible{outline:2px solid #2271b1;outline-offset:1px}
+			.aisooq-ordc .aisooq-ordc-icon .dashicons{width:16px;height:16px;font-size:16px;line-height:16px}
+			.aisooq-ordc-check[disabled]{opacity:.45;cursor:not-allowed;color:#646970}
+			@media (prefers-reduced-motion:reduce){
+				.aisooq-ordc .aisooq-ordc-icon{transition:none}
+			}
 			/* Eye: icon-only, so it needs an explicit box rather than WP's
 			   text-button padding, or the glyph sits off-centre. It sits on the
 			   tally row now and reads as an affordance beside the figures, not
 			   as a second grey button competing with Recheck — hence button-link
 			   rather than .button. */
-			.aisooq-ordc-eye{display:inline-flex;align-items:center;justify-content:center;
-				width:26px;min-width:26px;height:26px;padding:0;border-radius:4px;
-				color:#2271b1;text-decoration:none;cursor:pointer}
-			.aisooq-ordc-eye:hover,.aisooq-ordc-eye:focus{background:#f0f6fc;color:#135e96}
-			.aisooq-ordc-eye .dashicons{width:18px;height:18px;font-size:18px;line-height:18px}
 			.aisooq-ordc-hist{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;margin-top:8px;
 				padding-top:8px;border-top:1px solid #f0f0f1;font-size:12px}
 			/* Popup. A plain overlay rather than <dialog>, which Safari only got
@@ -757,27 +862,32 @@ class AI_Sooq_Order_Courier {
 			   the row width and the button needs a real tap target (WCAG 2.5.5
 			   asks 44px; WP's own small button is 26px high). */
 			@media (max-width:782px){
-				.aisooq-ratio{max-width:none;flex-basis:100%}
-				.aisooq-ratio-track{height:22px}
+				.aisooq-ratio{max-width:none}
+				.aisooq-ratio-track{height:22px;min-width:44px}
 				.aisooq-ratio-val{line-height:22px;font-size:12px}
 				.aisooq-ordc-head{gap:10px}
-				.aisooq-ordc-check.button{min-height:36px;padding:0 14px;line-height:34px}
 				.aisooq-ordc-tbl th,.aisooq-ordc-tbl td{padding:8px 6px}
 				/* The tally is the part a phone user reads first, so it gets
-				   bigger figures and a real tap target on the eye — 26px is
-				   under the 44px WCAG 2.5.5 asks for on touch. */
-				.aisooq-ordc-counts{gap:13px;margin-bottom:6px}
-				.aisooq-pill{font-size:13px;line-height:22px;padding:1px 9px;min-width:26px}
-				.aisooq-pill + .aisooq-pill::before{left:-7px;height:14px}
-				.aisooq-ordc-eye{width:40px;min-width:40px;height:40px;margin-left:auto}
-				.aisooq-ordc-eye .dashicons{width:20px;height:20px;font-size:20px;line-height:20px}
+				   bigger figures — and both icons get a real tap target: 26px
+				   is well under the 44px WCAG 2.5.5 asks for on touch. */
+				.aisooq-ordc-row{gap:6px}
+				/* Tighter than desktop, not looser: four figures, two icons and
+				   a bar have to share a phone's width, and the gap between
+				   pills was costing more room than the pills themselves. */
+				.aisooq-ordc-counts{gap:9px}
+				.aisooq-pill{font-size:13px;line-height:22px;padding:1px 7px;min-width:24px}
+				.aisooq-pill + .aisooq-pill::before{left:-5px;height:14px}
+				.aisooq-ordc .aisooq-ordc-icon{width:40px;min-width:40px;height:40px}
+				.aisooq-ordc .aisooq-ordc-icon .dashicons{width:20px;height:20px;font-size:20px;line-height:20px}
 			}
 			/* WP stacks the orders table into cards below 782px and hands each
 			   cell the full row width. Without this the tally wraps mid-figure
 			   and the column label collides with the pills. */
 			@media (max-width:600px){
 				.aisooq-ordc{width:100%}
-				.aisooq-ordc-counts{width:100%}
+				/* The stack already suits a narrow card; the bar just stops
+				   being capped so it uses the width the phone gives it. */
+				.aisooq-ratio{max-width:none}
 				.aisooq-cmark{width:38px;height:22px}
 			}
 			/* Smallest phones: let the figures wrap onto a second line rather
@@ -789,7 +899,7 @@ class AI_Sooq_Order_Courier {
 			}
 			@media (pointer:coarse){
 				.aisooq-ordc-check.button{min-height:36px}
-				.aisooq-ordc-eye{width:40px;min-width:40px;height:40px}
+				.aisooq-ordc .aisooq-ordc-icon{width:40px;min-width:40px;height:40px}
 			}
 		</style>
 		<script>

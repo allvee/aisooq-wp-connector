@@ -363,22 +363,63 @@ class AI_Sooq_Abandoned_Admin {
 				$checked = $snap['checked_at'] ? human_time_diff( strtotime( $snap['checked_at'] . ' UTC' ) ) : '';
 				$rows    = $snap['couriers'];
 				?>
+				<?php
+				/*
+				 * Same shape as the orders list, deliberately: an operator moves
+				 * between the two screens all day and a delivery ratio that is a
+				 * pill here and a segmented bar there reads as two different
+				 * measurements. The bar is rendered by the orders-list class so
+				 * there is one implementation of the green/red split, not two
+				 * that drift.
+				 */
+				?>
 				<div class="aisooq-courier-head">
+					<?php if ( null !== $snap['parcels'] || null !== $snap['success'] || null !== $snap['cancelled'] ) : ?>
+						<span class="aisooq-courier-counts">
+							<?php if ( null !== $snap['parcels'] ) : ?>
+								<span class="aisooq-pill total" title="<?php esc_attr_e( 'Parcels this number has been sent, across all couriers', 'aisooq-connector' ); ?>"><?php echo esc_html( number_format_i18n( $snap['parcels'] ) ); ?></span>
+							<?php endif; ?>
+							<?php if ( null !== $snap['success'] ) : ?>
+								<span class="aisooq-pill ok" title="<?php esc_attr_e( 'Delivered', 'aisooq-connector' ); ?>"><?php echo esc_html( number_format_i18n( $snap['success'] ) ); ?></span>
+							<?php endif; ?>
+							<?php if ( null !== $snap['cancelled'] ) : ?>
+								<span class="aisooq-pill err" title="<?php esc_attr_e( 'Returned / refused', 'aisooq-connector' ); ?>"><?php echo esc_html( number_format_i18n( $snap['cancelled'] ) ); ?></span>
+							<?php endif; ?>
+						</span>
+					<?php endif; ?>
+
 					<?php if ( null === $snap['ratio'] ) : ?>
 						<span class="aisooq-dim" title="<?php esc_attr_e( 'No BDCourier history for this number, or BDCourier is not configured for this store on the platform.', 'aisooq-connector' ); ?>"><?php esc_html_e( 'No data', 'aisooq-connector' ); ?></span>
 					<?php else : ?>
-						<span class="aisooq-ratio <?php echo esc_attr( $this->ratio_tone( $snap['ratio'] ) ); ?>">
-							<?php echo esc_html( round( $snap['ratio'] ) . '%' ); ?>
-							<?php if ( null !== $snap['parcels'] ) : ?><span class="aisooq-dim">· <?php echo esc_html( $snap['parcels'] ); ?></span><?php endif; ?>
-						</span>
+						<?php
+						echo AI_Sooq_Order_Courier::ratio_bar( // phpcs:ignore WordPress.Security.EscapeOutput -- ratio_bar() escapes.
+							$snap['ratio'],
+							$snap['parcels'],
+							$snap['success'],
+							$snap['cancelled']
+						);
+						?>
 					<?php endif; ?>
+
+					<div class="aisooq-courier-actions">
 					<?php if ( $rows ) : ?>
-						<button type="button" class="button-link aisooq-courier-toggle" aria-expanded="false"><?php esc_html_e( 'Breakdown', 'aisooq-connector' ); ?></button>
+						<button type="button" class="button-link aisooq-courier-toggle aisooq-icon-btn"
+							aria-expanded="false"
+							title="<?php esc_attr_e( 'Show the per-courier breakdown', 'aisooq-connector' ); ?>"
+							aria-label="<?php esc_attr_e( 'Breakdown', 'aisooq-connector' ); ?>">
+							<span class="dashicons dashicons-visibility" aria-hidden="true"></span>
+						</button>
 					<?php endif; ?>
-					<button type="button" class="button-link aisooq-check-courier" title="<?php echo esc_attr( $why ); ?>" <?php disabled( ! $active ); ?>><?php esc_html_e( 'Recheck', 'aisooq-connector' ); ?></button>
+					<button type="button" class="button-link aisooq-check-courier aisooq-icon-btn"
+						title="<?php echo esc_attr( $why ); ?>"
+						aria-label="<?php esc_attr_e( 'Recheck courier history', 'aisooq-connector' ); ?>"
+						<?php disabled( ! $active ); ?>>
+						<span class="dashicons dashicons-update" aria-hidden="true"></span>
+					</button>
 					<?php if ( ! $active ) : ?>
 						<span class="aisooq-courier-why"><?php esc_html_e( 'connection paused', 'aisooq-connector' ); ?></span>
 					<?php endif; ?>
+					</div>
 				</div>
 				<?php if ( $rows ) : ?>
 					<div class="aisooq-courier-detail" hidden>
@@ -943,8 +984,69 @@ class AI_Sooq_Abandoned_Admin {
 				.aisooq-cust{font-weight:600}
 				.aisooq-contact{color:var(--muted);font-size:12px;margin-top:2px;line-height:1.5}
 				.aisooq-courier{margin-top:4px}
-				.aisooq-courier-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+				/* Three stacked rows, same as the orders list: the figures, the
+				   bar they describe, then the controls. An operator moves
+				   between the two screens all day and the same measurement
+				   should not be laid out two different ways. */
+				.aisooq-courier-head{display:flex;flex-direction:column;align-items:stretch;gap:5px;min-width:0}
+				/* The figures stay on one line — wrapping them mid-set turns
+				   three related numbers into two unrelated groups. */
+				.aisooq-courier-counts{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;min-width:0}
+				.aisooq-courier-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+				.aisooq-pill{position:relative;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
+					min-width:18px;padding:0 6px;border-radius:999px;font-size:11px;font-weight:600;
+					line-height:17px;font-variant-numeric:tabular-nums;white-space:nowrap}
+				.aisooq-pill + .aisooq-pill::before{content:":";position:absolute;left:-6px;top:50%;
+					transform:translateY(-50%);color:#8c8f94;font-weight:600;line-height:1}
+				.aisooq-pill.total{background:#e9f0f8;color:#2c5c8f}
+				.aisooq-pill.ok{background:#e8f3ec;color:#2f6b45}
+				.aisooq-pill.err{background:#f7ece9;color:#964a3f}
+				/* `.aisooq-ratio` is a PILL elsewhere on this screen (the
+				   breakdown table still uses it that way). The direct-child
+				   selector turns only the headline instance into the bar, so
+				   the table's pills are untouched. */
+				.aisooq-courier-head > .aisooq-ratio{display:flex;align-items:center;gap:6px;width:100%;
+					max-width:168px;padding:0;border:0;background:none;border-radius:0}
+				.aisooq-courier-head .aisooq-ratio-track{position:relative;flex:1 1 auto;height:16px;border-radius:999px;
+					background:#f0f0f1;border:1px solid #dcdcde;overflow:hidden;min-width:56px}
+				.aisooq-courier-head .aisooq-ratio-fill{position:absolute;top:0;bottom:0;left:0;
+					transition:width .35s cubic-bezier(.32,.72,0,1)}
+				.aisooq-courier-head .aisooq-ratio-fill.is-ok{background:#45805a;border-radius:999px 0 0 999px}
+				.aisooq-courier-head .aisooq-ratio-fill.is-err{background:#a85a4e}
+				.aisooq-courier-head .aisooq-ratio-fill.is-full{border-radius:999px}
+				.aisooq-courier-head .aisooq-ratio-fill.is-err.is-full{border-radius:0 999px 999px 0}
+				.aisooq-courier-head .aisooq-ratio-val{position:absolute;top:0;line-height:16px;font-size:10px;
+					font-weight:700;font-variant-numeric:tabular-nums}
+				.aisooq-courier-head .aisooq-ratio.inside .aisooq-ratio-val{left:0;width:100%;text-align:center;
+					color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.28)}
+				.aisooq-courier-head .aisooq-ratio.outside .aisooq-ratio-val{right:6px;color:#1d2327}
+				.aisooq-courier-head .aisooq-ratio-meta{font-size:11px;color:var(--muted);white-space:nowrap}
+				/* Icon controls, paired on the row under the bar. */
+				/* Two classes deep: `.wp-core-ui .button-link` underlines its
+				   link-buttons and a single-class rule loses to it. */
+				.aisooq-courier .aisooq-icon-btn,.aisooq-courier-actions .aisooq-icon-btn{display:inline-flex;align-items:center;justify-content:center;
+					width:24px;min-width:24px;height:24px;padding:0;border-radius:4px;flex:0 0 auto;
+					color:#2271b1;text-decoration:none;cursor:pointer;touch-action:manipulation;
+					transition:background-color .18s cubic-bezier(.32,.72,0,1),color .18s cubic-bezier(.32,.72,0,1)}
+				.aisooq-icon-btn:hover:not([disabled]),.aisooq-icon-btn:focus-visible{background:#f0f6fc;color:#135e96}
+				.aisooq-icon-btn:focus-visible{outline:2px solid #2271b1;outline-offset:1px}
+				.aisooq-icon-btn .dashicons{width:16px;height:16px;font-size:16px;line-height:16px}
 				.aisooq-courier-head .button-link{font-size:11px;text-decoration:none}
+				@media (prefers-reduced-motion:reduce){
+					.aisooq-courier-head .aisooq-ratio-fill,.aisooq-icon-btn{transition:none}
+				}
+				/* Touch: both icons get a real target — 26px is well under the
+				   44px WCAG 2.5.5 asks for. */
+				@media (max-width:782px),(pointer:coarse){
+					.aisooq-courier .aisooq-icon-btn{width:40px;min-width:40px;height:40px}
+					.aisooq-courier .aisooq-icon-btn .dashicons{width:20px;height:20px;font-size:20px;line-height:20px}
+					.aisooq-courier-head > .aisooq-ratio{max-width:none}
+					.aisooq-courier-head .aisooq-ratio-track{height:20px}
+					.aisooq-courier-head .aisooq-ratio-val{line-height:20px;font-size:11px}
+					.aisooq-courier-counts{gap:9px}
+					.aisooq-pill{font-size:13px;line-height:22px;min-width:24px}
+					.aisooq-pill + .aisooq-pill::before{left:-5px;height:14px}
+				}
 				.aisooq-courier-when{font-size:11px;margin-top:2px}
 				.aisooq-courier-why{font-size:11px;color:var(--warn);margin-left:6px;font-style:italic}
 				.aisooq-check-courier[disabled]{opacity:.45;cursor:not-allowed}
