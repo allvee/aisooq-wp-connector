@@ -862,8 +862,8 @@ class AI_Sooq_Order_Courier {
 			   the row width and the button needs a real tap target (WCAG 2.5.5
 			   asks 44px; WP's own small button is 26px high). */
 			@media (max-width:782px){
-				.aisooq-ratio{max-width:none}
-				.aisooq-ratio-track{height:22px;min-width:44px}
+				.aisooq-ratio{max-width:200px}
+				.aisooq-ratio-track{height:20px;min-width:44px}
 				.aisooq-ratio-val{line-height:22px;font-size:12px}
 				.aisooq-ordc-head{gap:10px}
 				.aisooq-ordc-tbl th,.aisooq-ordc-tbl td{padding:8px 6px}
@@ -885,9 +885,10 @@ class AI_Sooq_Order_Courier {
 			   and the column label collides with the pills. */
 			@media (max-width:600px){
 				.aisooq-ordc{width:100%}
-				/* The stack already suits a narrow card; the bar just stops
-				   being capped so it uses the width the phone gives it. */
-				.aisooq-ratio{max-width:none}
+				/* Still capped on a phone: a bar only has to be long enough
+				   to compare at a glance, and past that it is width taken from
+				   the rest of the card. */
+				.aisooq-ratio{max-width:200px}
 				.aisooq-cmark{width:38px;height:22px}
 			}
 			/* Smallest phones: let the figures wrap onto a second line rather

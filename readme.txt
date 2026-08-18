@@ -6,7 +6,7 @@ Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 2.6.1
+Stable tag: 2.6.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,16 @@ No — one WooCommerce site connects to one AI Sooq store (one OAuth app = one
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 2.6.3 =
+* **The delivery bar is shorter on a phone.** It was stretching to fill whatever width it was given — most of an order panel — for a figure that is readable at a third of that. A bar only has to be long enough to compare at a glance; past that it is width taken from everything around it.
+* **The abandoned-cart list is a proper card on a phone.** Nine label-and-value rows made a card you had to scroll to read one cart, with every value pinned to the far right and a column of dead space down the middle. The same information now reads as a card: who it is on top, the courier evidence under it, then the short facts two-up with each label above its value, and the actions closing the card next to when it was last updated. About a fifth shorter and far quicker to scan.
+* Nothing was dropped to get there — every column, control, label and bulk-select is still present, just placed. Selecting a cart is now a full-size tap target instead of a 22px checkbox.
+
+= 2.6.2 =
+* **The AI Sooq column is icons now, matching the Courier column beside it.** A cloud-upload to push an order, a green tick once it is through, and circular arrows to push it again — at the same size as the courier controls, so two neighbouring columns stop reading as two different kinds of thing. Between them they were taking about 170px of a crowded table.
+* Nothing is lost with the text: every word survives in the tooltip and for screen readers, and the tooltip is still where the platform order id and the sync time live. The arrows turn while a push is in flight, so a slow sync looks like work rather than a dead button, and a failed push puts the control back exactly as it was instead of leaving the row claiming a state the platform never reached.
+* Resync still sits beside the tick, so a corrected address or an edited line can be pushed again without waiting for a status change.
 
 = 2.6.1 =
 * **The Courier column is laid out to be read down a list, and takes less width doing it.** The figures sit on one line separated by colons, the bar goes underneath them, and the two controls sit under that — so the eye runs figures → quantity → action instead of hunting across a wrapped row.

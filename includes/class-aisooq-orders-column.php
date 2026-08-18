@@ -88,19 +88,34 @@ class AI_Sooq_Orders_Column {
 		if ( '' !== $platform_id ) {
 			$at    = (string) $order->get_meta( AISOOQ_META_SYNCED_AT );
 			$title = trim( sprintf( 'Platform #%s %s', $platform_id, $at ? '· ' . $at : '' ) );
+			/*
+			 * Icons, at the same size as the courier column's, because this cell
+			 * sits beside it and two neighbouring columns of differently-shaped
+			 * controls read as two different kinds of thing. The words are not
+			 * lost — every one of them survives in `aria-label` and `title`,
+			 * which is also where the platform id and sync time live.
+			 *
+			 * `role="img"` on the state mark: a bare <span aria-label> is not
+			 * announced by screen readers without one.
+			 */
 			return '<span class="aisooq-order-cell">'
-				. '<span class="aisooq-order-synced" title="' . esc_attr( $title ) . '">&#10003; '
-				. esc_html__( 'Synced', 'aisooq-connector' ) . '</span>'
-				. '<button type="button" class="button button-small aisooq-sync-order is-resync" data-order="'
+				. '<span class="aisooq-order-synced" role="img" title="' . esc_attr( $title ) . '" aria-label="'
+				. esc_attr__( 'Synced', 'aisooq-connector' ) . '">'
+				. '<span class="dashicons dashicons-yes-alt" aria-hidden="true"></span></span>'
+				. '<button type="button" class="button-link aisooq-sync-order aisooq-order-icon is-resync" data-order="'
 				. esc_attr( $id ) . '" title="'
 				. esc_attr__( 'Push this order again — use after editing the address or items', 'aisooq-connector' )
-				. '">' . esc_html__( 'Resync', 'aisooq-connector' ) . '</button>'
+				. '" aria-label="' . esc_attr__( 'Resync', 'aisooq-connector' ) . '">'
+				. '<span class="dashicons dashicons-update" aria-hidden="true"></span></button>'
 				. '</span>';
 		}
 
 		return '<span class="aisooq-order-cell">'
-			. '<button type="button" class="button button-small aisooq-sync-order" data-order="'
-			. esc_attr( $id ) . '">' . esc_html__( 'Sync', 'aisooq-connector' ) . '</button>'
+			. '<button type="button" class="button-link aisooq-sync-order aisooq-order-icon" data-order="'
+			. esc_attr( $id ) . '" title="'
+			. esc_attr__( 'Push this order to AI Sooq now', 'aisooq-connector' )
+			. '" aria-label="' . esc_attr__( 'Sync', 'aisooq-connector' ) . '">'
+			. '<span class="dashicons dashicons-cloud-upload" aria-hidden="true"></span></button>'
 			. '</span>';
 	}
 
@@ -118,17 +133,44 @@ class AI_Sooq_Orders_Column {
 		?>
 		<style>
 			.aisooq-order-cell{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-			.aisooq-order-synced{color:#00844a;font-weight:600;white-space:nowrap}
-			.aisooq-sync-order.is-resync{color:#646970}
-			/* Below 782px WordPress stacks the orders table into cards and the
-			   cell gets the full row, so the control can breathe — and a 26px
-			   WP small button is well under a usable tap target. */
-			@media (max-width:782px){
-				.aisooq-order-cell{gap:10px}
-				.aisooq-sync-order.button{min-height:36px;padding:0 14px;line-height:34px}
+			/* Same box as the courier column's icons, so the two columns read as
+			   one row of controls rather than two unrelated ones. Two classes
+			   deep because `.wp-core-ui .button-link` underlines its
+			   link-buttons and outranks a single-class rule. */
+			.aisooq-order-cell .aisooq-order-icon{display:inline-flex;align-items:center;justify-content:center;
+				width:24px;min-width:24px;height:24px;padding:0;border-radius:4px;flex:0 0 auto;
+				color:#2271b1;text-decoration:none;cursor:pointer;touch-action:manipulation;
+				transition:background-color .18s cubic-bezier(.32,.72,0,1),color .18s cubic-bezier(.32,.72,0,1)}
+			.aisooq-order-cell .aisooq-order-icon:hover:not([disabled]){background:#f0f6fc;color:#135e96}
+			.aisooq-order-cell .aisooq-order-icon:focus-visible{outline:2px solid #2271b1;outline-offset:1px}
+			.aisooq-order-cell .aisooq-order-icon .dashicons{width:16px;height:16px;font-size:16px;line-height:16px}
+			.aisooq-order-cell .aisooq-order-icon[disabled]{opacity:.55;cursor:default}
+			/* Resync is the quieter of the two: the order is already through, so
+			   it should not compete with the un-synced state beside it. */
+			.aisooq-order-cell .aisooq-order-icon.is-resync{color:#646970}
+			.aisooq-order-cell .aisooq-order-icon.is-resync:hover:not([disabled]){color:#2271b1}
+			.aisooq-order-synced{display:inline-flex;align-items:center;justify-content:center;
+				width:24px;height:24px;color:#00844a;flex:0 0 auto}
+			.aisooq-order-synced .dashicons{width:18px;height:18px;font-size:18px;line-height:18px}
+			/* In flight: the arrows turn, so a slow push looks like work rather
+			   than a dead button. */
+			.aisooq-order-icon.is-busy .dashicons{animation:aisooq-spin 1s linear infinite}
+			@keyframes aisooq-spin{to{transform:rotate(360deg)}}
+			@media (prefers-reduced-motion:reduce){
+				.aisooq-order-cell .aisooq-order-icon{transition:none}
+				.aisooq-order-icon.is-busy .dashicons{animation:none;opacity:.6}
 			}
-			@media (pointer:coarse){
-				.aisooq-sync-order.button{min-height:36px}
+			/* Below 782px WordPress stacks the orders table into cards and the
+			   cell gets the full row — and 24px is well under a usable tap
+			   target, which WCAG 2.5.5 puts at 44px. */
+			@media (max-width:782px),(pointer:coarse){
+				.aisooq-order-cell{gap:6px}
+				.aisooq-order-cell .aisooq-order-icon{width:40px;min-width:40px;height:40px}
+				.aisooq-order-cell .aisooq-order-icon .dashicons{width:20px;height:20px;font-size:20px;line-height:20px}
+				/* The synced mark is a state, not a control — nobody taps it, so
+				   it keeps its small box. A touch target belongs on things you
+				   press, and inflating this one only widened the column. */
+				.aisooq-order-synced .dashicons{width:20px;height:20px;font-size:20px;line-height:20px}
 			}
 		</style>
 		<script>
@@ -141,8 +183,23 @@ class AI_Sooq_Orders_Column {
 				if ( ! b || b.disabled ) { return; }
 				e.preventDefault();
 				b.disabled = true;
-				var orig = b.textContent;
-				b.textContent = '<?php echo $syncing; // phpcs:ignore ?>';
+				// The label lives in aria-label now, not in text — writing to
+				// textContent would delete the icon element inside the button.
+				var icon = b.querySelector( '.dashicons' );
+				var orig = { label: b.getAttribute( 'aria-label' ), title: b.getAttribute( 'title' ), icon: icon ? icon.className : '' };
+				b.classList.add( 'is-busy' );
+				b.setAttribute( 'aria-label', '<?php echo $syncing; // phpcs:ignore ?>' );
+				b.setAttribute( 'title', '<?php echo $syncing; // phpcs:ignore ?>' );
+				if ( icon ) { icon.className = 'dashicons dashicons-update'; }
+				// A failed push must leave the control exactly as it was, or the
+				// row starts claiming a state the platform never reached.
+				function restore() {
+					b.disabled = false;
+					b.classList.remove( 'is-busy' );
+					if ( orig.label ) { b.setAttribute( 'aria-label', orig.label ); }
+					if ( orig.title ) { b.setAttribute( 'title', orig.title ); }
+					if ( icon && orig.icon ) { icon.className = orig.icon; }
+				}
 				var data = new FormData();
 				data.append( 'action', 'aisooq_order_sync' );
 				data.append( 'nonce', nonce );
@@ -150,6 +207,7 @@ class AI_Sooq_Orders_Column {
 				fetch( ajaxurl, { method: 'POST', credentials: 'same-origin', body: data } )
 					.then( function ( r ) { return r.json(); } )
 					.then( function ( j ) {
+						b.classList.remove( 'is-busy' );
 						if ( j && j.success ) {
 							// Leave the button in place and turn it into Resync,
 							// so a corrected order can be pushed again without a
@@ -159,19 +217,22 @@ class AI_Sooq_Orders_Column {
 							if ( ! cell.querySelector( '.aisooq-order-synced' ) ) {
 								var s = document.createElement( 'span' );
 								s.className = 'aisooq-order-synced';
-								s.innerHTML = '✓ <?php echo $synced; // phpcs:ignore ?>';
+								s.setAttribute( 'role', 'img' );
+								s.setAttribute( 'aria-label', '<?php echo $synced; // phpcs:ignore ?>' );
+								s.innerHTML = '<span class="dashicons dashicons-yes-alt" aria-hidden="true"></span>';
 								cell.insertBefore( s, b );
 							}
 							b.classList.add( 'is-resync' );
-							b.textContent = '<?php echo $resync; // phpcs:ignore ?>';
+							b.setAttribute( 'aria-label', '<?php echo $resync; // phpcs:ignore ?>' );
+							b.setAttribute( 'title', '<?php echo $resync; // phpcs:ignore ?>' );
+							if ( icon ) { icon.className = 'dashicons dashicons-update'; }
 							b.disabled = false;
 						} else {
-							b.disabled = false;
-							b.textContent = orig;
+							restore();
 							window.alert( ( j && j.data && j.data.message ) || '<?php echo $failed; // phpcs:ignore ?>' );
 						}
 					} )
-					.catch( function () { b.disabled = false; b.textContent = orig; window.alert( '<?php echo $failed; // phpcs:ignore ?>' ); } );
+					.catch( function () { restore(); window.alert( '<?php echo $failed; // phpcs:ignore ?>' ); } );
 			} );
 		} )();
 		</script>

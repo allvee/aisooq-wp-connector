@@ -515,7 +515,7 @@ class AI_Sooq_Abandoned_Admin {
 			?>
 			<tr data-key="<?php echo $key_attr; ?>" data-status="<?php echo esc_attr( $row->status ); ?>">
 				<td class="aisooq-cb-cell"><input type="checkbox" class="aisooq-cb" value="<?php echo $key_attr; ?>" aria-label="<?php esc_attr_e( 'Select cart', 'aisooq-connector' ); ?>" /></td>
-				<td data-label="<?php esc_attr_e( 'Customer', 'aisooq-connector' ); ?>">
+				<td class="aisooq-cust-cell" data-label="<?php esc_attr_e( 'Customer', 'aisooq-connector' ); ?>">
 					<div class="aisooq-td-val">
 						<div class="aisooq-cust"><?php echo esc_html( $row->customer_name ? $row->customer_name : __( 'Anonymous', 'aisooq-connector' ) ); ?></div>
 						<div class="aisooq-contact">
@@ -528,15 +528,15 @@ class AI_Sooq_Abandoned_Admin {
 				<td class="aisooq-addr" data-label="<?php esc_attr_e( 'Address', 'aisooq-connector' ); ?>">
 					<span class="aisooq-td-val"><?php echo $addr_bits ? esc_html( implode( ', ', $addr_bits ) ) : '<span class="aisooq-dim">—</span>'; ?></span>
 				</td>
-				<td data-label="<?php esc_attr_e( 'Cart', 'aisooq-connector' ); ?>">
+				<td class="aisooq-cart-cell" data-label="<?php esc_attr_e( 'Cart', 'aisooq-connector' ); ?>">
 					<div class="aisooq-td-val">
 						<div class="aisooq-mono"><?php echo esc_html( sprintf( _n( '%d item', '%d items', $count, 'aisooq-connector' ), $count ) ); ?></div>
 						<?php if ( $first ) : ?><div class="aisooq-contact"><?php echo esc_html( wp_html_excerpt( $first, 42, '…' ) ); ?></div><?php endif; ?>
 					</div>
 				</td>
-				<td class="aisooq-mono" data-label="<?php esc_attr_e( 'Value', 'aisooq-connector' ); ?>"><span class="aisooq-td-val"><?php echo esc_html( $this->money( $row->subtotal, $row->currency ? $row->currency : $currency ) ); ?></span></td>
-				<td data-label="<?php esc_attr_e( 'Step', 'aisooq-connector' ); ?>"><span class="aisooq-td-val"><?php echo esc_html( $row->furthest_step ? ucfirst( (string) $row->furthest_step ) : '—' ); ?></span></td>
-				<td data-label="<?php esc_attr_e( 'Status', 'aisooq-connector' ); ?>">
+				<td class="aisooq-mono aisooq-value-cell" data-label="<?php esc_attr_e( 'Value', 'aisooq-connector' ); ?>"><span class="aisooq-td-val"><?php echo esc_html( $this->money( $row->subtotal, $row->currency ? $row->currency : $currency ) ); ?></span></td>
+				<td class="aisooq-step-cell" data-label="<?php esc_attr_e( 'Step', 'aisooq-connector' ); ?>"><span class="aisooq-td-val"><?php echo esc_html( $row->furthest_step ? ucfirst( (string) $row->furthest_step ) : '—' ); ?></span></td>
+				<td class="aisooq-status-cell" data-label="<?php esc_attr_e( 'Status', 'aisooq-connector' ); ?>">
 					<span class="aisooq-td-val">
 						<span class="aisooq-badge <?php echo esc_attr( $status_tone ); ?>"><?php echo esc_html( $status_label ); ?></span>
 						<?php if ( 'converted' === $row->status && $row->wc_order_id ) : ?>
@@ -544,7 +544,7 @@ class AI_Sooq_Abandoned_Admin {
 						<?php endif; ?>
 					</span>
 				</td>
-				<td class="aisooq-dim" data-label="<?php esc_attr_e( 'Updated', 'aisooq-connector' ); ?>"><span class="aisooq-td-val"><?php echo esc_html( $row->updated_at ? human_time_diff( strtotime( $row->updated_at . ' UTC' ) ) . ' ' . __( 'ago', 'aisooq-connector' ) : '—' ); ?></span></td>
+				<td class="aisooq-dim aisooq-updated-cell" data-label="<?php esc_attr_e( 'Updated', 'aisooq-connector' ); ?>"><span class="aisooq-td-val"><?php echo esc_html( $row->updated_at ? human_time_diff( strtotime( $row->updated_at . ' UTC' ) ) . ' ' . __( 'ago', 'aisooq-connector' ) : '—' ); ?></span></td>
 				<td class="aisooq-actions-cell" data-label="<?php esc_attr_e( 'Actions', 'aisooq-connector' ); ?>">
 					<div class="aisooq-menu-wrap">
 						<button type="button" class="button button-small aisooq-menu-btn" aria-haspopup="true" aria-expanded="false"><?php esc_html_e( 'Actions', 'aisooq-connector' ); ?> <span class="aisooq-caret">▾</span></button>
@@ -1040,7 +1040,7 @@ class AI_Sooq_Abandoned_Admin {
 				@media (max-width:782px),(pointer:coarse){
 					.aisooq-courier .aisooq-icon-btn{width:40px;min-width:40px;height:40px}
 					.aisooq-courier .aisooq-icon-btn .dashicons{width:20px;height:20px;font-size:20px;line-height:20px}
-					.aisooq-courier-head > .aisooq-ratio{max-width:none}
+					.aisooq-courier-head > .aisooq-ratio{max-width:200px}
 					.aisooq-courier-head .aisooq-ratio-track{height:20px}
 					.aisooq-courier-head .aisooq-ratio-val{line-height:20px;font-size:11px}
 					.aisooq-courier-counts{gap:9px}
@@ -1103,14 +1103,54 @@ class AI_Sooq_Abandoned_Admin {
 				@media(max-width:860px){
 					.aisooq-funnel__row{grid-template-columns:90px 1fr 40px}
 					.aisooq-toolbar{gap:8px}.aisooq-toolbar>div{flex:1 1 140px}.aisooq-toolbar input,.aisooq-toolbar select{width:100%}
+					/* ── The cart card ────────────────────────────────────────
+					   Nine label/value rows made a 492px card that had to be
+					   scrolled to read one cart, with every value pinned to the
+					   right edge and a column of dead space down the middle.
+					   The same nine cells now form a card: who it is on top, the
+					   courier evidence under it, then the four short facts as a
+					   2-up grid where a label sits above its value instead of
+					   across the card from it. Nothing is dropped — every cell,
+					   control and label is still here, just placed. */
 					.aisooq-tbl thead{display:none}
 					.aisooq-tbl,.aisooq-tbl tbody{display:block;width:100%}
-					.aisooq-tbl tr{display:block;border:1px solid var(--bd);border-radius:8px;margin:0 0 10px;padding:8px 10px}
-					.aisooq-tbl td{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;border:0;padding:6px 0;text-align:right}
-					.aisooq-tbl td::before{content:attr(data-label);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);text-align:left;flex:0 0 auto}
-					.aisooq-tbl td .aisooq-td-val{text-align:right}
-					.aisooq-tbl td.aisooq-cb-cell{justify-content:flex-start}.aisooq-tbl td.aisooq-cb-cell::before{content:none}
-					.aisooq-tbl td.aisooq-actions-cell{justify-content:flex-end}.aisooq-tbl td.aisooq-actions-cell::before{content:none}
+					.aisooq-tbl tr{position:relative;display:grid;grid-template-columns:1fr 1fr;
+						gap:8px 12px;border:1px solid var(--bd);border-radius:10px;margin:0 0 10px;padding:12px 12px 10px}
+					.aisooq-tbl td{display:block;border:0;padding:0;text-align:left;min-width:0}
+					/* Label above value: in a half-width cell there is no room to
+					   put them side by side without one of them wrapping. */
+					.aisooq-tbl td::before{display:block;content:attr(data-label);font-size:10px;font-weight:600;
+						text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:2px}
+					.aisooq-tbl td .aisooq-td-val{display:block;text-align:left;font-size:13px}
+
+					/* Who it is, and the evidence about them: full width. */
+					.aisooq-tbl td.aisooq-cust-cell{grid-column:1/-1;padding-right:44px}
+					.aisooq-tbl td.aisooq-cust-cell::before{content:none}
+					.aisooq-tbl td.aisooq-cust-cell .aisooq-cust{font-size:15px}
+					/* The courier block reads left-to-right like everything else
+					   here; right-aligned it looked like a different component. */
+					.aisooq-tbl td.aisooq-cust-cell .aisooq-courier{margin-top:8px;text-align:left}
+					.aisooq-tbl td.aisooq-cust-cell .aisooq-courier-head{align-items:flex-start}
+
+					/* The address is prose and wraps; it gets its own full row. */
+					.aisooq-tbl td.aisooq-addr{grid-column:1/-1}
+
+					/* Selection is chrome, not content — out of the flow, in the
+					   card's corner, still a real target. */
+					.aisooq-tbl td.aisooq-cb-cell{position:absolute;top:0;right:0;margin:0;
+						display:flex;align-items:center;justify-content:center;
+						width:44px;height:44px;padding:0}
+					.aisooq-tbl td.aisooq-cb-cell::before{content:none}
+					/* The box stays 22px because a giant checkbox looks broken,
+					   but the cell around it is a full 44px target — the space
+					   is already reserved by the name cell's padding. */
+					.aisooq-tbl td.aisooq-cb-cell .aisooq-cb{width:22px;height:22px;margin:0}
+
+					/* Actions close the card, right-aligned where a thumb is —
+					   sharing the last row with "updated" rather than each
+					   taking a full row to hold one short thing. */
+					.aisooq-tbl td.aisooq-actions-cell{justify-self:end;align-self:end;margin-top:2px}
+					.aisooq-tbl td.aisooq-actions-cell::before{content:none}
 					.aisooq-menu{right:0;left:auto}
 				}
 				@media(max-width:480px){.aisooq-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
