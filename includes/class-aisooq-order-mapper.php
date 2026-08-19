@@ -76,7 +76,21 @@ class AI_Sooq_Order_Mapper {
 			'financialStatus'  => $financial,
 			'fulfillmentStatus' => ( 'completed' === $status ) ? 'fulfilled' : 'unfulfilled',
 			'wcStatus'         => $status,
-			'paymentGateway'   => substr( (string) ( $order->get_payment_method() ?: 'external' ), 0, 32 ),
+			// The gateway SLUG, lower-cased — `cod`, `bacs`, `bkash` — not the
+			// display title. The platform groups payments by this string and its
+			// own picker speaks slugs, so a title ("Cash on delivery") would sit
+			// beside `cod` as a separate method and split the reports. The data
+			// already carries that scar from the legacy import (`CASH` next to
+			// `cash`), so this end at least stays consistent.
+			//
+			// Falls back to `cod`, NOT `external`: an order with no recorded
+			// method on this market is cash on delivery, and "external" told the
+			// platform nothing while still looking like a real answer.
+			'paymentGateway'   => substr(
+				strtolower( (string) ( $order->get_payment_method() ?: 'cod' ) ),
+				0,
+				32
+			),
 			'lineItems'        => $lines,
 			'totalTax'         => (float) $order->get_total_tax(),
 			// Authoritative WooCommerce aggregates. The platform re-derives the
