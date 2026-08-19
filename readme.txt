@@ -6,7 +6,7 @@ Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 2.6.3
+Stable tag: 2.7.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,16 @@ No — one WooCommerce site connects to one AI Sooq store (one OAuth app = one
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 2.7.0 =
+* Orders now push the channel and source they actually came from instead of a
+  hardcoded "manual"/"woocommerce". A Facebook, Messenger, Instagram, WhatsApp,
+  TikTok or Telegram referral is sent as channel `social` with that platform as
+  the source; a wp-admin order as `manual`; everything else as `web` with the
+  UTM source when WooCommerce knows it. Read from WooCommerce's own order
+  attribution (WC 8.5+), which this plugin already collected.
+* Fixes mirrored orders being excluded from the platform's courier delivery-risk
+  lookup, which skips manual-channel orders.
 
 = 2.6.3 =
 * **The delivery bar is shorter on a phone.** It was stretching to fill whatever width it was given — most of an order panel — for a figure that is readable at a third of that. A bar only has to be long enough to compare at a glance; past that it is width taken from everything around it.

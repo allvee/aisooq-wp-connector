@@ -70,8 +70,6 @@ class AI_Sooq_Order_Mapper {
 		$payload = array(
 			'externalSource'   => 'woocommerce',
 			'externalId'       => (string) $order->get_id(),
-			'channel'          => 'manual',
-			'sourceName'       => 'woocommerce',
 			'currency'         => $order->get_currency(),
 			'email'            => $order->get_billing_email() ?: null,
 			'phone'            => $order->get_billing_phone() ?: null,
@@ -141,6 +139,13 @@ class AI_Sooq_Order_Mapper {
 
 		$blob        = AI_Sooq_Attribution::get( $order );
 		$attribution = self::attribution( $order, $blob );
+
+		// Derived from that attribution, so it has to come after it. Was
+		// hardcoded to manual/woocommerce for every order — see origin().
+		$origin                  = self::origin( $order, $attribution );
+		$payload['channel']      = $origin['channel'];
+		$payload['sourceName']   = $origin['sourceName'];
+
 		if ( ! empty( $attribution ) ) {
 			$payload['attribution'] = $attribution;
 		}
@@ -295,6 +300,75 @@ class AI_Sooq_Order_Mapper {
 			'province' => $g( 'state' ),
 			'country'  => $g( 'country' ),
 			'zip'      => $g( 'postcode' ),
+		);
+	}
+
+
+	/**
+	 * Which lane the order actually arrived on, and the specific origin.
+	 *
+	 * Both used to be hardcoded (`manual` / `woocommerce`), so every order this
+	 * plugin pushed looked hand-written on the platform no matter where the
+	 * buyer came from. That is not just a reporting nicety: the platform's
+	 * bdcourier OrderCreated handler skips `manual`, so mislabelled orders
+	 * silently opted out of the delivery-risk lookup, and the orders list could
+	 * not tell a Messenger sale from a counter sale.
+	 *
+	 * Everything needed is already on the order — WooCommerce's own
+	 * order-attribution meta (WC 8.5+), which this class already reads for the
+	 * flat UTM columns. `channel` stays coarse (which lane) and `sourceName`
+	 * carries the specific origin, matching the platform's own split.
+	 *
+	 * @param WC_Order $order
+	 * @param array    $attribution flat attribution already computed
+	 * @return array{channel:string,sourceName:string}
+	 */
+	private static function origin( WC_Order $order, $attribution = array() ) {
+		$created_via = strtolower( (string) $order->get_created_via() );
+		$type        = strtolower( (string) $order->get_meta( '_wc_order_attribution_source_type' ) );
+		$utm         = strtolower( (string) ( isset( $attribution['utmSource'] ) ? $attribution['utmSource'] : '' ) );
+		$referrer    = strtolower( (string) ( isset( $attribution['referrer'] ) ? $attribution['referrer'] : '' ) );
+		$haystack    = $utm . ' ' . $referrer;
+
+		// Social first: a Facebook/Instagram referral is a social sale even
+		// though it technically checked out on the web storefront.
+		$social = array(
+			'messenger' => array( 'messenger', 'm.me' ),
+			'facebook'  => array( 'facebook', 'fb.com', 'fbclid' ),
+			'instagram' => array( 'instagram', 'ig.me' ),
+			'whatsapp'  => array( 'whatsapp', 'wa.me' ),
+			'tiktok'    => array( 'tiktok' ),
+			'telegram'  => array( 'telegram', 't.me' ),
+		);
+		foreach ( $social as $name => $needles ) {
+			foreach ( $needles as $needle ) {
+				if ( false !== strpos( $haystack, $needle ) ) {
+					return array( 'channel' => 'social', 'sourceName' => $name );
+				}
+			}
+		}
+
+		// Written by a human in wp-admin, or over the phone into the shop.
+		if ( 'admin' === $created_via || 'admin' === $type ) {
+			return array( 'channel' => 'manual', 'sourceName' => 'woocommerce-admin' );
+		}
+
+		if ( 'pos' === $created_via ) {
+			return array( 'channel' => 'pos', 'sourceName' => 'woocommerce-pos' );
+		}
+
+		// Anything else is a shopper who checked out on the storefront. Keep the
+		// specific origin when attribution knows it (organic, referral, a named
+		// utm_source); fall back to the plugin name.
+		$source = '';
+		if ( '' !== $utm ) {
+			$source = $utm;
+		} elseif ( '' !== $type && 'typein' !== $type ) {
+			$source = $type;
+		}
+		return array(
+			'channel'    => 'web',
+			'sourceName' => substr( '' !== $source ? $source : 'woocommerce', 0, 128 ),
 		);
 	}
 
