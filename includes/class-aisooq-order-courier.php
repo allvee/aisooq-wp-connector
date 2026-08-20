@@ -1094,8 +1094,14 @@ class AI_Sooq_Order_Courier {
 	 * falling back to the phone, so guest checkouts still resolve. The current
 	 * order is excluded — it is not part of its own history.
 	 */
-	/** Are orders stored in WooCommerce's own tables (HPOS) rather than posts? */
-	private static function hpos_enabled() {
+	/**
+	 * Are orders stored in WooCommerce's own tables (HPOS) rather than posts?
+	 *
+	 * Public because the duplicate-order guard in AI_Sooq_Fraud has to ask the
+	 * same question and get the same answer — two copies of this drift the
+	 * moment one of them is taught about a new storage mode.
+	 */
+	public static function hpos_enabled() {
 		return class_exists( '\Automattic\WooCommerce\Utilities\OrderUtil' )
 			&& \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled();
 	}
@@ -1106,8 +1112,15 @@ class AI_Sooq_Order_Courier {
 	 * Direct SQL because that store rejects both `billing_phone` and
 	 * `meta_query`, and there is no other way to ask it the question. Bounded
 	 * and prepared; the phone is the only input.
+	 *
+	 * Public for the same reason as `hpos_enabled()` — the duplicate-order
+	 * guard needs this exact query, and the legacy store's refusal to accept
+	 * `billing_phone` is not a fact worth learning twice.
+	 *
+	 * @param string $phone
+	 * @param int    $exclude_id Order to leave out (0 = none, e.g. pre-checkout).
 	 */
-	private static function order_ids_by_phone( $phone, $exclude_id ) {
+	public static function order_ids_by_phone( $phone, $exclude_id ) {
 		global $wpdb;
 		$ids = $wpdb->get_col( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			$wpdb->prepare(

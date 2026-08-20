@@ -6,7 +6,7 @@ Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 2.7.0
+Stable tag: 2.8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,22 @@ No — one WooCommerce site connects to one AI Sooq store (one OAuth app = one
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 2.8.0 =
+* **Disable duplicate orders for the same customer.** New switch under
+  **AI Sooq → Fraud & courier** refuses a second checkout from the same mobile
+  number or e-mail within a configurable window (default 24 hours, 1–168).
+  Answered from this store's own orders — no API call, nothing billed, and it
+  keeps working while the platform is unreachable.
+* Matched on phone AND e-mail, so varying one to get a second order through
+  does not work.
+* Cancelled, failed and refunded orders never count as the duplicate: a shopper
+  whose payment fell over must be able to retry, and would otherwise be locked
+  out by the store's own setting.
+* Runs before the BDCourier delivery-history gate, so a duplicate no longer
+  spends a billed lookup.
+* The blocked shopper sees the usual contact popup; the message is editable
+  under **Checkout messages** and takes a `{hours}` token.
 
 = 2.7.0 =
 * Orders now push the channel and source they actually came from instead of a

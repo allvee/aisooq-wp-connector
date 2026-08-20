@@ -4,14 +4,20 @@
  * fraud engine (POST /fraud/screen) and, per the operator's chosen action,
  * blocks the order, holds it for review, or just flags it.
  *
- * Layers (evaluated on the platform, first failure wins):
- *   1. phone / name / address heuristics
- *   2. IP-velocity auto-block
- *   3. courier delivery-history gate
+ * Order of gates at checkout, first failure wins:
+ *
+ *   0. duplicate-order guard — LOCAL. Same buyer, same store, inside the
+ *      configured window. No API call, nothing billed, and it still works
+ *      while the platform is unreachable. First because it is the cheapest
+ *      question, and answering it can save the billed lookup in gate 3.
+ *   1. phone / name / address heuristics      ┐
+ *   2. IP-velocity auto-block                 ├ platform, via /fraud/screen
+ *   3. courier delivery-history gate          ┘ (3 is separately billed)
  *   4. pixel Purchase dedup (post-order, handled by the analytics path)
  *
- * Fails OPEN: if the API is unreachable the checkout proceeds, so a platform
- * outage never blocks legitimate sales.
+ * Gates 1–4 fail OPEN: if the API is unreachable the checkout proceeds, so a
+ * platform outage never blocks legitimate sales. Gate 0 fails open too, but
+ * it does not depend on the API to answer in the first place.
  *
  * @package AISooq
  */
@@ -40,8 +46,9 @@ class AI_Sooq_Fraud {
 	public function register() {
 		$fraud   = (bool) $this->settings->get( 'enable_fraud' );
 		$courier = $this->courier_gate_enabled();
+		$dup     = $this->duplicate_gate_enabled();
 		// Nothing to enforce at checkout — stay dormant.
-		if ( ! $fraud && ! $courier ) {
+		if ( ! $fraud && ! $courier && ! $dup ) {
 			return;
 		}
 		// Classic checkout: validate posted fields; block by adding an error.
@@ -209,6 +216,124 @@ class AI_Sooq_Fraud {
 		return (int) $this->settings->get( 'courier_min_ratio' ) > 0;
 	}
 
+	/** Whether the operator has armed the duplicate-order guard. */
+	private function duplicate_gate_enabled() {
+		return (bool) $this->settings->get( 'dup_order_block' );
+	}
+
+	/** The configured duplicate window, clamped the same way the settings are. */
+	private function duplicate_window_hours() {
+		$h = (int) $this->settings->get( 'dup_order_window_hours' );
+		return max( 1, min( 168, $h ? $h : 24 ) );
+	}
+
+	/**
+	 * Duplicate-order guard. Blocks a second checkout from the same buyer
+	 * inside the configured window.
+	 *
+	 * Answered from THIS store's own order table — no API call, nothing billed,
+	 * and it keeps working while the platform is unreachable, which is the
+	 * opposite of the other three layers and deliberately so: a burst of
+	 * identical COD orders from one number is exactly the thing that arrives
+	 * during an outage.
+	 *
+	 * Runs FIRST of all the gates, ahead of the billed BDCourier lookup: it is
+	 * the cheapest question and answering it can save a paid one.
+	 *
+	 * Matched on e-mail AND phone, not e-mail-or-phone. `wc_get_orders` cannot
+	 * OR two fields, and checking only the first one present would let the same
+	 * number through by varying the e-mail — which is the whole trick this is
+	 * meant to stop.
+	 *
+	 * Fails OPEN on any error, like everything else here.
+	 *
+	 * @param string $phone
+	 * @param string $email
+	 * @param int    $exclude_id Order being created (Store API), else 0.
+	 * @return string block message, or '' to allow.
+	 */
+	private function duplicate_block_message( $phone, $email, $exclude_id = 0 ) {
+		if ( ! $this->duplicate_gate_enabled() || ! function_exists( 'wc_get_orders' ) ) {
+			return '';
+		}
+		$phone = trim( (string) $phone );
+		$email = trim( (string) $email );
+		if ( '' === $phone && '' === $email ) {
+			return ''; // nothing to match on
+		}
+
+		$hours = $this->duplicate_window_hours();
+		try {
+			$found = $this->recent_order_exists( $email, $phone, $hours, (int) $exclude_id );
+		} catch ( \Throwable $e ) {
+			$this->logger->error( 'Duplicate-order check failed (allowing checkout): ' . $e->getMessage() );
+			return '';
+		}
+		if ( ! $found ) {
+			return '';
+		}
+
+		$this->logger->debug(
+			sprintf( 'Duplicate-order guard blocked %s within %d h.', $email ? $email : $phone, $hours )
+		);
+		$template = trim( (string) $this->settings->get( 'msg_duplicate' ) );
+		if ( '' === $template ) {
+			$template = __( 'You already have an order with us. A repeat order from the same contact is not accepted within {hours} hours — please contact us to add to or change your existing order.', 'aisooq-connector' );
+		}
+		return strtr( $template, array( '{hours}' => (string) $hours ) );
+	}
+
+	/**
+	 * Is there an order from this buyer inside the window?
+	 *
+	 * Statuses that mean "this did not become a sale" are excluded. Blocking on
+	 * a cancelled or failed order would trap the legitimate case the guard is
+	 * most likely to meet — a shopper whose payment fell over, retrying — and
+	 * they would have no way through.
+	 *
+	 * @return bool
+	 */
+	private function recent_order_exists( $email, $phone, $hours, $exclude_id ) {
+		$countable = array_diff(
+			array_keys( wc_get_order_statuses() ),
+			array( 'wc-cancelled', 'wc-failed', 'wc-refunded', 'wc-checkout-draft' )
+		);
+		$base = array(
+			'limit'        => 1,
+			'return'       => 'ids',
+			'status'       => array_values( $countable ),
+			'date_created' => '>' . ( time() - ( $hours * HOUR_IN_SECONDS ) ),
+		);
+		if ( $exclude_id > 0 ) {
+			$base['exclude'] = array( $exclude_id );
+		}
+
+		if ( '' !== $email ) {
+			$hit = wc_get_orders( array_merge( $base, array( 'billing_email' => $email ) ) );
+			if ( is_array( $hit ) && $hit ) {
+				return true;
+			}
+		}
+		if ( '' === $phone ) {
+			return false;
+		}
+
+		// HPOS understands `billing_phone`; the legacy post store does not, and
+		// answering it there returns EVERY order — which would block every
+		// checkout on the shop. Resolve ids from postmeta instead.
+		if ( class_exists( 'AI_Sooq_Order_Courier' ) && ! AI_Sooq_Order_Courier::hpos_enabled() ) {
+			$ids = AI_Sooq_Order_Courier::order_ids_by_phone( $phone, $exclude_id );
+			if ( ! $ids ) {
+				return false;
+			}
+			$hit = wc_get_orders( array_merge( $base, array( 'include' => $ids ) ) );
+			return is_array( $hit ) && (bool) $hit;
+		}
+
+		$hit = wc_get_orders( array_merge( $base, array( 'billing_phone' => $phone ) ) );
+		return is_array( $hit ) && (bool) $hit;
+	}
+
 	/**
 	 * Classic checkout validation hook.
 	 *
@@ -222,6 +347,18 @@ class AI_Sooq_Fraud {
 		$address = isset( $data['shipping_address_1'] ) && '' !== $data['shipping_address_1']
 			? $data['shipping_address_1']
 			: ( isset( $data['billing_address_1'] ) ? $data['billing_address_1'] : '' );
+
+		// Duplicate-order guard FIRST: local, free, and answering it can save a
+		// billed BDCourier lookup further down.
+		$dup_msg = $this->duplicate_block_message(
+			$phone,
+			isset( $data['billing_email'] ) ? $data['billing_email'] : ''
+		);
+		if ( $dup_msg ) {
+			$this->stash_block( 'duplicate', $dup_msg );
+			$errors->add( 'aisooq_duplicate', $dup_msg );
+			return;
+		}
 
 		// Layers run in ascending order and stop at the first failure, so the
 		// shopper sees the lowest-numbered reason first:
@@ -269,6 +406,22 @@ class AI_Sooq_Fraud {
 		}
 		$name    = trim( $order->get_billing_first_name() . ' ' . $order->get_billing_last_name() );
 		$address = $order->get_shipping_address_1() ? $order->get_shipping_address_1() : $order->get_billing_address_1();
+
+		// Duplicate-order guard FIRST: local, free, and it can save a billed
+		// BDCourier lookup below. The order already exists on this path, so it
+		// is excluded from its own duplicate check.
+		$dup_msg = $this->duplicate_block_message(
+			$order->get_billing_phone(),
+			$order->get_billing_email(),
+			$order->get_id()
+		);
+		if ( $dup_msg ) {
+			if ( class_exists( '\Automattic\WooCommerce\StoreApi\Exceptions\RouteException' ) ) {
+				throw new \Automattic\WooCommerce\StoreApi\Exceptions\RouteException( 'aisooq_duplicate_order', $this->with_contact( $dup_msg ), 400 );
+			}
+			$order->update_status( 'failed', $dup_msg );
+			return;
+		}
 
 		// Ascending order (stop at first failure): Layer 1 basic validation
 		// (name/address/mobile) → Layer 2 IP velocity [→ Layer 3 platform courier]

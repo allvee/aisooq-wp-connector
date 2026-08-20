@@ -38,6 +38,12 @@ class AI_Sooq_Settings {
 			'fraud_action'          => 'block',
 			'courier_min_ratio'     => 0,
 			'courier_min_parcels'   => 3,
+			// Refuse a second order from the same buyer inside a short window.
+			// Off by default: a real shopper legitimately places a second order
+			// the same day, so this is only right for stores whose problem is
+			// repeat prank/COD orders from one number.
+			'dup_order_block'       => 0,
+			'dup_order_window_hours' => 24,
 			// Look up courier delivery history automatically when an order is
 			// placed, instead of an operator pressing a button per order.
 			// Off by default: BDCourier bills per lookup, so turning this on for
@@ -58,6 +64,8 @@ class AI_Sooq_Settings {
 			'msg_fraud_contact'     => 'আপনার দেওয়া তথ্য যাচাই করা যায়নি। সঠিক নাম, মোবাইল নম্বর ও ঠিকানা দিয়ে আবার চেষ্টা করুন অথবা আমাদের সাথে যোগাযোগ করুন।',
 			'msg_fraud_velocity'    => 'অল্প সময়ে অনেকবার চেষ্টা করা হয়েছে। কিছুক্ষণ পর আবার চেষ্টা করুন অথবা আমাদের সাথে যোগাযোগ করুন।',
 			'msg_fraud_generic'     => 'দুঃখিত, এই মুহূর্তে অর্ডারটি গ্রহণ করা যাচ্ছে না। সহায়তার জন্য আমাদের সাথে যোগাযোগ করুন।',
+			// {hours} is substituted with the configured window.
+			'msg_duplicate'         => 'আপনার একটি অর্ডার ইতিমধ্যে গ্রহণ করা হয়েছে। {hours} ঘণ্টার মধ্যে একই নম্বর থেকে আবার অর্ডার করা যাবে না। অর্ডারে কিছু যোগ বা পরিবর্তন করতে আমাদের সাথে যোগাযোগ করুন।',
 			'msg_help'              => 'অর্ডার সম্পন্ন করতে সাহায্য দরকার? আমাদের সাথে যোগাযোগ করুন:',
 			'enable_customer_sync'  => 0,
 			'customer_sync_dir'     => 'both',
@@ -376,10 +384,15 @@ class AI_Sooq_Settings {
 		$clean['courier_min_ratio']     = max( 0, min( 100, absint( isset( $raw['courier_min_ratio'] ) ? $raw['courier_min_ratio'] : 0 ) ) );
 		$clean['courier_min_parcels']   = max( 1, absint( isset( $raw['courier_min_parcels'] ) ? $raw['courier_min_parcels'] : 3 ) );
 		$clean['auto_courier_check']    = empty( $raw['auto_courier_check'] ) ? 0 : 1;
+		$clean['dup_order_block']       = empty( $raw['dup_order_block'] ) ? 0 : 1;
+		// 1 hour floor (0 would mean "block forever" once saved, which reads as
+		// the toggle being broken); 168 = one week ceiling.
+		$dup_hours                      = absint( isset( $raw['dup_order_window_hours'] ) ? $raw['dup_order_window_hours'] : 24 );
+		$clean['dup_order_window_hours'] = max( 1, min( 168, $dup_hours ? $dup_hours : 24 ) );
 		$clean['support_phone']         = sanitize_text_field( isset( $raw['support_phone'] ) ? $raw['support_phone'] : '' );
 		$clean['support_whatsapp']      = sanitize_text_field( isset( $raw['support_whatsapp'] ) ? $raw['support_whatsapp'] : '' );
 		$clean['support_messenger']     = esc_url_raw( isset( $raw['support_messenger'] ) ? trim( $raw['support_messenger'] ) : '' );
-		foreach ( array( 'msg_courier', 'msg_fraud_contact', 'msg_fraud_velocity', 'msg_fraud_generic', 'msg_help' ) as $mk ) {
+		foreach ( array( 'msg_courier', 'msg_fraud_contact', 'msg_fraud_velocity', 'msg_fraud_generic', 'msg_duplicate', 'msg_help' ) as $mk ) {
 			$clean[ $mk ] = isset( $raw[ $mk ] ) ? sanitize_textarea_field( $raw[ $mk ] ) : '';
 		}
 		$clean['enable_customer_sync']  = empty( $raw['enable_customer_sync'] ) ? 0 : 1;
@@ -1116,6 +1129,23 @@ class AI_Sooq_Settings {
 		</div>
 
 		<hr class="aisooq-rule" />
+		<p class="aisooq-subhead"><?php esc_html_e( 'Duplicate orders', 'aisooq-connector' ); ?></p>
+
+		<div class="aisooq-field aisooq-field--switch">
+			<label class="aisooq-check"><input type="checkbox" name="aisooq[dup_order_block]" value="1" <?php checked( $s['dup_order_block'] ); ?> /> <strong><?php esc_html_e( 'Disable duplicate orders for the same customer', 'aisooq-connector' ); ?></strong></label>
+			<p class="description"><?php esc_html_e( 'Refuses a second checkout from the same mobile number or e-mail inside the window below. Checked against this store’s own orders — no API call, nothing billed, and it keeps working if the platform is unreachable.', 'aisooq-connector' ); ?></p>
+		</div>
+		<div class="aisooq-field"<?php echo $this->depends_on( 'dup_order_block', __( 'Duplicate-order blocking is off', 'aisooq-connector' ) ); // phpcs:ignore WordPress.Security.EscapeOutput ?>>
+			<label class="h" for="aisooq_dup_hours"><?php esc_html_e( 'Time period', 'aisooq-connector' ); ?></label>
+			<span class="aisooq-inline">
+				<?php esc_html_e( 'Block a repeat order within', 'aisooq-connector' ); ?>
+				<input name="aisooq[dup_order_window_hours]" id="aisooq_dup_hours" type="number" min="1" max="168" step="1" value="<?php echo esc_attr( $s['dup_order_window_hours'] ); ?>" class="small-text" />
+				<?php esc_html_e( 'hours', 'aisooq-connector' ); ?>
+			</span>
+			<p class="description"><?php esc_html_e( 'Time period in hours to prevent duplicate orders from the same customer. Cancelled, failed and refunded orders never count — a shopper whose payment failed must be able to try again.', 'aisooq-connector' ); ?></p>
+		</div>
+
+		<hr class="aisooq-rule" />
 		<p class="aisooq-subhead"><?php esc_html_e( 'When a shopper is blocked', 'aisooq-connector' ); ?></p>
 		<div class="aisooq-field">
 			<span class="h"><?php esc_html_e( 'Support contacts', 'aisooq-connector' ); ?></span>
@@ -1151,6 +1181,11 @@ class AI_Sooq_Settings {
 		<div class="aisooq-field">
 			<label class="h" for="aisooq_msg_fraud_generic"><?php esc_html_e( 'Fraud — other / fallback', 'aisooq-connector' ); ?></label>
 			<textarea name="aisooq[msg_fraud_generic]" id="aisooq_msg_fraud_generic" rows="2"><?php echo esc_textarea( $s['msg_fraud_generic'] ); ?></textarea>
+		</div>
+		<div class="aisooq-field">
+			<label class="h" for="aisooq_msg_duplicate"><?php esc_html_e( 'Duplicate order', 'aisooq-connector' ); ?></label>
+			<textarea name="aisooq[msg_duplicate]" id="aisooq_msg_duplicate" rows="2"><?php echo esc_textarea( $s['msg_duplicate'] ); ?></textarea>
+			<p class="description"><?php esc_html_e( '{hours} is replaced with the configured window.', 'aisooq-connector' ); ?></p>
 		</div>
 		<div class="aisooq-field">
 			<label class="h" for="aisooq_msg_help"><?php esc_html_e( 'Popup contact prompt', 'aisooq-connector' ); ?></label>
