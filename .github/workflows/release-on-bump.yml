@@ -1,0 +1,95 @@
+name: Publish release on version bump
+
+# The zip is the deliverable — a site is updated by uploading it — but nothing
+# reaches GitHub until someone remembers to push a tag. Between v2.3.0 and
+# v2.9.0 that step was missed seven times, so the newest downloadable release
+# was months behind the code.
+#
+# This closes that gap: whenever `main` lands a commit whose plugin header
+# carries a version with no tag yet, tag it and publish the zip. Idempotent —
+# a push that does not change the version finds the tag already there and
+# exits, so it is a no-op on every ordinary commit.
+on:
+  push:
+    branches: [ main ]
+    paths:
+      # Only the file that holds the version. Nothing else can trigger a release.
+      - 'aisooq-connector.php'
+  # Still available by hand if a release ever needs re-cutting.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Tag and publish if the version is new
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Tags are needed to tell "already released" from "new".
+          fetch-depth: 0
+
+      - name: Read the version from the plugin header
+        id: v
+        run: |
+          # The same header bin/build-zip.sh reads, so the tag and the zip can
+          # never disagree about which version this is.
+          version=$(grep -m1 -E '^\s*\*\s*Version:' aisooq-connector.php \
+            | sed -E 's/.*Version:[[:space:]]*//' | tr -d '[:space:]')
+          if [ -z "$version" ]; then
+            echo "::error::No Version header found in aisooq-connector.php"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version"    >> "$GITHUB_OUTPUT"
+          echo "Plugin header says $version"
+
+      - name: Skip if that version is already released
+        id: gate
+        run: |
+          tag='${{ steps.v.outputs.tag }}'
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "$tag already exists — nothing to publish."
+            echo "fresh=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "fresh=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check the version spots agree
+        if: steps.gate.outputs.fresh == 'true'
+        run: |
+          # AISOOQ_VERSION and readme.txt's Stable tag are separate from the
+          # header and have drifted before (readme sat at 2.2.0 while the
+          # plugin was 2.3.0). A release is the wrong moment to find out.
+          version='${{ steps.v.outputs.version }}'
+          const=$(grep -m1 "define( 'AISOOQ_VERSION'" aisooq-connector.php \
+            | sed -E "s/.*'AISOOQ_VERSION',[[:space:]]*'([^']+)'.*/\1/")
+          stable=$(grep -m1 -E '^Stable tag:' readme.txt \
+            | sed -E 's/Stable tag:[[:space:]]*//' | tr -d '[:space:]')
+          fail=0
+          [ "$const"  = "$version" ] || { echo "::error::AISOOQ_VERSION is $const, header says $version"; fail=1; }
+          [ "$stable" = "$version" ] || { echo "::error::readme.txt Stable tag is $stable, header says $version"; fail=1; }
+          exit $fail
+
+      - name: Build plugin zip
+        if: steps.gate.outputs.fresh == 'true'
+        run: bash bin/build-zip.sh
+
+      # Pushing the tag here does NOT re-trigger release.yml, and must not:
+      # GitHub deliberately refuses to start a workflow from an event raised
+      # with the default GITHUB_TOKEN. That is what keeps this to ONE release
+      # rather than two racing to create the same one. If anyone ever swaps
+      # this for a PAT to "make tags work properly", release.yml will start
+      # firing on these tags and the second one will fail on an existing
+      # release — drop the `gh release create` below if that day comes.
+      - name: Tag and publish
+        if: steps.gate.outputs.fresh == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag='${{ steps.v.outputs.tag }}'
+          git tag "$tag"
+          git push origin "$tag"
+          gh release create "$tag" dist/*.zip --title "$tag" --generate-notes
