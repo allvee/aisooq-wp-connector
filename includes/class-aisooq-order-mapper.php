@@ -70,6 +70,19 @@ class AI_Sooq_Order_Mapper {
 		$payload = array(
 			'externalSource'   => 'woocommerce',
 			'externalId'       => (string) $order->get_id(),
+			// The platform id we were told LAST time, echoed straight back.
+			//
+			// `externalId` above is the WooCommerce order id, which is a post
+			// id — a site migration, or a staging database promoted to
+			// production, re-keys every order. The platform dedupes on
+			// (source, externalId), so after a re-key every order arrives under
+			// an id it has never seen and is imported a SECOND time.
+			//
+			// This meta travels with the order through that migration, so
+			// sending it back lets the platform recognise the order and repair
+			// its stored externalId instead of duplicating it. Omitted on an
+			// order that has never synced, which is the normal first push.
+			'platformOrderId'  => ( (int) $order->get_meta( AISOOQ_META_ID ) ) ?: null,
 			'currency'         => $order->get_currency(),
 			'email'            => $order->get_billing_email() ?: null,
 			'phone'            => $order->get_billing_phone() ?: null,

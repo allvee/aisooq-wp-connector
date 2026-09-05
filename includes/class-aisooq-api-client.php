@@ -21,6 +21,12 @@ class AI_Sooq_Api_Client {
 
 	const TIMEOUT = 20;
 
+
+	/** Used when a 429 carries no `Retry-After` — matches the platform's 60s window. */
+	const RATE_LIMIT_FALLBACK = 60;
+
+	/** Ceiling on a server-supplied wait, so a bad header cannot park an order for a day. */
+	const RATE_LIMIT_MAX_WAIT = 900;
 	/** @var AI_Sooq_Settings */
 	private $settings;
 
@@ -164,6 +170,47 @@ class AI_Sooq_Api_Client {
 		}
 
 		$decoded = json_decode( wp_remote_retrieve_body( $response ), true );
+
+		// Rate limited. Carry the server's OWN wait so the caller schedules
+		// against the window the platform actually opened rather than guessing.
+		//
+		// This is not a failure of the request — nothing about it is wrong, and
+		// the same call will succeed once the window opens — so it gets its own
+		// error code, and the background order push neither counts it against
+		// its attempt budget nor stacks exponential backoff on top.
+		//
+		// The MESSAGE stays the server's whenever it sent one. A 429 here is
+		// not always this platform throttling us: the courier lookup is an
+		// operator pressing a button, and its 429 body says `bdcourier rate
+		// limited` — the UPSTREAM courier API. Replacing that with a sentence
+		// about retrying would name the wrong culprit on the one path where a
+		// person is reading the message, and there is no retry to describe.
+		if ( 429 === $code ) {
+			$after = (int) wp_remote_retrieve_header( $response, 'retry-after' );
+			if ( $after <= 0 ) {
+				// The platform runs Nest's throttler unnamed, which emits a
+				// plain `Retry-After` in SECONDS; a proxy in front of it may
+				// drop the header, so fall back to its 60s window.
+				$after = self::RATE_LIMIT_FALLBACK;
+			}
+			// Cap it: a mis-set header must not park an order for a day.
+			$after = min( $after, self::RATE_LIMIT_MAX_WAIT );
+
+			$server_msg = ( is_array( $decoded ) && isset( $decoded['message'] ) )
+				? ( is_array( $decoded['message'] ) ? implode( '; ', $decoded['message'] ) : $decoded['message'] )
+				: '';
+			$msg = ( '' !== $server_msg )
+				? $server_msg
+				: __( 'Rate limited by the platform; the sync will retry automatically.', 'aisooq-connector' );
+
+			$this->logger->debug( $method . ' ' . $path . ' rate limited; retry in ' . $after . 's.' );
+			return new WP_Error(
+				'aisooq_rate_limited',
+				$msg,
+				array( 'status' => 429, 'retry_after' => $after, 'body' => $decoded )
+			);
+		}
+
 		if ( $code < 200 || $code >= 300 ) {
 			$msg = ( is_array( $decoded ) && isset( $decoded['message'] ) )
 				? ( is_array( $decoded['message'] ) ? implode( '; ', $decoded['message'] ) : $decoded['message'] )

@@ -6,7 +6,7 @@ Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 2.8.0
+Stable tag: 2.9.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,25 @@ No — one WooCommerce site connects to one AI Sooq store (one OAuth app = one
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 2.9.0 =
+* **A re-keyed site no longer imports every order twice.** The platform matches
+  a mirrored order on its WooCommerce order id, which is a post id — so a site
+  migration, or a staging database promoted to production, re-keys every order
+  and each one arrives looking brand new. The push now also sends the platform
+  order id this plugin already stores in the order's own meta, which survives
+  that migration, so the platform recognises the order and repairs its stored
+  id instead of duplicating it.
+* Existing orders are unaffected: the matching key itself has not changed, so
+  nothing needs re-syncing and no duplicates are created by upgrading.
+* **Rate limits are no longer treated as broken orders.** A 429 used to count
+  against an order's retry budget and stack the plugin's own backoff on top, so
+  a busy hour could permanently abandon orders that were never wrong. The push
+  now waits exactly as long as the platform's `Retry-After` asks (capped at 15
+  minutes, falling back to 60 seconds when a proxy strips the header) and does
+  not spend an attempt.
+* The courier lookup still reports the upstream provider's own wording when it
+  is the one rate limiting, rather than a generic message about this platform.
 
 = 2.8.0 =
 * **Disable duplicate orders for the same customer.** New switch under

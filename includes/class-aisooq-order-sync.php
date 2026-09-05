@@ -193,6 +193,29 @@ class AI_Sooq_Order_Sync {
 	}
 
 	private function handle_failure( WC_Order $order, WP_Error $err, $is_backfill = false ) {
+		// A rate limit is not a failure of this order.
+		//
+		// Nothing about the payload is wrong and the same push will succeed
+		// once the window opens, so counting it against MAX_ATTEMPTS would let
+		// a busy hour permanently abandon orders that were never broken. Wait
+		// exactly as long as the platform asked, and leave the attempt counter
+		// untouched.
+		$data = $err->get_error_data();
+		if ( 'aisooq_rate_limited' === $err->get_error_code() && is_array( $data ) && ! empty( $data['retry_after'] ) ) {
+			if ( function_exists( 'as_schedule_single_action' ) ) {
+				as_schedule_single_action(
+					time() + (int) $data['retry_after'],
+					AISOOQ_SYNC_ACTION,
+					array( $order->get_id(), $is_backfill ? 1 : 0 ),
+					AISOOQ_AS_GROUP
+				);
+			}
+			$this->logger->debug(
+				'Order ' . $order->get_id() . ' rate limited; re-queued in ' . (int) $data['retry_after'] . 's.'
+			);
+			return;
+		}
+
 		$attempts = (int) $order->get_meta( AISOOQ_META_ATTEMPTS ) + 1;
 		$order->update_meta_data( AISOOQ_META_ATTEMPTS, $attempts );
 		$order->save();

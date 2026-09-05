@@ -35,6 +35,37 @@ class Test_Order_Mapper extends WP_UnitTestCase {
 		return wc_get_order( $order->get_id() );
 	}
 
+	/**
+	 * A WooCommerce order id is a post id, so a site migration or a
+	 * staging-to-production promotion re-keys every order. The platform dedupes
+	 * on (source, externalId), so after a re-key every order would arrive under
+	 * an id it has never seen and be imported a SECOND time.
+	 *
+	 * This meta survives that migration, so echoing it back is what lets the
+	 * platform tell "re-keyed" apart from "new".
+	 */
+	public function test_platform_order_id_is_echoed_back_when_known() {
+		$order = $this->make_cod_order( 'processing' );
+		$order->update_meta_data( AISOOQ_META_ID, '10241' );
+		$order->save();
+
+		$payload = AI_Sooq_Order_Mapper::map( wc_get_order( $order->get_id() ), false );
+
+		$this->assertSame( 10241, $payload['platformOrderId'] );
+		// externalId stays the numeric WC id: the status poller round-trips it
+		// through wc_get_order(), so it cannot become an order_key string.
+		$this->assertSame( (string) $order->get_id(), $payload['externalId'] );
+	}
+
+	public function test_platform_order_id_is_null_before_the_first_sync() {
+		$order   = $this->make_cod_order( 'processing' );
+		$payload = AI_Sooq_Order_Mapper::map( $order, false );
+
+		// Null, not 0 or '': the platform ignores an unresolvable hint, but
+		// sending a falsy id every time would be noise on the normal path.
+		$this->assertNull( $payload['platformOrderId'] );
+	}
+
 	public function test_cod_processing_maps_to_pending_on_live_push() {
 		$order   = $this->make_cod_order( 'processing' );
 		$payload = AI_Sooq_Order_Mapper::map( $order, false );
