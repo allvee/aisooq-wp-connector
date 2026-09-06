@@ -1,43 +1,77 @@
 /**
  * AI Sooq — admin design system.
  *
- * A single shared skin for BOTH plugin admin screens (Settings `.wrap.aisooq`
- * and Abandoned carts `.wrap.aisooq-ab`), mirroring the platform admin UI:
- * navy primary + gold highlight on a cool off-white surface, soft elevation,
- * 12px radius, pill badges, tabular figures.
+ * A single shared skin for all three plugin screens: Settings (`.wrap.aisooq`),
+ * Abandoned carts (`.wrap.aisooq-ab`) and Blocked (`.wrap.aisooq-bl`).
  *
- * The palette is AI Sooq's, adapted for a light surface — wp-admin is a light
- * UI, so the brand's night/navy ground can't be the page. Navy becomes the
- * primary (14.6:1 on white) and gold stays the single accent, used as a fill
- * rather than as text so it never has to carry contrast on its own.
+ * THE LANGUAGE IS X/TWITTER'S, THE PALETTE IS AI SOOQ'S.
  *
- * Selectors are scoped under `.wrap.aisooq` / `.wrap.aisooq-ab` so their specificity
- * (0,2,x) beats each page's inline base rules (0,1,x) regardless of source
- * order — this restyles both pages without rewriting their markup, and is the
- * single source of truth for the plugin's admin look.
+ * What that means concretely, because it is the thing every rule below serves:
+ *
+ *   FLAT.      No drop shadows on anything that sits in the page. X separates
+ *              content with a 1px hairline and nothing else; elevation is
+ *              reserved for things that float ABOVE the page (menus, modals),
+ *              where it means "this is temporary".
+ *   HAIRLINES. `--line` (#eff3f4) is the only divider. It is deliberately
+ *              lighter than a WordPress border: the structure should be felt
+ *              rather than drawn.
+ *   PILLS.     Every button is fully rounded. Containers are 16px, matching
+ *              X's own sidebar modules.
+ *   DENSE.     15px/20px base — X's exact metrics. Tighter than wp-admin's
+ *              default, which is what makes a long settings form readable.
+ *   ONE VOICE. Navy carries the role X gives its blue: every primary action,
+ *              every active state, every focus ring. Gold is the single
+ *              accent, used the way X uses nothing else — to say "you are
+ *              here" and to mark unsaved work.
+ *
+ * The surface stays light on purpose. These pages sit inside wp-admin's own
+ * light chrome, and a dark panel against a light sidebar reads as a broken
+ * embed rather than a deliberate theme.
+ *
+ * Selectors are scoped under `.wrap.aisooq*` so their specificity (0,2,x) beats
+ * each page's inline base rules (0,1,x) regardless of source order — this
+ * restyles every page without rewriting its markup, and is the single source of
+ * truth for the plugin's admin look.
  */
 
-/* ── Design tokens (light) — AI Sooq on a light admin surface ───────────── */
+/* ── Design tokens ──────────────────────────────────────────────────────── */
 .wrap.aisooq,
-.wrap.aisooq-ab {
-	--pri: #08294C;          /* AI Sooq navy */
+.wrap.aisooq-ab,
+.wrap.aisooq-bl {
+	--pri: #08294C;          /* AI Sooq navy — plays X-blue's role */
 	--pri-d: #04162B;        /* night — hover/active */
-	--pri-fg: #EDF3FA;       /* paper on navy */
+	--pri-fg: #ffffff;
+	--pri-wash: rgba(8, 41, 76, .1);   /* ghost-button hover, X's blue wash */
 	--hl: #FDC137;           /* AI Sooq gold — the only accent */
 	--hl-d: #E0A81F;
-	--ok: #2f8055;
-	--warn: #a8690a;
-	--err: #c33a29;
+
+	--ok: #00754b;
+	--warn: #8a5a00;
+	--err: #c0392b;
 	--info: #1f6f9c;
-	--bd: #dce3ec;           /* cool border */
-	--muted: #5a6b80;        /* 5.1:1 on --bg */
-	--fg: #0f1d2e;
-	--bg: #f4f7fb;
+
+	/* X's own greys. `--line` divides, `--edge` is for controls that must read
+	   as interactive (inputs, secondary buttons) and needs the extra weight. */
+	--line: #eff3f4;
+	--edge: #cfd9de;
+	--muted: #536471;        /* 4.9:1 on white */
+	--fg: #0f1419;
+	--bg: #ffffff;
 	--card: #ffffff;
-	--radius: 12px;
-	--radius-sm: 8px;
-	--sh-card: 0 1px 2px rgba(8, 41, 76, .07), 0 1px 1px rgba(8, 41, 76, .04);
-	--sh-elev: 0 8px 24px -8px rgba(8, 41, 76, .18), 0 3px 8px -4px rgba(8, 41, 76, .09);
+	--wash: rgba(15, 20, 25, .03);     /* row / item hover */
+
+	/* Compatibility alias. The abandoned-carts screen still carries an inline
+	   <style> base layer that draws its own borders with `var(--bd)`. Pointing
+	   it at the hairline here moves that screen onto the new language without
+	   touching its markup — drop this only when that inline block goes. */
+	--bd: var(--line);
+
+	--radius: 16px;          /* X's module radius */
+	--radius-sm: 4px;        /* inputs */
+	--pill: 9999px;
+	/* Only things that float get elevation. */
+	--sh-elev: 0 0 15px rgba(101, 119, 134, .2), 0 0 3px 1px rgba(101, 119, 134, .15);
+
 	/* Repaint WordPress's own admin accent within our screens — recolours
 	   checkbox/radio checks, focus rings and any theme-var-driven control to
 	   navy in one shot. */
@@ -46,142 +80,186 @@
 	--wp-admin-theme-color-darker-20: #04162B;
 }
 
-/* Links default to WP blue — bring them onto the teal brand (buttons + tabs
-   keep their own styling). */
+/* ── Page canvas + base type ────────────────────────────────────────────── */
+.wrap.aisooq,
+.wrap.aisooq-ab,
+.wrap.aisooq-bl {
+	color: var(--fg);
+	font-size: 15px;
+	line-height: 20px;
+	-webkit-font-smoothing: antialiased;
+}
+body.toplevel_page_aisooq-connector,
+body[class*="page_aisooq-abandoned"],
+body[class*="page_aisooq-blocked"] {
+	background: var(--bg);
+}
+.wrap.aisooq h1,
+.wrap.aisooq-ab h1,
+.wrap.aisooq-bl h1 {
+	font-size: 20px;
+	line-height: 24px;
+	font-weight: 800;
+	letter-spacing: -.01em;
+	color: var(--fg);
+}
+.wrap.aisooq h2,
+.wrap.aisooq-ab h2,
+.wrap.aisooq-bl h2 {
+	font-size: 17px;
+	line-height: 22px;
+	font-weight: 800;
+	letter-spacing: -.01em;
+	color: var(--fg);
+	margin: 24px 0 10px;
+}
+.wrap.aisooq .description,
+.wrap.aisooq-ab .description,
+.wrap.aisooq-bl .description {
+	color: var(--muted);
+	font-size: 13px;
+	line-height: 18px;
+}
+
+/* Links carry the brand, not WordPress blue. X underlines only on hover. */
 .wrap.aisooq a:not(.button):not(.aisooq-tab):not(.nav-tab):not(.on),
 .wrap.aisooq-ab a:not(.button):not(.aisooq-tab):not(.nav-tab):not(.on),
+.wrap.aisooq-bl a:not(.button):not(.aisooq-tab):not(.on),
 .wrap.aisooq .button-link,
-.wrap.aisooq-ab .button-link {
+.wrap.aisooq-ab .button-link,
+.wrap.aisooq-bl .button-link {
 	color: var(--pri);
+	text-decoration: none;
+	font-weight: 600;
 }
 .wrap.aisooq a:not(.button):not(.aisooq-tab):not(.on):hover,
 .wrap.aisooq-ab a:not(.button):not(.aisooq-tab):not(.on):hover,
+.wrap.aisooq-bl a:not(.button):not(.aisooq-tab):not(.on):hover,
 .wrap.aisooq .button-link:hover,
-.wrap.aisooq-ab .button-link:hover {
+.wrap.aisooq-ab .button-link:hover,
+.wrap.aisooq-bl .button-link:hover {
 	color: var(--pri-d);
+	text-decoration: underline;
 }
 
-/* Active filter pill: keep its white-on-teal label (its own inline rule sets
-   the teal fill) — the link recolour above intentionally skips `.on`. */
-.wrap.aisooq-ab .aisooq-filters a.on {
-	color: #fff;
-}
+/* Active filter pill keeps its white-on-navy label — the recolour skips `.on`. */
+.wrap.aisooq-ab .aisooq-filters a.on { color: #fff; }
 
 /* Native checkboxes/radios adopt the brand even where WP doesn't use its var. */
 .wrap.aisooq input[type="checkbox"],
 .wrap.aisooq input[type="radio"],
 .wrap.aisooq-ab input[type="checkbox"],
-.wrap.aisooq-ab input[type="radio"] {
+.wrap.aisooq-ab input[type="radio"],
+.wrap.aisooq-bl input[type="checkbox"] {
 	accent-color: var(--pri);
 }
 .wrap.aisooq input[type="checkbox"]:checked,
-.wrap.aisooq-ab input[type="checkbox"]:checked {
+.wrap.aisooq-ab input[type="checkbox"]:checked,
+.wrap.aisooq-bl input[type="checkbox"]:checked {
 	background: var(--pri);
-	border-color: var(--pri-d);
+	border-color: var(--pri);
 }
 .wrap.aisooq input[type="checkbox"]:checked::before,
-.wrap.aisooq-ab input[type="checkbox"]:checked::before {
-	color: #fff;
-}
+.wrap.aisooq-ab input[type="checkbox"]:checked::before { color: #fff; }
 
-/* Page canvas + base type */
-.wrap.aisooq,
-.wrap.aisooq-ab {
-	color: var(--fg);
-	-webkit-font-smoothing: antialiased;
-}
-body.toplevel_page_aisooq-connector,
-body[class*="page_aisooq-abandoned"] {
-	background: var(--bg);
-}
-
-/* ── Hero ───────────────────────────────────────────────────────────────── */
+/* ── Hero / page header ─────────────────────────────────────────────────────
+ * X's page header is not a card: it is the top of the page, separated from
+ * what follows by one hairline. */
 .wrap.aisooq .aisooq-hero,
 .wrap.aisooq-ab .aisooq-hero {
-	background: var(--card);
-	border: 1px solid var(--bd);
-	border-radius: var(--radius);
-	box-shadow: var(--sh-card);
-	position: relative;
-	overflow: hidden;
-}
-.wrap.aisooq .aisooq-hero::before,
-.wrap.aisooq-ab .aisooq-hero::before {
-	content: "";
-	position: absolute;
-	inset: 0 auto 0 0;
-	width: 4px;
-	background: linear-gradient(var(--pri), var(--hl));
+	background: transparent;
+	border: 0;
+	border-bottom: 1px solid var(--line);
+	border-radius: 0;
+	box-shadow: none;
+	padding: 4px 0 16px;
+	margin: 8px 0 20px;
 }
 .wrap.aisooq .aisooq-hero__title,
-.wrap.aisooq-ab .aisooq-hero__title,
-.wrap.aisooq-ab h1 {
-	color: var(--fg);
+.wrap.aisooq-ab .aisooq-hero__title {
+	font-size: 20px;
+	line-height: 24px;
+	font-weight: 800;
 	letter-spacing: -.01em;
+	color: var(--fg);
 }
+.wrap.aisooq .aisooq-hero__sub { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
 
-/* ── Cards ──────────────────────────────────────────────────────────────── */
+/* ── Containers ─────────────────────────────────────────────────────────────
+ * X's sidebar modules: 16px radius, one hairline, no shadow. */
 .wrap.aisooq .aisooq-card,
 .wrap.aisooq-ab .aisooq-card,
-.wrap.aisooq-ab .aisooq-panel {
+.wrap.aisooq-ab .aisooq-panel,
+.wrap.aisooq-bl .aisooq-card {
 	background: var(--card);
-	border: 1px solid var(--bd);
+	border: 1px solid var(--line);
 	border-radius: var(--radius);
-	box-shadow: var(--sh-card);
+	box-shadow: none;
 	overflow: hidden;
 }
 .wrap.aisooq .aisooq-card__head {
 	display: flex;
 	align-items: center;
 	gap: 8px;
-	padding: 13px 18px;
-	font-weight: 650;
-	font-size: 13.5px;
+	padding: 14px 16px;
+	font-weight: 800;
+	font-size: 15px;
 	color: var(--fg);
-	background: linear-gradient(0deg, rgba(8, 41, 76, .015), rgba(8, 41, 76, .05));
-	border-bottom: 1px solid var(--bd);
+	background: transparent;
+	border-bottom: 1px solid var(--line);
 }
-.wrap.aisooq .aisooq-card__head .dashicons {
-	color: var(--pri);
-}
-.wrap.aisooq .aisooq-card__body {
-	padding: 16px 18px;
-}
+.wrap.aisooq .aisooq-card__head .dashicons { color: var(--pri); }
+.wrap.aisooq .aisooq-card__body { padding: 16px; }
 
-/* ── Buttons ────────────────────────────────────────────────────────────── */
+/* ── Buttons ────────────────────────────────────────────────────────────────
+ * Pills, always. Bold label, no border on the primary, no text shadow, no
+ * gradient — X's buttons are a solid shape and a word. */
 .wrap.aisooq .button,
-.wrap.aisooq-ab .button {
-	border-radius: var(--radius-sm);
-	border-color: var(--bd);
-	min-height: 34px;
-	font-weight: 550;
+.wrap.aisooq-ab .button,
+.wrap.aisooq-bl .button {
+	border-radius: var(--pill);
+	border: 1px solid var(--edge);
+	background: transparent;
+	color: var(--fg);
+	min-height: 36px;
+	padding: 0 16px;
+	font-size: 14px;
+	font-weight: 700;
+	line-height: 34px;
+	box-shadow: none;
+	text-shadow: none;
+	transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+}
+.wrap.aisooq .button:hover,
+.wrap.aisooq-ab .button:hover,
+.wrap.aisooq-bl .button:hover {
+	background: var(--wash);
+	border-color: var(--edge);
+	color: var(--fg);
 }
 .wrap.aisooq .button-primary,
 .wrap.aisooq-ab .button-primary,
+.wrap.aisooq-bl .button-primary,
 .wrap.aisooq .aisooq-btn-primary {
 	background: var(--pri);
-	border-color: var(--pri-d);
+	border-color: var(--pri);
 	color: var(--pri-fg);
-	text-shadow: none;
-	box-shadow: 0 1px 0 rgba(23, 40, 36, .12);
 }
 .wrap.aisooq .button-primary:hover,
 .wrap.aisooq-ab .button-primary:hover,
+.wrap.aisooq-bl .button-primary:hover,
 .wrap.aisooq .button-primary:focus {
 	background: var(--pri-d);
 	border-color: var(--pri-d);
 	color: var(--pri-fg);
 }
-.wrap.aisooq .button:focus-visible,
-.wrap.aisooq-ab .button:focus-visible,
-.wrap.aisooq a:focus-visible,
-.wrap.aisooq-ab a:focus-visible {
-	outline: 2px solid var(--pri);
-	outline-offset: 2px;
-	box-shadow: none;
-}
+.wrap.aisooq .button:disabled,
+.wrap.aisooq-ab .button:disabled,
+.wrap.aisooq-bl .button:disabled { opacity: .5; }
 
-/* ── Inputs ─────────────────────────────────────────────────────────────── */
+/* ── Inputs ─────────────────────────────────────────────────────────────────
+ * Small radius, real edge, and a focus state that is a heavier accent border
+ * rather than a glow — X never blurs a control's boundary. */
 .wrap.aisooq input[type="text"],
 .wrap.aisooq input[type="url"],
 .wrap.aisooq input[type="number"],
@@ -192,26 +270,33 @@ body[class*="page_aisooq-abandoned"] {
 .wrap.aisooq-ab input[type="text"],
 .wrap.aisooq-ab input[type="search"],
 .wrap.aisooq-ab input[type="date"],
-.wrap.aisooq-ab select {
+.wrap.aisooq-ab select,
+.wrap.aisooq-bl input[type="text"],
+.wrap.aisooq-bl input[type="search"],
+.wrap.aisooq-bl input[type="number"],
+.wrap.aisooq-bl select {
 	border-radius: var(--radius-sm);
-	border-color: var(--bd);
+	border: 1px solid var(--edge);
 	background: #fff;
 	color: var(--fg);
+	font-size: 15px;
+	min-height: 38px;
+	box-shadow: none;
 }
+.wrap.aisooq textarea { min-height: 0; padding: 8px 10px; line-height: 20px; }
 .wrap.aisooq input:focus,
 .wrap.aisooq select:focus,
 .wrap.aisooq textarea:focus,
 .wrap.aisooq-ab input:focus,
-.wrap.aisooq-ab select:focus {
+.wrap.aisooq-ab select:focus,
+.wrap.aisooq-bl input:focus,
+.wrap.aisooq-bl select:focus {
 	border-color: var(--pri);
-	box-shadow: 0 0 0 2px rgba(8, 41, 76, .18);
+	box-shadow: inset 0 0 0 1px var(--pri);
 	outline: none;
 }
 .wrap.aisooq .aisooq-field > label.h,
-.wrap.aisooq .aisooq-field label.h {
-	color: var(--fg);
-	font-weight: 600;
-}
+.wrap.aisooq .aisooq-field label.h { color: var(--fg); font-weight: 700; }
 
 /* ── Tap targets ─────────────────────────────────────────────────────────
    WordPress only enlarges form controls below its own 783px breakpoint, so on
@@ -223,12 +308,16 @@ body[class*="page_aisooq-abandoned"] {
 .wrap.aisooq input[type="checkbox"],
 .wrap.aisooq input[type="radio"],
 .wrap.aisooq-ab input[type="checkbox"],
-.wrap.aisooq-ab input[type="radio"] {
+.wrap.aisooq-ab input[type="radio"],
+.wrap.aisooq-bl input[type="checkbox"] {
 	width: 24px;
 	height: 24px;
+	border-radius: var(--radius-sm);
+	border-color: var(--edge);
 }
 .wrap.aisooq input[type="checkbox"]:checked::before,
-.wrap.aisooq-ab input[type="checkbox"]:checked::before {
+.wrap.aisooq-ab input[type="checkbox"]:checked::before,
+.wrap.aisooq-bl input[type="checkbox"]:checked::before {
 	width: 24px;
 	height: 24px;
 	margin: -2px 0 0 -4px;
@@ -242,7 +331,8 @@ body[class*="page_aisooq-abandoned"] {
 	line-height: 1;
 }
 .wrap.aisooq .button-link,
-.wrap.aisooq-ab .button-link {
+.wrap.aisooq-ab .button-link,
+.wrap.aisooq-bl .button-link {
 	display: inline-flex;
 	align-items: center;
 	min-height: 28px;
@@ -258,115 +348,163 @@ body[class*="page_aisooq-abandoned"] {
 	gap: 4px;
 	max-width: 100%;
 }
-.wrap.aisooq .aisooq-field input.small-text {
-	max-width: 100%;
-}
+.wrap.aisooq .aisooq-field input.small-text { max-width: 100%; }
 
 /* ── Badges / pills ─────────────────────────────────────────────────────── */
 .wrap.aisooq .aisooq-badge,
 .wrap.aisooq-ab .aisooq-badge,
+.wrap.aisooq-bl .aisooq-badge,
 .wrap.aisooq .aisooq-act-badge {
-	border-radius: 999px;
-	font-weight: 600;
-	font-size: 11.5px;
+	display: inline-flex;
+	align-items: center;
+	border-radius: var(--pill);
+	font-weight: 700;
+	font-size: 12px;
 	padding: 2px 10px;
-	line-height: 1.7;
-	letter-spacing: .01em;
+	line-height: 18px;
+	letter-spacing: 0;
 }
-.wrap.aisooq-ab .aisooq-badge.ok { background: #e7f3ec; color: #216b45; }
-.wrap.aisooq-ab .aisooq-badge.warn { background: #fbf0dd; color: #97620a; }
-.wrap.aisooq-ab .aisooq-badge.err { background: #fbe9e6; color: #a5301f; }
-.wrap.aisooq-ab .aisooq-badge.info { background: #e4eff5; color: #1a5c82; }
-.wrap.aisooq-ab .aisooq-badge.muted { background: #e8edf4; color: #5a6b80; }
+.wrap.aisooq-ab .aisooq-badge.ok,
+.wrap.aisooq-bl .aisooq-badge.ok { background: #e3f2ec; color: var(--ok); }
+.wrap.aisooq-ab .aisooq-badge.warn,
+.wrap.aisooq-bl .aisooq-badge.warn { background: #fdf3e0; color: var(--warn); }
+.wrap.aisooq-ab .aisooq-badge.err,
+.wrap.aisooq-bl .aisooq-badge.err { background: #fdeceb; color: var(--err); }
+.wrap.aisooq-ab .aisooq-badge.info { background: #e8f1f7; color: var(--info); }
+.wrap.aisooq-ab .aisooq-badge.muted { background: var(--line); color: var(--muted); }
 
-/* ── KPI tiles ──────────────────────────────────────────────────────────── */
+/* ── Stat tiles ─────────────────────────────────────────────────────────────
+ * X's profile stats: the NUMBER is the object, the label is a caption under it.
+ * No shadow, no coloured left rail — the number carries the emphasis. */
 .wrap.aisooq .aisooq-kpi,
-.wrap.aisooq-ab .aisooq-kpi {
+.wrap.aisooq-ab .aisooq-kpi,
+.wrap.aisooq-bl .aisooq-kpi {
 	background: var(--card);
-	border: 1px solid var(--bd);
+	border: 1px solid var(--line);
 	border-radius: var(--radius);
-	box-shadow: var(--sh-card);
+	box-shadow: none;
+	padding: 14px 16px;
+	transition: background-color .15s ease;
 }
+.wrap.aisooq .aisooq-kpi:hover,
+.wrap.aisooq-ab .aisooq-kpi:hover,
+.wrap.aisooq-bl .aisooq-kpi:hover { background: var(--wash); }
 .wrap.aisooq .aisooq-kpi__value,
 .wrap.aisooq-ab .aisooq-kpi__value {
 	font-variant-numeric: tabular-nums;
 	letter-spacing: -.02em;
 	color: var(--fg);
 }
-.wrap.aisooq-ab .aisooq-kpi.ok { border-left: 3px solid var(--ok); }
-.wrap.aisooq-ab .aisooq-kpi.warn { border-left: 3px solid var(--hl); }
-.wrap.aisooq-ab .aisooq-kpi.info { border-left: 3px solid var(--info); }
-.wrap.aisooq-ab .aisooq-kpi.err { border-left: 3px solid var(--err); }
-.wrap.aisooq-ab .aisooq-kpi.muted { border-left: 3px solid var(--muted); }
+/* Status is a dot beside the label, not a rail down the side of the tile. */
+.wrap.aisooq-ab .aisooq-kpi.ok .aisooq-kpi__label::before,
+.wrap.aisooq-ab .aisooq-kpi.warn .aisooq-kpi__label::before,
+.wrap.aisooq-ab .aisooq-kpi.info .aisooq-kpi__label::before,
+.wrap.aisooq-ab .aisooq-kpi.err .aisooq-kpi__label::before,
+.wrap.aisooq-ab .aisooq-kpi.muted .aisooq-kpi__label::before,
+.wrap.aisooq .aisooq-kpi.warn .aisooq-kpi__label::before,
+.wrap.aisooq .aisooq-kpi.err .aisooq-kpi__label::before {
+	content: '';
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	flex: 0 0 auto;
+}
+.wrap.aisooq-ab .aisooq-kpi.ok .aisooq-kpi__label::before { background: var(--ok); }
+.wrap.aisooq-ab .aisooq-kpi.warn .aisooq-kpi__label::before,
+.wrap.aisooq .aisooq-kpi.warn .aisooq-kpi__label::before { background: var(--hl); }
+.wrap.aisooq-ab .aisooq-kpi.info .aisooq-kpi__label::before { background: var(--info); }
+.wrap.aisooq-ab .aisooq-kpi.err .aisooq-kpi__label::before,
+.wrap.aisooq .aisooq-kpi.err .aisooq-kpi__label::before { background: var(--err); }
+.wrap.aisooq-ab .aisooq-kpi.muted .aisooq-kpi__label::before { background: var(--muted); }
 
-/* ── Tabs (settings) ────────────────────────────────────────────────────── */
+/* ── Tabs ───────────────────────────────────────────────────────────────────
+ * X's tab bar: no boxes, no borders around the tab itself. The active tab is
+ * bold and carries a short rounded underline; everything else is muted text on
+ * a hover wash. */
 .wrap.aisooq .aisooq-tab.is-active,
 .wrap.aisooq .aisooq-tabnav a.is-active,
-.wrap.aisooq .nav-tab-active {
-	color: var(--pri);
-	border-bottom-color: var(--pri);
-}
+.wrap.aisooq .nav-tab-active { color: var(--fg); }
 
-/* ── Connection panel / permissions (settings) ─────────────────────────── */
+/* ── Connection panel ───────────────────────────────────────────────────── */
 .wrap.aisooq .aisooq-conn {
-	background: linear-gradient(180deg, rgba(8, 41, 76, .04), rgba(8, 41, 76, 0));
-	border: 1px solid var(--bd);
+	background: transparent;
+	border: 1px solid var(--line);
 	border-radius: var(--radius);
 }
 .wrap.aisooq .aisooq-perms__h { color: var(--muted); }
-.wrap.aisooq .aisooq-act-badge.other { background: #efece4; color: var(--muted); }
+.wrap.aisooq .aisooq-act-badge.other { background: var(--line); color: var(--muted); }
 
-/* ── Data table (abandoned) ─────────────────────────────────────────────── */
-.wrap.aisooq-ab .aisooq-tbl {
-	border: 1px solid var(--bd);
+/* ── Data tables ────────────────────────────────────────────────────────────
+ * A timeline, not a spreadsheet: no outer frame, one hairline between rows,
+ * and a wash on hover so the row reads as the clickable object. */
+.wrap.aisooq-ab .aisooq-tbl,
+.wrap.aisooq-bl .widefat {
+	border: 1px solid var(--line);
 	border-radius: var(--radius);
 	overflow: hidden;
-	box-shadow: var(--sh-card);
+	box-shadow: none;
 	border-collapse: separate;
 	border-spacing: 0;
 }
-.wrap.aisooq-ab .aisooq-tbl th {
-	background: #f4f1e9;
+.wrap.aisooq-ab .aisooq-tbl th,
+.wrap.aisooq-bl .widefat thead th {
+	background: transparent;
 	color: var(--muted);
-	font-weight: 650;
-	border-bottom: 1px solid var(--bd);
+	font-weight: 700;
+	font-size: 13px;
+	border-bottom: 1px solid var(--line);
 }
-.wrap.aisooq-ab .aisooq-tbl td { border-bottom: 1px solid var(--bd); }
-.wrap.aisooq-ab .aisooq-tbl tbody tr:hover { background: rgba(8, 41, 76, .035); }
-.wrap.aisooq-ab .aisooq-tbl tbody tr:last-child td { border-bottom: 0; }
+.wrap.aisooq-ab .aisooq-tbl td,
+.wrap.aisooq-bl .widefat tbody td {
+	border-bottom: 1px solid var(--line);
+	font-size: 14px;
+}
+.wrap.aisooq-ab .aisooq-tbl tbody tr:hover,
+.wrap.aisooq-bl .widefat tbody tr:hover { background: var(--wash); }
+.wrap.aisooq-bl .widefat.striped tbody tr:nth-child(odd) { background: transparent; }
+.wrap.aisooq-ab .aisooq-tbl tbody tr:last-child td,
+.wrap.aisooq-bl .widefat tbody tr:last-child td { border-bottom: 0; }
+.wrap.aisooq-bl .widefat code {
+	background: var(--line);
+	border-radius: var(--radius-sm);
+	padding: 1px 6px;
+	font-size: 13px;
+}
 
-/* ── Row action menu (abandoned) ────────────────────────────────────────── */
+/* ── Row action menu ────────────────────────────────────────────────────────
+ * Floating, so this is one of the two places elevation is allowed. */
 .wrap.aisooq-ab .aisooq-menu {
-	border: 1px solid var(--bd);
+	border: 1px solid var(--line);
 	border-radius: var(--radius);
 	box-shadow: var(--sh-elev);
 	overflow: hidden;
 }
-.wrap.aisooq-ab .aisooq-act:hover { background: rgba(8, 41, 76, .06); }
+.wrap.aisooq-ab .aisooq-act:hover { background: var(--wash); }
 .wrap.aisooq-ab .aisooq-primary,
 .wrap.aisooq-ab .aisooq-primary .dashicons { color: var(--pri); }
 .wrap.aisooq-ab .aisooq-danger,
 .wrap.aisooq-ab .aisooq-danger .dashicons { color: var(--err); }
 
-/* ── Details modal (abandoned) ──────────────────────────────────────────── */
+/* ── Details modal ──────────────────────────────────────────────────────── */
 .wrap.aisooq-ab .aisooq-dl,
 .wrap.aisooq-ab .aisooq-modal__box {
 	border-radius: var(--radius);
 	box-shadow: var(--sh-elev);
 }
 
-/* ── Toolbar (abandoned) ────────────────────────────────────────────────── */
+/* ── Toolbar ────────────────────────────────────────────────────────────── */
 .wrap.aisooq-ab .aisooq-toolbar {
 	background: var(--card);
-	border: 1px solid var(--bd);
+	border: 1px solid var(--line);
 	border-radius: var(--radius);
-	box-shadow: var(--sh-card);
+	box-shadow: none;
 }
 
 /* ── Motion / a11y ──────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
 	.wrap.aisooq *,
-	.wrap.aisooq-ab * {
+	.wrap.aisooq-ab *,
+	.wrap.aisooq-bl * {
 		animation-duration: .001ms !important;
 		transition-duration: .001ms !important;
 	}
@@ -381,73 +519,71 @@ body[class*="page_aisooq-abandoned"] {
  * layout inside PHP guarantees the two drift.
  * ════════════════════════════════════════════════════════════════════════ */
 
-/* ── Hero ───────────────────────────────────────────────────────────────── */
 .wrap.aisooq .aisooq-hero {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: 16px;
 	flex-wrap: wrap;
-	padding: 16px 20px;
-	margin: 16px 0;
 }
-.wrap.aisooq .aisooq-hero__sub { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
 .wrap.aisooq .aisooq-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .wrap.aisooq .aisooq-sync-group {
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
 	flex-wrap: wrap;
-	padding: 4px 8px;
-	border: 1px solid var(--bd);
-	border-radius: 8px;
+	padding: 4px 6px 4px 12px;
+	border: 1px solid var(--line);
+	border-radius: var(--pill);
 }
-.wrap.aisooq .aisooq-sync-label { font-size: 12px; font-weight: 600; color: var(--muted); }
-.wrap.aisooq .aisooq-sync-group .button { padding: 0 8px; }
-.wrap.aisooq .aisooq-result { font-size: 13px; }
+.wrap.aisooq .aisooq-sync-label { font-size: 13px; font-weight: 700; color: var(--muted); }
+.wrap.aisooq .aisooq-sync-group .button { padding: 0 12px; min-height: 30px; line-height: 28px; font-size: 13px; }
+.wrap.aisooq .aisooq-result { font-size: 13px; font-weight: 600; }
 .wrap.aisooq .aisooq-result.is-pending { color: var(--muted); }
-.wrap.aisooq .aisooq-result.is-ok { color: var(--ok); font-weight: 600; }
-.wrap.aisooq .aisooq-result.is-err { color: var(--err); font-weight: 600; }
+.wrap.aisooq .aisooq-result.is-ok { color: var(--ok); }
+.wrap.aisooq .aisooq-result.is-err { color: var(--err); }
 
-/* ── KPI strip ──────────────────────────────────────────────────────────── */
-.wrap.aisooq .aisooq-kpis {
+/* ── Stat strip ─────────────────────────────────────────────────────────── */
+.wrap.aisooq .aisooq-kpis,
+.wrap.aisooq-bl .aisooq-kpis {
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
-	gap: 14px;
-	margin: 0 0 22px;
+	grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+	gap: 12px;
+	margin: 0 0 24px;
 }
-.wrap.aisooq .aisooq-kpi { border-left: 3px solid var(--pri); padding: 14px 16px; }
-.wrap.aisooq .aisooq-kpi.warn { border-left-color: var(--warn); }
-.wrap.aisooq .aisooq-kpi.err { border-left-color: var(--err); }
-.wrap.aisooq .aisooq-kpi__label {
+.wrap.aisooq .aisooq-kpi__label,
+.wrap.aisooq-bl .aisooq-kpi__label {
 	display: flex;
 	align-items: center;
 	gap: 6px;
-	font-size: 11px;
-	text-transform: uppercase;
-	letter-spacing: .04em;
+	font-size: 13px;
+	letter-spacing: 0;
+	text-transform: none;
 	color: var(--muted);
 	font-weight: 600;
 }
-.wrap.aisooq .aisooq-kpi__label .dashicons { font-size: 15px; width: 15px; height: 15px; color: var(--pri); }
-.wrap.aisooq .aisooq-kpi__num {
-	font-size: 26px;
-	font-weight: 700;
-	line-height: 1.15;
-	margin-top: 7px;
+.wrap.aisooq .aisooq-kpi__label .dashicons { font-size: 16px; width: 16px; height: 16px; color: var(--muted); }
+.wrap.aisooq .aisooq-kpi__num,
+.wrap.aisooq-bl .aisooq-kpi__num {
+	font-size: 28px;
+	font-weight: 800;
+	line-height: 1.1;
+	margin-top: 4px;
+	letter-spacing: -.02em;
 	font-variant-numeric: tabular-nums;
 }
-.wrap.aisooq .aisooq-kpi__sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.wrap.aisooq .aisooq-kpi__sub,
+.wrap.aisooq-bl .aisooq-kpi__sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
 
 /* ── Setup guide ────────────────────────────────────────────────────────── */
 .wrap.aisooq .aisooq-help {
 	background: var(--card);
-	border: 1px solid var(--bd);
+	border: 1px solid var(--line);
 	border-radius: var(--radius);
-	padding: 6px 16px;
+	padding: 4px 16px;
 	margin: 0 0 16px;
 }
-.wrap.aisooq .aisooq-help summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
+.wrap.aisooq .aisooq-help summary { cursor: pointer; font-weight: 700; padding: 10px 0; }
 
 /* ── Tab strip ──────────────────────────────────────────────────────────────
  * Hidden until the script that drives it has run, so a broken or blocked
@@ -459,8 +595,8 @@ body[class*="page_aisooq-abandoned"] {
 	align-items: flex-end;
 	justify-content: space-between;
 	gap: 12px;
-	margin: 0 0 16px;
-	border-bottom: 1px solid var(--bd);
+	margin: 0 0 20px;
+	border-bottom: 1px solid var(--line);
 }
 /* The tab row scrolls sideways on its own. The find box is deliberately NOT a
  * flex item inside it: as one, its intrinsic width fought the nowrap scroll
@@ -468,91 +604,90 @@ body[class*="page_aisooq-abandoned"] {
 .wrap.aisooq .aisooq-tabs {
 	display: flex;
 	align-items: center;
-	gap: 4px;
+	gap: 0;
 	flex-wrap: wrap;
 	min-width: 0;
 }
 .wrap.aisooq .aisooq-tab {
 	display: inline-flex;
 	align-items: center;
+	justify-content: center;
 	gap: 7px;
 	/* 44px min target — a settings tab is a primary control, not a link. */
-	min-height: 44px;
-	padding: 0 14px;
-	border: 1px solid transparent;
-	border-bottom: 0;
-	border-radius: 8px 8px 0 0;
+	min-height: 48px;
+	padding: 0 16px;
+	border: 0;
+	border-radius: 0;
 	background: transparent;
 	color: var(--muted);
-	font-size: 13px;
+	font-size: 15px;
 	font-weight: 600;
 	cursor: pointer;
 	position: relative;
-	bottom: -1px;
-	transition: color .15s ease, background-color .15s ease;
+	transition: background-color .15s ease, color .15s ease;
 }
-.wrap.aisooq .aisooq-tab:hover { color: var(--pri); background: rgba(8, 41, 76, .05); }
-.wrap.aisooq .aisooq-tab .dashicons { font-size: 17px; width: 17px; height: 17px; }
-.wrap.aisooq .aisooq-tab.is-active {
-	background: var(--card);
-	border-color: var(--bd);
-	color: var(--pri);
-}
-/* The gold underline is the only accent that says "you are here" — it reads at
- * a glance even where the 1px border edges don't. */
+.wrap.aisooq .aisooq-tab:hover { color: var(--fg); background: var(--wash); }
+.wrap.aisooq .aisooq-tab .dashicons { font-size: 18px; width: 18px; height: 18px; }
+.wrap.aisooq .aisooq-tab.is-active { color: var(--fg); font-weight: 800; background: transparent; }
+/* The gold underline is the only accent that says "you are here". X's is a
+ * short rounded bar under the LABEL, not a full-width tab edge. */
 .wrap.aisooq .aisooq-tab.is-active::after {
 	content: '';
 	position: absolute;
-	left: 0;
-	right: 0;
-	bottom: -1px;
-	height: 3px;
+	left: 16px;
+	right: 16px;
+	bottom: 0;
+	height: 4px;
 	background: var(--hl);
-	border-radius: 3px 3px 0 0;
+	border-radius: var(--pill);
 }
 .wrap.aisooq .aisooq-tab__count {
 	min-width: 18px;
-	padding: 0 5px;
-	border-radius: 999px;
+	padding: 0 6px;
+	border-radius: var(--pill);
 	background: var(--hl);
 	color: #3d2c00;
-	font-size: 11px;
+	font-size: 12px;
 	line-height: 18px;
 	text-align: center;
+	font-weight: 700;
 	font-variant-numeric: tabular-nums;
 }
 
-/* ── Find a setting ─────────────────────────────────────────────────────── */
+/* ── Find a setting ─────────────────────────────────────────────────────────
+ * X's search: a filled pill that gains an accent edge on focus. */
 .wrap.aisooq .aisooq-find {
 	display: inline-flex;
 	align-items: center;
-	gap: 6px;
+	gap: 8px;
 	flex: 0 1 auto;
 	min-width: 0;
-	padding: 0 10px;
-	min-height: 36px;
-	border: 1px solid var(--bd);
-	border-radius: 999px;
-	background: var(--card);
-	margin-bottom: 6px;
+	padding: 0 14px;
+	min-height: 40px;
+	border: 1px solid transparent;
+	border-radius: var(--pill);
+	background: var(--line);
+	margin-bottom: 8px;
 }
-.wrap.aisooq .aisooq-find .dashicons { color: var(--muted); font-size: 16px; width: 16px; height: 16px; }
+.wrap.aisooq .aisooq-find .dashicons { color: var(--muted); font-size: 17px; width: 17px; height: 17px; }
 .wrap.aisooq .aisooq-find input {
 	border: 0;
 	box-shadow: none;
 	background: transparent;
 	min-width: 180px;
+	min-height: 0;
 	padding: 0;
 	margin: 0;
-	font-size: 13px;
+	font-size: 15px;
 }
 .wrap.aisooq .aisooq-find input:focus { box-shadow: none; outline: 0; }
-.wrap.aisooq .aisooq-find:focus-within { border-color: var(--pri); box-shadow: 0 0 0 2px rgba(8, 41, 76, .12); }
+.wrap.aisooq .aisooq-find:focus-within { background: #fff; border-color: var(--pri); }
+.wrap.aisooq .aisooq-find:focus-within .dashicons { color: var(--pri); }
 .wrap.aisooq .aisooq-nores {
 	margin: 0 0 16px;
-	padding: 14px 16px;
+	padding: 16px;
 	background: var(--card);
-	border: 1px dashed var(--bd);
+	border: 1px solid var(--line);
 	border-radius: var(--radius);
 	color: var(--muted);
 }
@@ -565,11 +700,11 @@ body[class*="page_aisooq-abandoned"] {
  * rather than letting inputs stretch across a 1600px monitor. */
 .wrap.aisooq .aisooq-panel .aisooq-card__body { max-width: 60rem; }
 
-.wrap.aisooq .aisooq-field { margin: 0 0 20px; }
+.wrap.aisooq .aisooq-field { margin: 0 0 22px; }
 .wrap.aisooq .aisooq-field:last-child { margin-bottom: 0; }
 .wrap.aisooq .aisooq-field[hidden] { display: none; }
 .wrap.aisooq .aisooq-field > label.h,
-.wrap.aisooq .aisooq-field > span.h { display: block; font-weight: 600; margin-bottom: 6px; }
+.wrap.aisooq .aisooq-field > span.h { display: block; font-weight: 700; margin-bottom: 6px; }
 .wrap.aisooq .aisooq-field .description { margin: 6px 0 0; }
 .wrap.aisooq .aisooq-field input[type=url],
 .wrap.aisooq .aisooq-field input[type=text],
@@ -578,7 +713,7 @@ body[class*="page_aisooq-abandoned"] {
 .wrap.aisooq .aisooq-field textarea,
 .wrap.aisooq .aisooq-field select { width: 100%; max-width: 100%; }
 .wrap.aisooq .aisooq-field input.small-text { width: 5.5em; }
-.wrap.aisooq .aisooq-check { display: block; margin: 0 0 8px; }
+.wrap.aisooq .aisooq-check { display: block; margin: 0 0 10px; }
 .wrap.aisooq .aisooq-check:last-child { margin-bottom: 0; }
 .wrap.aisooq .aisooq-inline { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .wrap.aisooq .aisooq-row { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -586,17 +721,17 @@ body[class*="page_aisooq-abandoned"] {
 .wrap.aisooq .aisooq-checkgrid {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-	gap: 2px 12px;
+	gap: 4px 12px;
 }
 .wrap.aisooq .aisooq-entity select { max-width: 22rem; }
-.wrap.aisooq .aisooq-rule { border: 0; border-top: 1px solid var(--bd); margin: 24px 0 16px; }
+.wrap.aisooq .aisooq-rule { border: 0; border-top: 1px solid var(--line); margin: 24px 0 18px; }
 .wrap.aisooq .aisooq-subhead {
 	margin: 0 0 4px;
-	font-size: 11px;
-	font-weight: 700;
-	text-transform: uppercase;
-	letter-spacing: .05em;
-	color: var(--muted);
+	font-size: 13px;
+	font-weight: 800;
+	text-transform: none;
+	letter-spacing: 0;
+	color: var(--fg);
 }
 .wrap.aisooq .aisooq-subnote { margin: 0 0 16px; }
 .wrap.aisooq .aisooq-cost { display: flex; align-items: flex-start; gap: 5px; color: var(--warn); }
@@ -610,7 +745,8 @@ body[class*="page_aisooq-abandoned"] {
 
 /* ── Save bar ───────────────────────────────────────────────────────────────
  * Sticky: the form is tall enough that a bottom-of-page button means scrolling
- * back to commit a one-checkbox change. */
+ * back to commit a one-checkbox change. X's sticky bars sit on a translucent
+ * blur, so the content reads as passing underneath rather than being cut off. */
 .wrap.aisooq .aisooq-savebar {
 	position: sticky;
 	bottom: 0;
@@ -619,25 +755,29 @@ body[class*="page_aisooq-abandoned"] {
 	align-items: center;
 	gap: 12px;
 	flex-wrap: wrap;
-	margin: 16px 0 0;
+	margin: 20px 0 0;
 	padding: 12px 16px;
-	background: var(--card);
-	border: 1px solid var(--bd);
-	border-radius: var(--radius);
-	box-shadow: 0 -2px 10px rgba(8, 41, 76, .06);
+	background: rgba(255, 255, 255, .85);
+	-webkit-backdrop-filter: blur(12px);
+	backdrop-filter: blur(12px);
+	border: 0;
+	border-top: 1px solid var(--line);
+	border-radius: 0;
+	box-shadow: none;
 }
 .wrap.aisooq .aisooq-dirty {
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
-	font-size: 12px;
-	font-weight: 600;
+	font-size: 13px;
+	font-weight: 700;
 	color: var(--warn);
 }
 /* An author `display` beats the UA sheet's `[hidden]{display:none}`, so every
  * element this file gives a display value to must opt back out of it — or the
  * script's `hidden = true` silently does nothing. */
-.wrap.aisooq [hidden] { display: none !important; }
+.wrap.aisooq [hidden],
+.wrap.aisooq-bl [hidden] { display: none !important; }
 .wrap.aisooq .aisooq-dirty::before {
 	content: '';
 	width: 8px;
@@ -653,10 +793,16 @@ body[class*="page_aisooq-abandoned"] {
 .wrap.aisooq input:focus-visible,
 .wrap.aisooq select:focus-visible,
 .wrap.aisooq textarea:focus-visible,
-.wrap.aisooq [tabindex]:focus-visible {
+.wrap.aisooq [tabindex]:focus-visible,
+.wrap.aisooq-ab a:focus-visible,
+.wrap.aisooq-ab button:focus-visible,
+.wrap.aisooq-bl a:focus-visible,
+.wrap.aisooq-bl button:focus-visible,
+.wrap.aisooq-bl input:focus-visible,
+.wrap.aisooq-bl select:focus-visible {
 	outline: 2px solid var(--pri);
-	outline-offset: 1px;
-	border-radius: 4px;
+	outline-offset: 2px;
+	box-shadow: none;
 }
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
@@ -670,12 +816,14 @@ body[class*="page_aisooq-abandoned"] {
 	.wrap.aisooq .aisooq-find input { min-width: 0; flex: 1 1 auto; }
 }
 @media (max-width: 600px) {
-	.wrap.aisooq .aisooq-hero { padding: 14px; }
+	.wrap.aisooq .aisooq-hero { padding: 4px 0 14px; }
 	.wrap.aisooq .aisooq-actions { width: 100%; }
 	.wrap.aisooq .aisooq-sync-group { width: 100%; justify-content: flex-start; }
 	.wrap.aisooq .aisooq-sync-group .button { flex: 1 1 auto; }
-	.wrap.aisooq .aisooq-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-	.wrap.aisooq .aisooq-kpi__num { font-size: 22px; }
+	.wrap.aisooq .aisooq-kpis,
+	.wrap.aisooq-bl .aisooq-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+	.wrap.aisooq .aisooq-kpi__num,
+	.wrap.aisooq-bl .aisooq-kpi__num { font-size: 24px; }
 	/* Tabs go horizontally scrollable rather than wrapping to four rows and
 	 * pushing the form off the first screen. */
 	.wrap.aisooq.aisooq-has-tabs .aisooq-tabs {
@@ -684,73 +832,115 @@ body[class*="page_aisooq-abandoned"] {
 		scrollbar-width: none;
 	}
 	.wrap.aisooq.aisooq-has-tabs .aisooq-tabs::-webkit-scrollbar { display: none; }
-	.wrap.aisooq .aisooq-find { min-height: 40px; }
-	.wrap.aisooq .aisooq-tab { flex: 0 0 auto; padding: 0 11px; }
-	.wrap.aisooq .aisooq-tab span:not(.dashicons):not(.aisooq-tab__count) { font-size: 12.5px; }
+	.wrap.aisooq .aisooq-tab { flex: 0 0 auto; padding: 0 13px; }
+	.wrap.aisooq .aisooq-tab.is-active::after { left: 13px; right: 13px; }
+	.wrap.aisooq .aisooq-tab span:not(.dashicons):not(.aisooq-tab__count) { font-size: 14px; }
 	.wrap.aisooq .aisooq-checkgrid { grid-template-columns: 1fr; }
 	.wrap.aisooq .aisooq-savebar { padding: 10px 12px; }
 	.wrap.aisooq .aisooq-savebar .description { flex-basis: 100%; font-size: 12px; }
 }
 @media (max-width: 400px) {
-	.wrap.aisooq .aisooq-kpis { grid-template-columns: 1fr; }
+	.wrap.aisooq .aisooq-kpis,
+	.wrap.aisooq-bl .aisooq-kpis { grid-template-columns: 1fr; }
 }
 
 /* ── Connection panel (store identity + granted scopes) ─────────────────── */
-.wrap.aisooq .aisooq-conn { padding: 16px 18px; margin: 0 0 16px; }
+.wrap.aisooq .aisooq-conn { padding: 16px; margin: 0 0 16px; }
 .wrap.aisooq .aisooq-conn__top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+/* X's avatar is a circle, always. */
 .wrap.aisooq .aisooq-conn__avatar {
-	width: 40px;
-	height: 40px;
-	border-radius: 10px;
+	width: 44px;
+	height: 44px;
+	border-radius: 50%;
 	background: var(--pri);
 	color: var(--pri-fg);
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	font-weight: 700;
+	font-weight: 800;
 	font-size: 18px;
 	flex: 0 0 auto;
 }
-.wrap.aisooq .aisooq-conn__name { font-size: 16px; font-weight: 700; line-height: 1.2; }
+.wrap.aisooq .aisooq-conn__name { font-size: 17px; font-weight: 800; line-height: 1.2; letter-spacing: -.01em; }
 .wrap.aisooq .aisooq-conn__meta {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 6px 16px;
+	gap: 4px 16px;
 	margin-top: 10px;
-	font-size: 12.5px;
+	font-size: 13px;
 	color: var(--muted);
 }
-.wrap.aisooq .aisooq-conn__meta b { font-weight: 600; }
-.wrap.aisooq .aisooq-perms { margin-top: 14px; border-top: 1px solid var(--bd); padding-top: 12px; }
+.wrap.aisooq .aisooq-conn__meta b { font-weight: 700; color: var(--fg); }
+.wrap.aisooq .aisooq-perms { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 14px; }
 .wrap.aisooq .aisooq-perms__h {
-	font-size: 11px;
-	font-weight: 700;
-	text-transform: uppercase;
-	letter-spacing: .05em;
-	margin: 0 0 8px;
+	font-size: 13px;
+	font-weight: 800;
+	text-transform: none;
+	letter-spacing: 0;
+	margin: 0 0 10px;
 }
 .wrap.aisooq .aisooq-perms__grid {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
 	gap: 8px;
 }
-.wrap.aisooq .aisooq-perm { border: 1px solid var(--bd); border-radius: 8px; padding: 8px 10px; }
-.wrap.aisooq .aisooq-perm__name { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; }
+.wrap.aisooq .aisooq-perm { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.wrap.aisooq .aisooq-perm__name { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14px; }
 .wrap.aisooq .aisooq-perm__name .dashicons { font-size: 16px; width: 16px; height: 16px; color: var(--pri); }
 .wrap.aisooq .aisooq-perm__acts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .wrap.aisooq .aisooq-act-badge {
-	font-size: 10.5px;
-	font-weight: 600;
-	padding: 2px 7px;
-	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 700;
+	padding: 1px 8px;
+	border-radius: var(--pill);
 	text-transform: capitalize;
 }
-.wrap.aisooq .aisooq-act-badge.read { background: #e4eff5; color: #1a5c82; }
-.wrap.aisooq .aisooq-act-badge.write { background: #fbf0dd; color: #97620a; }
-.wrap.aisooq .aisooq-act-badge.other { background: #e8edf4; color: #5a6b80; }
+.wrap.aisooq .aisooq-act-badge.read { background: #e8f1f7; color: var(--info); }
+.wrap.aisooq .aisooq-act-badge.write { background: #fdf3e0; color: var(--warn); }
+.wrap.aisooq .aisooq-act-badge.other { background: var(--line); color: var(--muted); }
+
+/* ── Abandoned screen: the rest of the inline base layer ────────────────────
+ * These components are drawn by the <style> block still inside
+ * class-aisooq-abandoned-admin.php, on the radii of the previous design (4-12px
+ * and a boxed look). Bringing them here finishes the conversion of that screen
+ * without editing its markup — the same override strategy the top of this file
+ * describes. */
+.wrap.aisooq-ab .aisooq-panel__head,
+.wrap.aisooq-ab .aisooq-bulkbar,
+.wrap.aisooq-ab .aisooq-toolbar {
+	background: transparent;
+	border-bottom-color: var(--line);
+}
+.wrap.aisooq-ab .aisooq-toolbar { border-radius: var(--radius) var(--radius) 0 0; }
+.wrap.aisooq-ab .aisooq-panel__head { font-weight: 800; font-size: 15px; }
+
+/* Filter chips are X's pill nav: no box until you are on one. */
+.wrap.aisooq-ab .aisooq-filters a {
+	border-color: transparent;
+	background: transparent;
+	border-radius: var(--pill);
+	font-weight: 600;
+	color: var(--muted);
+	min-height: 32px;
+	display: inline-flex;
+	align-items: center;
+}
+.wrap.aisooq-ab .aisooq-filters a:hover { background: var(--wash); color: var(--fg); }
+.wrap.aisooq-ab .aisooq-filters a.on { background: var(--pri); border-color: var(--pri); }
+
+.wrap.aisooq-ab .aisooq-courier-detail,
+.wrap.aisooq-ab .aisooq-dl-meta {
+	border-radius: 12px;
+	border-color: var(--line);
+	background: transparent;
+}
+.wrap.aisooq-ab .aisooq-courier-tbl tfoot td { background: transparent; border-top-color: var(--line); }
+.wrap.aisooq-ab .aisooq-thumb { border-radius: 8px; }
+.wrap.aisooq-ab .aisooq-act { border-radius: var(--radius-sm); }
+.wrap.aisooq-ab .aisooq-modal { border-radius: var(--radius); }
 
 /* ── Abandoned-cart funnel ────────────────────────────────────────────────
- * The same card row as the KPIs above, in checkout order. Secondary weight on
+ * The same tile row as the stats above, in checkout order. Secondary weight on
  * purpose: this is context for the list below it, and the list is what an
  * operator came to work through — it must not be pushed off the first screen.
  */
@@ -761,5 +951,61 @@ body[class*="page_aisooq-abandoned"] {
 }
 .wrap.aisooq-ab .aisooq-kpis--funnel .aisooq-kpi { padding: 10px 12px; }
 .wrap.aisooq-ab .aisooq-kpis--funnel .aisooq-kpi__num { font-size: 20px; margin-top: 3px; }
-.wrap.aisooq-ab .aisooq-kpis--funnel .aisooq-kpi__label { font-size: 10.5px; }
-.wrap.aisooq-ab .aisooq-kpis--funnel .aisooq-kpi__sub { font-size: 11px; }
+.wrap.aisooq-ab .aisooq-kpis--funnel .aisooq-kpi__label { font-size: 12px; }
+.wrap.aisooq-ab .aisooq-kpis--funnel .aisooq-kpi__sub { font-size: 12px; }
+
+/* ════════════════════════════════════════════════════════════════════════
+ * Blocked screen
+ * ════════════════════════════════════════════════════════════════════════ */
+
+.wrap.aisooq-bl .aisooq-hero {
+	border-bottom: 1px solid var(--line);
+	padding: 4px 0 16px;
+	margin: 8px 0 20px;
+}
+.wrap.aisooq-bl .aisooq-hero__sub { margin: 4px 0 0; color: var(--muted); font-size: 14px; max-width: 60rem; }
+
+/* The add-entry row reads as one composed control, the way X composes a reply. */
+.wrap.aisooq-bl .aisooq-compose {
+	display: flex;
+	gap: 10px;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	padding: 16px;
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+	margin: 0 0 10px;
+}
+.wrap.aisooq-bl .aisooq-compose label { display: block; }
+.wrap.aisooq-bl .aisooq-compose .h {
+	display: block;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--muted);
+	margin-bottom: 4px;
+}
+.wrap.aisooq-bl .aisooq-compose .grow { flex: 1 1 220px; min-width: 0; }
+.wrap.aisooq-bl .aisooq-compose .grow input { width: 100%; }
+.wrap.aisooq-bl .aisooq-msg { font-size: 13px; font-weight: 700; align-self: center; }
+.wrap.aisooq-bl .aisooq-msg.is-ok { color: var(--ok); }
+.wrap.aisooq-bl .aisooq-msg.is-err { color: var(--err); }
+
+/* Mode is the one thing on this screen that must be readable at a glance. */
+.wrap.aisooq-bl .aisooq-mode { font-weight: 800; font-size: 13px; }
+.wrap.aisooq-bl .aisooq-mode.block { color: var(--err); }
+.wrap.aisooq-bl .aisooq-mode.allow { color: var(--ok); }
+
+.wrap.aisooq-bl .aisooq-who > div { line-height: 20px; }
+.wrap.aisooq-bl .aisooq-who small { color: var(--muted); font-size: 13px; }
+.wrap.aisooq-bl .aisooq-decide { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.wrap.aisooq-bl .aisooq-empty { color: var(--muted); }
+.wrap.aisooq-bl .aisooq-error { color: var(--err); font-weight: 700; }
+.wrap.aisooq-bl .tablenav { margin-top: 12px; }
+
+@media (max-width: 600px) {
+	.wrap.aisooq-bl .aisooq-compose { padding: 12px; gap: 8px; }
+	.wrap.aisooq-bl .aisooq-compose label,
+	.wrap.aisooq-bl .aisooq-compose .grow { flex: 1 1 100%; }
+	.wrap.aisooq-bl .aisooq-compose select,
+	.wrap.aisooq-bl .aisooq-compose input { width: 100%; }
+}
