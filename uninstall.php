@@ -33,6 +33,7 @@ function aisooq_uninstall_site() {
 		'aisooq_status',
 		'aisooq_version',
 		'aisooq_table_missing',
+		'aisooq_blocklist_notice',
 		// Sync cursors and caches.
 		'aisooq_poll_cursor',
 		'aisooq_customer_cursor',
@@ -65,6 +66,7 @@ function aisooq_uninstall_site() {
 		'aisooq_status_poll',
 		'aisooq_customer_pull',
 		'aisooq_catalog_pull',
+		'aisooq_block_gc',
 		// Previous names.
 		'shopify_pulse_abandoned_sweep',
 		'shopify_pulse_status_poll',
@@ -94,7 +96,7 @@ function aisooq_uninstall_site() {
 		delete_metadata( 'user', 0, $meta_key, '', true );
 	}
 
-	foreach ( array( 'aisooq_abandoned_carts', 'sp_abandoned_carts', 'wafi_abandoned_carts' ) as $suffix ) {
+	foreach ( array( 'aisooq_abandoned_carts', 'aisooq_blocklist', 'aisooq_block_log', 'sp_abandoned_carts', 'wafi_abandoned_carts' ) as $suffix ) {
 		$table = $wpdb->prefix . $suffix;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL
 		$wpdb->query( "DROP TABLE IF EXISTS `{$table}`" );

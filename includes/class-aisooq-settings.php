@@ -66,6 +66,10 @@ class AI_Sooq_Settings {
 			'msg_fraud_generic'     => 'দুঃখিত, এই মুহূর্তে অর্ডারটি গ্রহণ করা যাচ্ছে না। সহায়তার জন্য আমাদের সাথে যোগাযোগ করুন।',
 			// {hours} is substituted with the configured window.
 			'msg_duplicate'         => 'আপনার একটি অর্ডার ইতিমধ্যে গ্রহণ করা হয়েছে। {hours} ঘণ্টার মধ্যে একই নম্বর থেকে আবার অর্ডার করা যাবে না। অর্ডারে কিছু যোগ বা পরিবর্তন করতে আমাদের সাথে যোগাযোগ করুন।',
+			// Shown when the operator's own block list refuses a checkout. It is
+			// deliberately vague about WHY: naming the reason would tell an
+			// abuser exactly which identifier to change.
+			'msg_blocked'           => '',
 			'msg_help'              => 'অর্ডার সম্পন্ন করতে সাহায্য দরকার? আমাদের সাথে যোগাযোগ করুন:',
 			'enable_customer_sync'  => 0,
 			'customer_sync_dir'     => 'both',
@@ -478,7 +482,7 @@ class AI_Sooq_Settings {
 		$clean['support_phone']         = sanitize_text_field( isset( $raw['support_phone'] ) ? $raw['support_phone'] : '' );
 		$clean['support_whatsapp']      = sanitize_text_field( isset( $raw['support_whatsapp'] ) ? $raw['support_whatsapp'] : '' );
 		$clean['support_messenger']     = esc_url_raw( isset( $raw['support_messenger'] ) ? trim( $raw['support_messenger'] ) : '' );
-		foreach ( array( 'msg_courier', 'msg_fraud_contact', 'msg_fraud_velocity', 'msg_fraud_generic', 'msg_duplicate', 'msg_help' ) as $mk ) {
+		foreach ( array( 'msg_courier', 'msg_fraud_contact', 'msg_fraud_velocity', 'msg_fraud_generic', 'msg_duplicate', 'msg_blocked', 'msg_help' ) as $mk ) {
 			$clean[ $mk ] = isset( $raw[ $mk ] ) ? sanitize_textarea_field( $raw[ $mk ] ) : '';
 		}
 		$clean['enable_customer_sync']  = empty( $raw['enable_customer_sync'] ) ? 0 : 1;
@@ -1400,6 +1404,11 @@ class AI_Sooq_Settings {
 			<label class="h" for="aisooq_msg_duplicate"><?php esc_html_e( 'Duplicate order', 'aisooq-connector' ); ?></label>
 			<textarea name="aisooq[msg_duplicate]" id="aisooq_msg_duplicate" rows="2"><?php echo esc_textarea( $s['msg_duplicate'] ); ?></textarea>
 			<p class="description"><?php esc_html_e( '{hours} is replaced with the configured window.', 'aisooq-connector' ); ?></p>
+		</div>
+		<div class="aisooq-field">
+			<label class="h" for="aisooq_msg_blocked"><?php esc_html_e( 'Blocked by your list', 'aisooq-connector' ); ?></label>
+			<textarea name="aisooq[msg_blocked]" id="aisooq_msg_blocked" rows="2"><?php echo esc_textarea( $s['msg_blocked'] ); ?></textarea>
+			<p class="description"><?php esc_html_e( 'Shown when a checkout matches an entry on your own block list. Keep it vague about the reason — naming it tells an abuser which detail to change. Blank uses the built-in wording.', 'aisooq-connector' ); ?></p>
 		</div>
 		<div class="aisooq-field">
 			<label class="h" for="aisooq_msg_help"><?php esc_html_e( 'Popup contact prompt', 'aisooq-connector' ); ?></label>

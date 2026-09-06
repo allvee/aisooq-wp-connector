@@ -210,6 +210,39 @@ class AI_Sooq_Fraud {
 	}
 
 	/**
+	 * Record a refused checkout, whichever gate refused it.
+	 *
+	 * Every gate that blocks already calls stash_block(), but a `block` never
+	 * becomes an order — so without this the refusal left no trace an operator
+	 * could ever see, and nobody could tell a wall of fraud from a
+	 * mis-configured threshold turning away real customers.
+	 *
+	 * @param string $gate    manual|duplicate|fraud|courier
+	 * @param string $reason  Why, in the operator's terms.
+	 * @param string $name
+	 * @param string $phone
+	 * @param string $email
+	 * @param int    $order_id
+	 */
+	private function record_block( $gate, $reason, $name, $phone, $email, $order_id = 0 ) {
+		if ( ! class_exists( 'AI_Sooq_Blocklist' ) ) {
+			return;
+		}
+		AI_Sooq_Blocklist::log(
+			$gate,
+			$reason,
+			array(
+				'phone'    => $phone,
+				'email'    => $email,
+				'ip'       => $this->client_ip(),
+				'name'     => $name,
+				'order_id' => $order_id,
+				'action'   => 'block',
+			)
+		);
+	}
+
+	/**
 	 * Resolve the support contact shown on a block: the plugin's explicit
 	 * Support phone / WhatsApp settings, falling back to the connected tenant's
 	 * contact number (cached from the last "Verify connection").
@@ -474,13 +507,32 @@ class AI_Sooq_Fraud {
 			? $data['shipping_address_1']
 			: ( isset( $data['billing_address_1'] ) ? $data['billing_address_1'] : '' );
 
-		// Duplicate-order guard FIRST: local, free, and answering it can save a
+		$email = isset( $data['billing_email'] ) ? $data['billing_email'] : '';
+
+		// Gate -1: the operator's own list, before anything else.
+		//
+		// It is local and free, so it costs nothing to ask; and an `allow`
+		// entry has to be consulted here or it could not rescue a customer the
+		// automatic layers keep rejecting. Being first also means a number the
+		// operator has already decided about never spends a billed lookup.
+		$listed = $this->blocklist_verdict( $name, $phone, $email );
+		if ( 'block' === $listed['decision'] ) {
+			$this->stash_block( 'manual', $listed['message'] );
+			$errors->add( 'aisooq_blocked', $this->with_contact( $listed['message'] ) );
+			return;
+		}
+		if ( 'allow' === $listed['decision'] ) {
+			return; // explicitly trusted — no further gate may refuse them
+		}
+
+		// Duplicate-order guard next: local, free, and answering it can save a
 		// billed BDCourier lookup further down.
 		$dup_msg = $this->duplicate_block_message(
 			$phone,
-			isset( $data['billing_email'] ) ? $data['billing_email'] : ''
+			$email
 		);
 		if ( $dup_msg ) {
+			$this->record_block( 'duplicate', $dup_msg, $name, $phone, $email );
 			$this->stash_block( 'duplicate', $dup_msg );
 			$errors->add( 'aisooq_duplicate', $dup_msg );
 			return;
@@ -495,6 +547,7 @@ class AI_Sooq_Fraud {
 			if ( $verdict && empty( $verdict['allowed'] ) ) {
 				$action = $this->settings->get( 'fraud_action' );
 				if ( 'block' === $action ) {
+					$this->record_block( 'fraud', $this->message( $verdict ), $name, $phone, $email );
 					$this->stash_block( 'fraud', $this->message( $verdict ) );
 					$errors->add( 'aisooq_fraud', $this->message( $verdict ) );
 					return;
@@ -510,6 +563,7 @@ class AI_Sooq_Fraud {
 		// fraud_action, and runs even when the full fraud screen is disabled.
 		$courier_msg = $this->courier_block_message( $phone );
 		if ( $courier_msg ) {
+			$this->record_block( 'courier', $courier_msg, $name, $phone, $email );
 			$this->stash_block( 'courier', $courier_msg );
 			$errors->add( 'aisooq_courier', $courier_msg );
 			return;
@@ -552,7 +606,20 @@ class AI_Sooq_Fraud {
 		$name    = trim( $order->get_billing_first_name() . ' ' . $order->get_billing_last_name() );
 		$address = $order->get_shipping_address_1() ? $order->get_shipping_address_1() : $order->get_billing_address_1();
 
-		// Duplicate-order guard FIRST: local, free, and it can save a billed
+		// Gate -1: the operator's own list. Same reasoning as the classic path.
+		$listed = $this->blocklist_verdict( $name, $order->get_billing_phone(), $order->get_billing_email(), $order->get_id() );
+		if ( 'block' === $listed['decision'] ) {
+			if ( class_exists( '\Automattic\WooCommerce\StoreApi\Exceptions\RouteException' ) ) {
+				throw new \Automattic\WooCommerce\StoreApi\Exceptions\RouteException( 'aisooq_blocked', $this->with_contact( $listed['message'] ), 400 );
+			}
+			$order->update_status( 'failed', $listed['message'] );
+			return;
+		}
+		if ( 'allow' === $listed['decision'] ) {
+			return;
+		}
+
+		// Duplicate-order guard next: local, free, and it can save a billed
 		// BDCourier lookup below. The order already exists on this path, so it
 		// is excluded from its own duplicate check.
 		$dup_msg = $this->duplicate_block_message(
@@ -561,6 +628,7 @@ class AI_Sooq_Fraud {
 			$order->get_id()
 		);
 		if ( $dup_msg ) {
+			$this->record_block( 'duplicate', $dup_msg, $name, $order->get_billing_phone(), $order->get_billing_email(), $order->get_id() );
 			if ( class_exists( '\Automattic\WooCommerce\StoreApi\Exceptions\RouteException' ) ) {
 				throw new \Automattic\WooCommerce\StoreApi\Exceptions\RouteException( 'aisooq_duplicate_order', $this->with_contact( $dup_msg ), 400 );
 			}
@@ -576,6 +644,7 @@ class AI_Sooq_Fraud {
 			if ( $verdict && empty( $verdict['allowed'] ) ) {
 				$action = $this->settings->get( 'fraud_action' );
 				if ( 'block' === $action ) {
+					$this->record_block( 'fraud', $this->message( $verdict ), $name, $order->get_billing_phone(), $order->get_billing_email(), $order->get_id() );
 					if ( class_exists( '\Automattic\WooCommerce\StoreApi\Exceptions\RouteException' ) ) {
 						throw new \Automattic\WooCommerce\StoreApi\Exceptions\RouteException(
 							'aisooq_fraud_blocked',
@@ -597,6 +666,7 @@ class AI_Sooq_Fraud {
 		// payment, only after name/address/mobile + IP have passed.
 		$courier_msg = $this->courier_block_message( $order->get_billing_phone() );
 		if ( $courier_msg ) {
+			$this->record_block( 'courier', $courier_msg, $name, $order->get_billing_phone(), $order->get_billing_email(), $order->get_id() );
 			if ( class_exists( '\Automattic\WooCommerce\StoreApi\Exceptions\RouteException' ) ) {
 				throw new \Automattic\WooCommerce\StoreApi\Exceptions\RouteException( 'aisooq_courier_blocked', $this->with_contact( $courier_msg ), 400 );
 			}
@@ -765,22 +835,80 @@ class AI_Sooq_Fraud {
 		return false;
 	}
 
+	/**
+	 * Consult the operator's own block/allow list.
+	 *
+	 * Returns the decision plus the message to show. A blocked attempt is
+	 * recorded before it is refused — this is the one gate where the shopper
+	 * never becomes an order, so the log is the only evidence it happened.
+	 *
+	 * @param string $name
+	 * @param string $phone
+	 * @param string $email
+	 * @param int    $order_id Known only on the Store API path.
+	 * @return array{decision:string,message:string}
+	 */
+	private function blocklist_verdict( $name, $phone, $email, $order_id = 0 ) {
+		if ( ! class_exists( 'AI_Sooq_Blocklist' ) ) {
+			return array( 'decision' => '', 'message' => '' );
+		}
+		$ip  = $this->client_ip();
+		$res = AI_Sooq_Blocklist::decide( $phone, $email, $ip );
+
+		if ( 'block' !== $res['decision'] ) {
+			return array( 'decision' => $res['decision'], 'message' => '' );
+		}
+
+		$template = trim( (string) $this->settings->get( 'msg_blocked' ) );
+		if ( '' === $template ) {
+			$template = __( 'Sorry, we are unable to accept this order. Please contact us if you think this is a mistake.', 'aisooq-connector' );
+		}
+
+		$this->logger->debug( 'Blocklist refused checkout (' . $res['matched'] . ').' );
+		AI_Sooq_Blocklist::log(
+			'manual',
+			$res['reason'] ? $res['reason'] : $res['matched'],
+			compact( 'phone', 'email', 'ip', 'name', 'order_id' ) + array( 'action' => 'block' )
+		);
+
+		return array( 'decision' => 'block', 'message' => $template );
+	}
+
 	/** Build the /fraud/screen body, forwarding the SHOPPER's ip/ua. */
 	private function ctx( $name, $phone, $address ) {
 		$ctx = array(
 			'ip'        => $this->client_ip(),
-			'userAgent' => isset( $_SERVER['HTTP_USER_AGENT'] ) ? substr( sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ), 0, 512 ) : '',
+			'userAgent' => isset( $_SERVER['HTTP_USER_AGENT'] ) ? self::clamp( sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ), 512 ) : '',
 		);
 		if ( '' !== trim( (string) $name ) ) {
-			$ctx['name'] = substr( (string) $name, 0, 255 );
+			$ctx['name'] = self::clamp( $name, 255 );
 		}
 		if ( '' !== trim( (string) $phone ) ) {
-			$ctx['phone'] = substr( (string) $phone, 0, 32 );
+			$ctx['phone'] = self::clamp( $phone, 32 );
 		}
 		if ( '' !== trim( (string) $address ) ) {
-			$ctx['address'] = substr( (string) $address, 0, 500 );
+			$ctx['address'] = self::clamp( $address, 500 );
 		}
 		return $ctx;
+	}
+
+	/**
+	 * Truncate without splitting a character.
+	 *
+	 * substr() counts BYTES, and a Bangla name or address is three bytes per
+	 * character — so a long one was cut mid-character. The result is invalid
+	 * UTF-8, wp_json_encode() then returns false, and the fraud screen posts a
+	 * broken body. It fails open, so the visible effect was simply that
+	 * screening stopped happening for those customers, silently and only for
+	 * them.
+	 *
+	 * @param string $value
+	 * @param int    $len Characters.
+	 * @return string
+	 */
+	private static function clamp( $value, $len ) {
+		$value = (string) $value;
+		return function_exists( 'mb_substr' ) ? mb_substr( $value, 0, $len, 'UTF-8' ) : substr( $value, 0, $len );
 	}
 
 	/** The operator-configured block message for this verdict's layer (falling
