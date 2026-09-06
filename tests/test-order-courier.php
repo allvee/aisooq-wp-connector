@@ -601,10 +601,54 @@ class Test_Order_Courier extends WP_Ajax_UnitTestCase {
 		);
 	}
 
+	/**
+	 * A bad nonce must be rejected BY THE NONCE CHECK.
+	 *
+	 * This test used to stub nothing, so the request failed for want of an API
+	 * response rather than for want of a nonce — and it passed unchanged with
+	 * `check_ajax_referer` deleted from ajax_recheck(). Stubbing a SUCCESSFUL
+	 * API response removes every other reason the handler could refuse, so the
+	 * guard is the only thing left holding this up: no API call may be made,
+	 * nothing may be written to the order, and no success may come back.
+	 */
 	public function test_recheck_rejects_a_bad_nonce() {
+		$this->stub_api( $this->api_payload() );
 		$order = $this->make_order();
-		$res   = $this->post_recheck( $order->get_id(), 'not-a-nonce' );
+
+		$res = $this->post_recheck( $order->get_id(), 'not-a-nonce' );
+
 		$this->assertNotTrue( isset( $res['success'] ) && $res['success'] );
+		$this->assertSame( 0, $this->api_calls, 'A request with a bad nonce must not reach the platform.' );
+		$this->assertNull(
+			$this->courier->snapshot( $this->reload( $order ) ),
+			'A request with a bad nonce must not write a courier snapshot.'
+		);
+	}
+
+	/** The same guard, on the detail endpoint. */
+	public function test_detail_rejects_a_bad_nonce() {
+		$this->stub_api( $this->api_payload() );
+		$order = $this->make_order();
+
+		$_POST = array( 'order_id' => $order->get_id(), 'nonce' => 'not-a-nonce' );
+		$this->_last_response = '';
+		$_REQUEST             = array_merge( $_POST, $_GET );
+		$level                = ob_get_level();
+		ob_start();
+		try {
+			do_action( 'wp_ajax_aisooq_order_courier_detail' );
+		} catch ( WPAjaxDieContinueException $e ) { // phpcs:ignore Generic.CodeAnalysis.EmptyStatement
+			// Expected.
+		} catch ( WPAjaxDieStopException $e ) { // phpcs:ignore Generic.CodeAnalysis.EmptyStatement
+			// Expected.
+		}
+		while ( ob_get_level() > $level ) {
+			ob_end_clean();
+		}
+		$res = json_decode( $this->_last_response, true );
+
+		$this->assertNotTrue( isset( $res['success'] ) && $res['success'] );
+		$this->assertSame( 0, $this->api_calls );
 	}
 
 	public function test_recheck_refuses_while_the_connection_is_paused() {

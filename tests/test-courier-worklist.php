@@ -337,13 +337,15 @@ class Test_Courier_Worklist extends WP_Ajax_UnitTestCase {
 	}
 
 	public function test_the_check_targets_the_stored_phone_not_the_posted_one() {
-		$key = $this->make_cart( '+8801712345678' );
-		$seen = '';
-		add_filter( 'pre_http_request', function ( $pre, $args, $url ) use ( &$seen ) {
+		$key       = $this->make_cart( '+8801712345678' );
+		$seen_url  = '';
+		$seen_body = '';
+		add_filter( 'pre_http_request', function ( $pre, $args, $url ) use ( &$seen_url, &$seen_body ) {
 			if ( false === strpos( $url, '/connect/courier' ) ) {
 				return $pre;
 			}
-			$seen = $url;
+			$seen_url  = $url;
+			$seen_body = isset( $args['body'] ) ? (string) $args['body'] : '';
 			return array(
 				'headers'  => array(),
 				'body'     => wp_json_encode( $this->api_payload() ),
@@ -360,8 +362,15 @@ class Test_Courier_Worklist extends WP_Ajax_UnitTestCase {
 		);
 		$this->call_ajax( 'aisooq_abandoned_courier' );
 
-		$this->assertStringContainsString( rawurlencode( '+8801712345678' ), $seen );
-		$this->assertStringNotContainsString( '9999999999', $seen );
+		// The stored number is the one looked up, never the posted one.
+		$this->assertStringContainsString( '+8801712345678', $seen_body );
+		$this->assertStringNotContainsString( '9999999999', $seen_body );
+
+		// And it travels in the BODY, not the URL: as a query parameter the
+		// customer's phone number is written into the access log of this
+		// server and of every proxy between here and the platform.
+		$this->assertStringNotContainsString( '1712345678', $seen_url );
+		$this->assertStringNotContainsString( 'phone=', $seen_url );
 	}
 
 	public function test_an_unknown_cart_is_rejected_before_any_paid_lookup() {
