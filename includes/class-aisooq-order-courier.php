@@ -30,6 +30,9 @@ class AI_Sooq_Order_Courier {
 	const META_JSON    = '_aisooq_courier_json';
 	const META_CHECKED = '_aisooq_courier_checked_at';
 	const META_PHONE   = '_aisooq_courier_phone';
+
+	/** How long one paid courier answer is reused across call sites. */
+	const LOOKUP_TTL = 600;
 	const ACTION       = 'aisooq_order_courier_check';
 	const NONCE        = 'aisooq_order_courier';
 
@@ -128,8 +131,29 @@ class AI_Sooq_Order_Courier {
 			return false;
 		}
 
-		$res = $this->api->get( '/connect/courier?phone=' . rawurlencode( $phone ) );
-		if ( is_wp_error( $res ) ) {
+		// Every lookup here is billed to the merchant, and this runs from a
+		// queue — so the world may have moved on since it was scheduled.
+		//
+		// Re-check that automatic checking is still on: the operator may have
+		// turned it off, or paused the connection, between enqueue and
+		// execution, and a queued job must not keep spending their money after
+		// they said stop.
+		if ( ! $this->is_enabled() ) {
+			$this->logger->debug( sprintf( 'Courier check for order %d skipped: automatic checking is off.', $order_id ) );
+			return false;
+		}
+
+		// And do not buy the same fact twice. Pressing "Recheck" in the admin
+		// answers this order while the queued automatic check is still pending;
+		// without this the merchant was charged for both.
+		$existing = $order->get_meta( self::META_CHECKED );
+		if ( $existing && trim( (string) $order->get_meta( self::META_PHONE ) ) === $phone ) {
+			$this->logger->debug( sprintf( 'Courier check for order %d skipped: already checked this number.', $order_id ) );
+			return false;
+		}
+
+		$res = self::cached_lookup( $this->api, $phone );
+		if ( is_wp_error( $res ) || null === $res ) {
 			$this->logger->error( sprintf( 'Courier check for order %d failed: %s', $order_id, $res->get_error_message() ) );
 			return false;
 		}
@@ -1038,7 +1062,11 @@ class AI_Sooq_Order_Courier {
 			wp_send_json_error( array( 'message' => __( 'No phone on this order.', 'aisooq-connector' ) ) );
 		}
 
-		$res = $this->api->get( '/connect/courier?phone=' . rawurlencode( $phone ) );
+		// Forced: the operator pressed Recheck, so they must get a fresh answer
+		// rather than the one they are trying to replace. Still routed through
+		// the shared lookup, which keeps the number out of the request URL and
+		// refreshes the cache the automatic paths read.
+		$res = self::cached_lookup( $this->api, $phone, true );
 		if ( is_wp_error( $res ) ) {
 			wp_send_json_error( array( 'message' => $res->get_error_message() ) );
 		}
@@ -1122,22 +1150,146 @@ class AI_Sooq_Order_Courier {
 	 */
 	public static function order_ids_by_phone( $phone, $exclude_id ) {
 		global $wpdb;
+		// Match every plausible WRITTEN form of the same number, not the exact
+		// bytes the shopper happened to type. `_billing_phone` is stored
+		// verbatim, so `01712-345678` and `01712345678` are different strings
+		// and an exact comparison both misses real repeat customers and lets a
+		// duplicate through to anyone who adds a dash. An IN() over a short
+		// candidate list stays sargable on the meta_value index.
+		$variants = self::phone_variants( $phone );
+		if ( ! $variants ) {
+			return array();
+		}
+		$placeholders = implode( ', ', array_fill( 0, count( $variants ), '%s' ) );
+		$params       = $variants;
+		$params[]     = (int) $exclude_id;
+
 		$ids = $wpdb->get_col( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			$wpdb->prepare(
 				"SELECT pm.post_id
 				   FROM {$wpdb->postmeta} pm
 				   JOIN {$wpdb->posts} p ON p.ID = pm.post_id
 				  WHERE pm.meta_key = '_billing_phone'
-				    AND pm.meta_value = %s
+				    AND pm.meta_value IN ({$placeholders})
 				    AND p.post_type = 'shop_order'
 				    AND p.ID <> %d
 				  ORDER BY p.post_date DESC
-				  LIMIT 100",
-				$phone,
-				(int) $exclude_id
+				  LIMIT 100", // phpcs:ignore WordPress.DB.PreparedSQL
+				$params
 			)
 		);
 		return array_map( 'intval', (array) $ids );
+	}
+
+	/**
+	 * The written forms one phone number is plausibly stored as.
+	 *
+	 * Bangladesh mobile numbers are eleven digits beginning `01`, and shoppers
+	 * type them with dashes, spaces, a `+880` or a bare `880`. Everything is
+	 * reduced to the eleven-digit national form and then expanded back into the
+	 * handful of shapes WooCommerce may already hold, so the comparison is
+	 * about the NUMBER rather than its punctuation.
+	 *
+	 * @param string $phone Raw input.
+	 * @return string[] Unique candidates, empty when there is nothing to match.
+	 */
+	/**
+	 * The canonical national form of a phone number, or '' if there isn't one.
+	 *
+	 * Bangladesh mobile numbers are eleven digits beginning `01`; shoppers type
+	 * them with dashes, spaces, a `+880` or a bare `880`. Reducing to one form
+	 * is what lets two spellings of the same number share a single paid lookup.
+	 *
+	 * @param string $phone
+	 * @return string
+	 */
+	public static function normalize_phone( $phone ) {
+		$digits = preg_replace( '/\D+/', '', (string) $phone );
+		if ( '' === $digits ) {
+			return '';
+		}
+		if ( 0 === strpos( $digits, '880' ) ) {
+			$digits = substr( $digits, 3 );
+		}
+		if ( '' === $digits ) {
+			return '';
+		}
+		return ( '0' === $digits[0] ) ? $digits : '0' . $digits;
+	}
+
+	/**
+	 * One paid courier lookup, shared.
+	 *
+	 * Every call to /connect/courier is billed to the merchant, and three
+	 * separate paths asked for the same number within seconds of each other:
+	 * the checkout gate, the queued per-order check, and the admin recheck. A
+	 * short transient keyed on the NORMALISED number collapses them onto one
+	 * answer, so a shopper placing an order costs one lookup rather than three.
+	 *
+	 * Failures are deliberately NOT cached — every caller fails open on an
+	 * error, and caching that would extend an outage into a window where the
+	 * gate silently does nothing.
+	 *
+	 * `$force` is for the one case the cache must never serve: an operator
+	 * pressing Recheck. They are asking BECAUSE they think the stored answer is
+	 * wrong, so handing back the cached copy would make the button do nothing
+	 * visible. A forced call still refreshes the cache for everyone else.
+	 *
+	 * @param AI_Sooq_Api_Client $api
+	 * @param string             $phone
+	 * @param bool               $force Skip the cached answer (operator-initiated).
+	 * @return array|WP_Error|null Null when there is no number to look up.
+	 */
+	public static function cached_lookup( AI_Sooq_Api_Client $api, $phone, $force = false ) {
+		$norm = self::normalize_phone( $phone );
+		if ( '' === $norm ) {
+			return null;
+		}
+		$key = 'aisooq_cr_' . md5( $norm );
+		if ( ! $force ) {
+			$hit = get_transient( $key );
+			if ( is_array( $hit ) ) {
+				return $hit;
+			}
+		}
+
+		// POST, so the number travels in the BODY.
+		//
+		// As a query parameter the customer's phone number is written into the
+		// access log of every hop between here and the platform — this server,
+		// any reverse proxy, any CDN — and those logs are retained, shipped and
+		// backed up far outside the store's own data handling. A request body is
+		// not logged that way.
+		//
+		// Older platform builds only expose the GET form, so a 404/405 falls
+		// back to it rather than silently disabling the courier gate on a store
+		// that has not been updated yet.
+		$res = $api->post( '/connect/courier', array( 'phone' => $phone ) );
+		if ( is_wp_error( $res ) && in_array( (int) $res->get_error_data( 'status' ), array( 404, 405 ), true ) ) {
+			$res = $api->get( '/connect/courier?phone=' . rawurlencode( $phone ) );
+		}
+		if ( is_wp_error( $res ) || ! is_array( $res ) ) {
+			return $res;
+		}
+		set_transient( $key, $res, self::LOOKUP_TTL );
+		return $res;
+	}
+
+	public static function phone_variants( $phone ) {
+		$raw      = trim( (string) $phone );
+		$national = self::normalize_phone( $raw );
+		if ( '' === $national ) {
+			return array();
+		}
+		$digits = preg_replace( '/\D+/', '', $raw );
+
+		$candidates = array( $raw, $digits, $national );
+		if ( strlen( $national ) > 1 ) {
+			$bare         = substr( $national, 1 );  // drop the leading 0
+			$candidates[] = '880' . $bare;
+			$candidates[] = '+880' . $bare;
+		}
+		return array_values( array_unique( array_filter( $candidates, 'strlen' ) ) );
 	}
 
 	/**
@@ -1162,21 +1314,29 @@ class AI_Sooq_Order_Courier {
 		if ( null === $args ) {
 			return null;
 		}
-		// Keyed on what actually varies the answer. The current order is
-		// excluded from its own history, so it belongs in the key too.
+		// The memo has to be keyed on the CUSTOMER, not on the row.
+		//
+		// `exclude` holds the current order id, so including it in the key gave
+		// every row its own key and the memo never once hit — the orders list
+		// ran a wc_get_orders (plus, off HPOS, a raw postmeta scan) for every
+		// single row, which is exactly the cost this memo exists to avoid.
+		// Query the customer's orders WITHOUT the exclusion, cache that, and
+		// subtract the current order if it is in the set.
+		$this_id = $order->get_id();
+		unset( $args['exclude'] );
+
 		$key = md5( wp_json_encode( $args ) );
-		if ( array_key_exists( $key, $memo ) ) {
-			return $memo[ $key ];
+		if ( ! array_key_exists( $key, $memo ) ) {
+			if ( array() === $args ) {
+				$memo[ $key ] = array();
+			} else {
+				$ids          = wc_get_orders( $args );
+				$memo[ $key ] = is_array( $ids ) ? array_map( 'intval', $ids ) : array();
+			}
 		}
 
-		if ( array() === $args ) {
-			$memo[ $key ] = 0;
-			return 0;
-		}
-
-		$ids          = wc_get_orders( $args );
-		$memo[ $key ] = is_array( $ids ) ? count( $ids ) : 0;
-		return $memo[ $key ];
+		$ids = $memo[ $key ];
+		return count( $ids ) - ( in_array( (int) $this_id, $ids, true ) ? 1 : 0 );
 	}
 
 	/**

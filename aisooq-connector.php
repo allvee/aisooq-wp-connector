@@ -39,6 +39,7 @@ define( 'AISOOQ_CUSTOMER_PULL_CRON', 'aisooq_customer_pull' );
 define( 'AISOOQ_TERM_SYNC_ACTION', 'aisooq_sync_term' );
 define( 'AISOOQ_PRODUCT_SYNC_ACTION', 'aisooq_sync_product' );
 define( 'AISOOQ_CATALOG_PULL_CRON', 'aisooq_catalog_pull' );
+define( 'AISOOQ_PRODUCT_DELETE_ACTION', 'aisooq_delete_product' );
 
 // Order meta keys.
 define( 'AISOOQ_META_ID', '_aisooq_order_id' );
@@ -46,6 +47,10 @@ define( 'AISOOQ_META_HASH', '_aisooq_sync_hash' );
 define( 'AISOOQ_META_SYNCED_AT', '_aisooq_synced_at' );
 define( 'AISOOQ_META_ATTEMPTS', '_aisooq_sync_attempts' );
 define( 'AISOOQ_META_PIXEL_SENT', '_aisooq_purchase_pixel_sent' );
+// Counts consecutive rate-limit deferrals. Separate from AISOOQ_META_ATTEMPTS
+// because a 429 is not a fault of the order — but it still needs a ceiling, or
+// a permanently throttled platform re-queues every order forever.
+define( 'AISOOQ_META_RATE_DEFERRALS', '_aisooq_rate_deferrals' );
 
 require_once AISOOQ_DIR . 'includes/class-aisooq-logger.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-settings.php';
@@ -67,8 +72,20 @@ require_once AISOOQ_DIR . 'includes/class-aisooq-seo-sync.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-status-poller.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-orders-column.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-products-column.php';
+require_once AISOOQ_DIR . 'includes/class-aisooq-privacy.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-install.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-plugin.php';
+
+// Translations. This plugin ships from GitHub, not WordPress.org, so nothing
+// loads its text domain automatically — without this every __() call, including
+// the Bangla checkout messages, was untranslatable. `init` is the correct hook:
+// loading earlier triggers a _doing_it_wrong notice on WP 6.7+.
+add_action(
+	'init',
+	function () {
+		load_plugin_textdomain( 'aisooq-connector', false, dirname( AISOOQ_BASENAME ) . '/languages' );
+	}
+);
 
 register_activation_hook( __FILE__, array( 'AI_Sooq_Install', 'activate' ) );
 register_deactivation_hook( __FILE__, array( 'AI_Sooq_Install', 'deactivate' ) );

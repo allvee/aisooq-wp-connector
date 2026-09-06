@@ -18,6 +18,9 @@ class AI_Sooq_Abandoned_Sync {
 
 	const SWEEP_BATCH = 25;
 
+	/** Rows the 30-day garbage collector removes per run. */
+	const GC_BATCH = 500;
+
 	/** @var AI_Sooq_Settings */
 	private $settings;
 	/** @var AI_Sooq_Api_Client */
@@ -225,6 +228,16 @@ class AI_Sooq_Abandoned_Sync {
 			'updated_at'    => $now,
 		);
 		if ( $exists ) {
+			// A shopper who already bought once and is now filling a NEW cart
+			// must be recoverable again. The row is reused per session, so its
+			// `converted` status persisted and every later cart from the same
+			// customer was silently never captured. Real cart activity reopens
+			// a converted row — but NOT one an operator dispositioned as
+			// cancelled or fake, which stays as they left it.
+			if ( 'converted' === $this->row_status( $session_key ) ) {
+				$data['status']      = 'active';
+				$data['wc_order_id'] = null;
+			}
 			$wpdb->update( $table, $data, array( 'session_key' => $session_key ) ); // phpcs:ignore WordPress.DB
 		} else {
 			// First-touch attribution: snapshot the campaign/social source once, on
@@ -247,6 +260,35 @@ class AI_Sooq_Abandoned_Sync {
 	}
 
 	/**
+	 * The row key for a block-checkout beacon post, derived from the caller's
+	 * own WooCommerce session.
+	 *
+	 * The `blk_` prefix is retained deliberately: it marks the row as having
+	 * come from the PUBLIC beacon, which convert_to_wc_order() relies on to
+	 * decide whether the captured prices can be trusted.
+	 *
+	 * @return string Empty when there is no session to bind to.
+	 */
+	private static function beacon_key() {
+		if ( ! function_exists( 'WC' ) ) {
+			return '';
+		}
+		// A REST request outside the Store API namespace may not have had the
+		// session handler started yet.
+		if ( ! WC()->session && method_exists( WC(), 'initialize_session' ) ) {
+			WC()->initialize_session();
+		}
+		if ( ! WC()->session ) {
+			return '';
+		}
+		$customer_id = (string) WC()->session->get_customer_id();
+		if ( '' === $customer_id ) {
+			return '';
+		}
+		return 'blk_' . substr( preg_replace( '/[^A-Za-z0-9_\-]/', '', $customer_id ), 0, 60 );
+	}
+
+	/**
 	 * Capture from the block (Store API) checkout beacon. WooCommerce Blocks has
 	 * no server hook that fires while the shopper fills the form — only at order
 	 * placement — so the storefront JS posts the contact + address + cart it read
@@ -260,11 +302,18 @@ class AI_Sooq_Abandoned_Sync {
 		if ( ! $this->settings->get( 'enable_abandoned' ) ) {
 			return false;
 		}
-		$key = isset( $data['key'] ) ? preg_replace( '/[^A-Za-z0-9_\-]/', '', (string) $data['key'] ) : '';
-		if ( '' === $key ) {
+		// The row key is derived SERVER-SIDE, never taken from the request.
+		//
+		// It used to be `$data['key']`, a value the browser made up and sent —
+		// so an anonymous caller could write to, or overwrite, any row by
+		// naming its key, and every browser with localStorage disabled shared
+		// the single literal 'k-nostorage' and therefore one row. Binding to
+		// the WooCommerce session means a beacon can only ever touch the cart
+		// belonging to the session that sent it.
+		$session_key = self::beacon_key();
+		if ( '' === $session_key ) {
 			return false;
 		}
-		$session_key = 'blk_' . substr( $key, 0, 60 );
 
 		$email = isset( $data['email'] ) ? $this->clean_email( $data['email'] ) : '';
 		$phone = isset( $data['phone'] ) ? $this->clean_msisdn( $data['phone'] ) : '';
@@ -422,32 +471,64 @@ class AI_Sooq_Abandoned_Sync {
 	 */
 	public function mark_converted( $order_id ) {
 		try {
-			if ( ! function_exists( 'WC' ) || ! WC()->session ) {
-				return;
-			}
-			$session_key = WC()->session->get_customer_id();
-			if ( empty( $session_key ) ) {
-				return;
-			}
-			$data = array( 'status' => 'converted', 'converted' => 1, 'updated_at' => current_time( 'mysql', true ) );
-			if ( $order_id ) {
-				$data['wc_order_id'] = (int) $order_id;
-			}
 			global $wpdb;
-			$wpdb->update( self::table_name(), $data, array( 'session_key' => $session_key ) ); // phpcs:ignore WordPress.DB
+
+			// The session row, when there is a session. The contact-based sweep
+			// below must still run without one — a Store API checkout can reach
+			// here with no usable session key, and that is exactly the case
+			// whose row would otherwise never be closed.
+			$session_key = ( function_exists( 'WC' ) && WC()->session )
+				? (string) WC()->session->get_customer_id()
+				: '';
+			if ( '' !== $session_key ) {
+				$data = array( 'status' => 'converted', 'converted' => 1, 'updated_at' => current_time( 'mysql', true ) );
+				if ( $order_id ) {
+					$data['wc_order_id'] = (int) $order_id;
+				}
+				$wpdb->update( self::table_name(), $data, array( 'session_key' => $session_key ) ); // phpcs:ignore WordPress.DB
+			}
+
+			// Also close any row captured by the BLOCK-checkout beacon.
+			//
+			// capture_beacon() keys its rows `blk_<browser key>`, which is not
+			// the WooCommerce session customer id matched above — so a block
+			// checkout left its row `active` forever. It kept being pushed, and
+			// the platform went on chasing a shopper who had already paid.
+			// The shopper just completed an order with this e-mail/phone, so
+			// any still-active row for the same contact is recovered by
+			// definition.
+			$order = $order_id ? wc_get_order( $order_id ) : null;
+			if ( $order ) {
+				$table   = self::table_name();
+				$email   = $this->clean_email( $order->get_billing_email() );
+				$phone   = $this->clean_msisdn( $order->get_billing_phone() );
+				$clauses = array();
+				$params  = array();
+				if ( '' !== $email ) {
+					$clauses[] = 'email = %s';
+					$params[]  = $email;
+				}
+				if ( '' !== $phone ) {
+					$clauses[] = 'phone = %s';
+					$params[]  = $phone;
+				}
+				if ( $clauses ) {
+					$sql = "UPDATE {$table} SET status = 'converted', converted = 1, wc_order_id = %d, updated_at = %s"
+						. ' WHERE converted = 0 AND (' . implode( ' OR ', $clauses ) . ')';
+					array_unshift( $params, (int) $order_id, current_time( 'mysql', true ) );
+					$wpdb->query( $wpdb->prepare( $sql, $params ) ); // phpcs:ignore WordPress.DB
+				}
+			}
 
 			// Stamp the cart fingerprint on the order so the order push can tell the
 			// platform which abandoned checkout this order recovered — same key the
 			// abandoned push used (sha256(sid|session_key)) — so the platform closes
 			// the matching recovery-inbox row instead of chasing an already-bought cart.
-			if ( $order_id ) {
+			if ( $order && '' !== $session_key ) {
 				$sid = $this->settings->get_sid();
 				if ( ! empty( $sid ) ) {
-					$order = wc_get_order( $order_id );
-					if ( $order ) {
-						$order->update_meta_data( '_aisooq_cart_fingerprint', hash( 'sha256', $sid . '|' . $session_key ) );
-						$order->save();
-					}
+					$order->update_meta_data( '_aisooq_cart_fingerprint', hash( 'sha256', $sid . '|' . $session_key ) );
+					$order->save();
 				}
 			}
 		} catch ( \Throwable $e ) {
@@ -458,6 +539,19 @@ class AI_Sooq_Abandoned_Sync {
 
 	public function mark_converted_order( $order ) {
 		$this->mark_converted( is_object( $order ) && method_exists( $order, 'get_id' ) ? $order->get_id() : 0 );
+	}
+
+	/**
+	 * The stored lifecycle status of one row, or '' when there is none.
+	 *
+	 * @param string $session_key
+	 * @return string
+	 */
+	private function row_status( $session_key ) {
+		global $wpdb;
+		return (string) $wpdb->get_var( // phpcs:ignore WordPress.DB
+			$wpdb->prepare( 'SELECT status FROM ' . self::table_name() . ' WHERE session_key = %s', $session_key )
+		);
 	}
 
 	private function delete_row( $session_key ) {
@@ -510,7 +604,11 @@ class AI_Sooq_Abandoned_Sync {
 		// 30 days for the recovery analytics, then pruned alongside dead carts.
 		$gc_cutoff = gmdate( 'Y-m-d H:i:s', time() - 30 * DAY_IN_SECONDS );
 		$wpdb->query( // phpcs:ignore WordPress.DB
-			$wpdb->prepare( "DELETE FROM {$table} WHERE updated_at < %s", $gc_cutoff )
+			// LIMIT, because this runs every 15 minutes against a table that
+			// grows with traffic. An unbounded DELETE on a store with a large
+			// backlog is a long-held lock on the table the checkout writes to.
+			// Whatever this run does not reach, the next one does.
+			$wpdb->prepare( "DELETE FROM {$table} WHERE updated_at < %s LIMIT %d", $gc_cutoff, self::GC_BATCH )
 		);
 	}
 
@@ -702,15 +800,33 @@ class AI_Sooq_Abandoned_Sync {
 	public function resync_pending( $limit = 100 ) {
 		global $wpdb;
 		$limit = max( 1, min( 500, (int) $limit ) );
+		// `synced = 0` is the same predicate the screen's "pending" KPI counts.
+		// Without it the oldest rows were re-pushed regardless of whether they
+		// had already been sent, so on a store with more active carts than one
+		// page the button re-sent the same already-synced rows every time and
+		// the number beside it never moved.
 		$rows  = $wpdb->get_results( // phpcs:ignore WordPress.DB
 			$wpdb->prepare(
-				'SELECT * FROM ' . self::table_name() . " WHERE status = 'active' AND ( ( email IS NOT NULL AND email <> '' ) OR ( phone IS NOT NULL AND phone <> '' ) ) ORDER BY updated_at ASC LIMIT %d",
+				'SELECT * FROM ' . self::table_name() . " WHERE status = 'active' AND synced = 0 AND ( ( email IS NOT NULL AND email <> '' ) OR ( phone IS NOT NULL AND phone <> '' ) ) ORDER BY updated_at ASC LIMIT %d",
 				$limit
 			)
 		);
+		// Queue rather than push inline.
+		//
+		// This ran up to 100 sequential blocking HTTP calls inside one
+		// admin-ajax request. On a slow platform that exceeds any sane PHP
+		// timeout, and the operator saw a dead spinner with no record of where
+		// it stopped. Action Scheduler already runs these with bounded
+		// concurrency and its own retry, so hand them over and return at once.
+		//
+		// Without Action Scheduler there is nothing to hand them to, so fall
+		// back to the inline push rather than silently doing nothing.
 		$sent = 0;
 		foreach ( (array) $rows as $row ) {
-			if ( $this->push_row( $row ) ) {
+			if ( function_exists( 'as_enqueue_async_action' ) ) {
+				$this->schedule_instant_push( $row->session_key );
+				$sent++;
+			} elseif ( $this->push_row( $row ) ) {
 				$sent++;
 			}
 		}
@@ -914,6 +1030,9 @@ class AI_Sooq_Abandoned_Sync {
 			return $order;
 		}
 
+		// Rows written by the public REST beacon carry browser-supplied prices.
+		$beacon_row = ( 0 === strpos( (string) $row->session_key, 'blk_' ) );
+
 		foreach ( $lines as $l ) {
 			$qty     = isset( $l['qty'] ) ? max( 1, (int) $l['qty'] ) : 1;
 			$price   = isset( $l['price'] ) ? (float) $l['price'] : 0.0;
@@ -928,13 +1047,28 @@ class AI_Sooq_Abandoned_Sync {
 				}
 			}
 			if ( $product ) {
-				// Pin the captured unit price (it may differ from the current
-				// catalog price the cart was abandoned at).
-				$order->add_product( $product, $qty, array(
-					'subtotal' => $price * $qty,
-					'total'    => $price * $qty,
-				) );
-			} else {
+				if ( $beacon_row ) {
+					// This row came from the PUBLIC beacon, so its prices were
+					// supplied by a browser — an anonymous caller could seed a
+					// real product at 0.01 and wait for an operator to press
+					// Convert. Use the catalogue price this store actually
+					// charges; there is nothing else here worth trusting.
+					$order->add_product( $product, $qty );
+				} else {
+					// Server-captured row (read from WC()->cart in this very
+					// process): pin the captured unit price, which may
+					// legitimately differ from today's catalogue price.
+					$order->add_product( $product, $qty, array(
+						'subtotal' => $price * $qty,
+						'total'    => $price * $qty,
+					) );
+				}
+			} elseif ( ! $beacon_row ) {
+				// No resolvable product: carry it as a priced fee so the total
+				// still matches what the shopper saw. Skipped entirely for a
+				// beacon row, where both the description and the amount are
+				// attacker-controlled and there is no product to check them
+				// against.
 				$item = new WC_Order_Item_Fee();
 				$item->set_name( ! empty( $l['title'] ) ? (string) $l['title'] : __( 'Item', 'aisooq-connector' ) );
 				$item->set_amount( $price * $qty );

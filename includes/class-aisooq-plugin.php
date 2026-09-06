@@ -49,6 +49,8 @@ class AI_Sooq_Plugin {
 	private $seo_sync;
 	/** @var AI_Sooq_Status_Poller */
 	private $poller;
+	/** @var AI_Sooq_Privacy */
+	private $privacy;
 
 	private $orders_column;
 
@@ -83,6 +85,7 @@ class AI_Sooq_Plugin {
 		$this->product_sync   = new AI_Sooq_Product_Sync( $this->settings, $this->api, $this->logger );
 		$this->seo_sync       = new AI_Sooq_Seo_Sync( $this->settings, $this->api, $this->logger );
 		$this->poller         = new AI_Sooq_Status_Poller( $this->settings, $this->api, $this->logger );
+		$this->privacy        = new AI_Sooq_Privacy();
 		$this->orders_column  = new AI_Sooq_Orders_Column( $this->settings, $this->logger );
 		$this->products_column = new AI_Sooq_Products_Column( $this->settings, $this->logger );
 
@@ -91,6 +94,10 @@ class AI_Sooq_Plugin {
 		// components only hook when the connection is Active — flipping the
 		// master switch off fully pauses order/abandoned/analytics/fraud/poll.
 		$this->settings->register();
+		add_action( 'admin_notices', array( 'AI_Sooq_Install', 'admin_notices' ) );
+		// Registered unconditionally: a data-subject request must be honourable
+		// even while the connection is paused — the captured PII is still here.
+		$this->privacy->register();
 		// The abandoned-carts worklist + Resync screen is ALWAYS registered so the
 		// operator can review captured carts even while the connection is paused
 		// (Resync itself is gated on an active connection inside the handler).
@@ -98,6 +105,10 @@ class AI_Sooq_Plugin {
 		$this->order_courier->register();
 
 		if ( $this->settings->is_active() ) {
+			// Attribution was constructed but never registered, so its
+			// enqueue + checkout-snapshot hooks never bound and every order
+			// synced with empty UTM/click-id attribution.
+			$this->attribution->register();
 			$this->order_sync->register();
 			$this->abandoned_sync->register();
 			$this->block_beacon->register();
@@ -126,11 +137,12 @@ class AI_Sooq_Plugin {
 		return $this->settings;
 	}
 
-	/** @return AI_Sooq_Order_Sync */
+	/** @return AI_Sooq_Order_Courier */
 	public function order_courier() {
 		return $this->order_courier;
 	}
 
+	/** @return AI_Sooq_Order_Sync */
 	public function order_sync() {
 		return $this->order_sync;
 	}

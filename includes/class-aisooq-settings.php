@@ -201,6 +201,7 @@ class AI_Sooq_Settings {
 			'orders_synced' => 0,
 			'queue'         => 0,
 			'failed'        => 0,
+			'queue_errors'  => 0,
 			'abandoned'     => 0,
 			'products'      => 0,
 			'customers'     => 0,
@@ -222,7 +223,30 @@ class AI_Sooq_Settings {
 		if ( function_exists( 'as_get_scheduled_actions' ) ) {
 			$base = array( 'group' => AISOOQ_AS_GROUP, 'per_page' => 500 );
 			$stats['queue']  = count( (array) as_get_scheduled_actions( array_merge( $base, array( 'status' => 'pending' ) ), 'ids' ) );
-			$stats['failed'] = count( (array) as_get_scheduled_actions( array_merge( $base, array( 'status' => 'failed' ) ), 'ids' ) );
+			// Action Scheduler's own `failed` status is not the number we want.
+			// handle_failure() CATCHES the API error and returns normally, so
+			// the action completes successfully and this count is structurally
+			// zero — the screen reported a clean queue while orders were
+			// silently giving up. It is kept as a separate queue-level figure.
+			$stats['queue_errors'] = count( (array) as_get_scheduled_actions( array_merge( $base, array( 'status' => 'failed' ) ), 'ids' ) );
+		}
+
+		// The real number: orders that exhausted their retry budget and will
+		// never be pushed again unless someone intervenes.
+		$stats['failed'] = 0;
+		if ( function_exists( 'wc_get_orders' ) && class_exists( 'AI_Sooq_Order_Sync' ) ) {
+			$q = wc_get_orders( array(
+				'limit'        => 1,
+				'paginate'     => true,
+				'return'       => 'ids',
+				'meta_key'     => AISOOQ_META_ATTEMPTS, // phpcs:ignore WordPress.DB.SlowDBQuery
+				'meta_value'   => AI_Sooq_Order_Sync::MAX_ATTEMPTS, // phpcs:ignore WordPress.DB.SlowDBQuery
+				'meta_compare' => '>=',
+				'meta_type'    => 'NUMERIC',
+			) );
+			if ( is_object( $q ) && isset( $q->total ) ) {
+				$stats['failed'] = (int) $q->total;
+			}
 		}
 
 		if ( class_exists( 'AI_Sooq_Abandoned_Sync' ) ) {
@@ -354,6 +378,49 @@ class AI_Sooq_Settings {
 	 * Handle the settings form POST. Uses a manual save (not register_setting)
 	 * so we can mask the secret and keep the old value when the field is blank.
 	 */
+	/**
+	 * Validate an operator-supplied platform endpoint.
+	 *
+	 * Bearer tokens and OAuth credentials are sent to whatever this resolves
+	 * to, so it must be a plain https origin. A non-https scheme would put the
+	 * client secret on the wire in clear; a URL with credentials, a port, a
+	 * path or a query is not an API origin and usually means someone is trying
+	 * to steer the request somewhere it should not go.
+	 *
+	 * Returns the previous value when the input is unusable, so a typo cannot
+	 * silently blank the connection.
+	 *
+	 * @param string $value    Submitted URL.
+	 * @param string $fallback Currently stored value.
+	 * @return string
+	 */
+	private static function clean_endpoint( $value, $fallback ) {
+		$value = untrailingslashit( esc_url_raw( trim( (string) $value ) ) );
+		if ( '' === $value ) {
+			return '';
+		}
+		$parts = wp_parse_url( $value );
+		if ( empty( $parts['host'] ) || empty( $parts['scheme'] ) ) {
+			return (string) $fallback;
+		}
+		$host  = strtolower( $parts['host'] );
+		$local = in_array( $host, array( 'localhost', '127.0.0.1', '::1' ), true );
+
+		// http is tolerated only for local development.
+		if ( 'https' !== $parts['scheme'] && ! ( 'http' === $parts['scheme'] && $local ) ) {
+			return (string) $fallback;
+		}
+		// No embedded credentials.
+		if ( isset( $parts['user'] ) || isset( $parts['pass'] ) ) {
+			return (string) $fallback;
+		}
+		// Host only — the client appends its own paths.
+		if ( ! empty( $parts['query'] ) || ! empty( $parts['fragment'] ) ) {
+			return (string) $fallback;
+		}
+		return $value;
+	}
+
 	public function maybe_save() {
 		if ( empty( $_POST['aisooq_save'] ) ) {
 			return;
@@ -368,13 +435,32 @@ class AI_Sooq_Settings {
 
 		$clean                          = array();
 		$clean['active']                = empty( $raw['active'] ) ? 0 : 1;
-		$clean['api_base']              = untrailingslashit( esc_url_raw( isset( $raw['api_base'] ) ? $raw['api_base'] : '' ) );
-		$clean['storefront_base']       = untrailingslashit( esc_url_raw( isset( $raw['storefront_base'] ) ? $raw['storefront_base'] : '' ) );
-		$clean['sid']                   = sanitize_text_field( isset( $raw['sid'] ) ? $raw['sid'] : '' );
-		$clean['client_id']             = sanitize_text_field( isset( $raw['client_id'] ) ? $raw['client_id'] : '' );
-		// Secret is write-only in the UI: blank submit keeps the stored value.
-		$secret_in                      = isset( $raw['client_secret'] ) ? trim( $raw['client_secret'] ) : '';
-		$clean['client_secret']         = ( '' === $secret_in ) ? $existing['client_secret'] : sanitize_text_field( $secret_in );
+
+		// The connection credentials are administrator-only.
+		//
+		// This screen is gated on `manage_woocommerce`, which a Shop Manager
+		// has. The client secret is write-only in the form, but the ENDPOINT is
+		// not: a Shop Manager could repoint `api_base` at a host they control
+		// and press Verify, and the token mint would post this store's
+		// client_id and client_secret straight to them. Steering where the
+		// credentials are sent is as sensitive as reading them, so both are
+		// held to `manage_options`; everything else on this screen stays
+		// editable by a shop manager.
+		if ( current_user_can( 'manage_options' ) ) {
+			$clean['api_base']        = self::clean_endpoint( isset( $raw['api_base'] ) ? $raw['api_base'] : '', $existing['api_base'] );
+			$clean['storefront_base'] = self::clean_endpoint( isset( $raw['storefront_base'] ) ? $raw['storefront_base'] : '', $existing['storefront_base'] );
+			$clean['sid']             = sanitize_text_field( isset( $raw['sid'] ) ? $raw['sid'] : '' );
+			$clean['client_id']       = sanitize_text_field( isset( $raw['client_id'] ) ? $raw['client_id'] : '' );
+			// Secret is write-only in the UI: blank submit keeps the stored value.
+			$secret_in                = isset( $raw['client_secret'] ) ? trim( $raw['client_secret'] ) : '';
+			$clean['client_secret']   = ( '' === $secret_in ) ? $existing['client_secret'] : sanitize_text_field( $secret_in );
+		} else {
+			$clean['api_base']        = $existing['api_base'];
+			$clean['storefront_base'] = $existing['storefront_base'];
+			$clean['sid']             = $existing['sid'];
+			$clean['client_id']       = $existing['client_id'];
+			$clean['client_secret']   = $existing['client_secret'];
+		}
 		$clean['enable_orders']         = empty( $raw['enable_orders'] ) ? 0 : 1;
 		$clean['enable_abandoned']      = empty( $raw['enable_abandoned'] ) ? 0 : 1;
 		$clean['enable_analytics']      = empty( $raw['enable_analytics'] ) ? 0 : 1;
@@ -436,10 +522,16 @@ class AI_Sooq_Settings {
 			$clean['shipping_map'] = isset( $existing['shipping_map'] ) && is_array( $existing['shipping_map'] ) ? $existing['shipping_map'] : array();
 		}
 
-		update_option( AISOOQ_OPTION, $clean );
+		// autoload=false: this option holds the OAuth client secret, and an
+		// autoloaded option is read into memory on EVERY request, front end
+		// included. Only the handful of paths that talk to the platform need it.
+		update_option( AISOOQ_OPTION, $clean, false );
 		$this->cache = null;
 		// Reset the cached token whenever credentials might have changed.
 		delete_transient( AISOOQ_TOKEN_TRANSIENT );
+		// …and the cached platform reads, so a negative result cached during an
+		// outage does not outlive the credentials the operator just corrected.
+		$this->flush_page_cache();
 
 		add_settings_error( 'aisooq_connector', 'saved', __( 'Settings saved.', 'aisooq-connector' ), 'updated' );
 
@@ -460,13 +552,41 @@ class AI_Sooq_Settings {
 	 * @param array $clean the sanitized local settings just saved
 	 */
 	private function push_platform_fraud( $clean ) {
-		$fraud = isset( $_POST['aisooq_fraud'] ) && is_array( $_POST['aisooq_fraud'] ) ? wp_unslash( $_POST['aisooq_fraud'] ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce checked in maybe_save()
-		if ( null === $fraud ) {
-			return; // fraud card not on this submit
-		}
+		$fraud  = isset( $_POST['aisooq_fraud'] ) && is_array( $_POST['aisooq_fraud'] ) ? wp_unslash( $_POST['aisooq_fraud'] ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce checked in maybe_save()
 		$status = get_option( self::STATUS_OPTION, array() );
+
 		if ( empty( $status['ok'] ) ) {
-			add_settings_error( 'aisooq_connector', 'fraud_offline', __( 'Fraud layers not saved to the platform — connect the store first (Verify connection).', 'aisooq-connector' ), 'warning' );
+			if ( null !== $fraud ) {
+				add_settings_error( 'aisooq_connector', 'fraud_offline', __( 'Fraud layers not saved to the platform — connect the store first (Verify connection).', 'aisooq-connector' ), 'warning' );
+			}
+			return;
+		}
+
+		// The layer card is absent whenever the config read failed — but the
+		// MASTER SWITCH was still on this submit, and it is the switch that arms
+		// the platform's engine. Returning here left the local toggle reading ON
+		// while the platform stayed off, which is the worst possible split:
+		// the operator believes checkouts are screened and they are not.
+		// Send `enabled` alone, and leave the layer fields untouched rather than
+		// overwriting the platform's real values with defaults we never read.
+		if ( null === $fraud ) {
+			$res = AI_Sooq_Plugin::instance()->api()->request(
+				'PUT',
+				'/connect/fraud-config',
+				array( 'enabled' => (bool) $clean['enable_fraud'] )
+			);
+			if ( is_wp_error( $res ) ) {
+				add_settings_error(
+					'aisooq_connector',
+					'fraud_put',
+					sprintf(
+						/* translators: %s: error */
+						__( 'The fraud master switch could not be sent to the platform: %s', 'aisooq-connector' ),
+						$res->get_error_message()
+					),
+					'warning'
+				);
+			}
 			return;
 		}
 
@@ -491,16 +611,69 @@ class AI_Sooq_Settings {
 	}
 
 	/**
-	 * Read the platform fraud config for the settings form (GET
-	 * /connect/fraud-config). Returns the config array, or null when the store
-	 * isn't connected / the call fails (the form then shows a connect prompt).
+	 * A platform GET whose answer is cached — including its failures.
+	 *
+	 * The settings screen used to make up to three uncached 20-second calls
+	 * before emitting a single byte, so the one page an operator opens to
+	 * diagnose an outage was the page the outage made unusable, and every
+	 * reload paid the full cost again.
+	 *
+	 * The failure is cached too, deliberately: without that, a down platform
+	 * costs a fresh 20s wait per call per reload. The key carries the api_base
+	 * and store id, so pointing at a different store invalidates it for free.
+	 *
+	 * @param string $path     Admin API path.
+	 * @param int    $ttl      Seconds to cache a successful answer.
+	 * @param int    $fail_ttl Seconds to remember a failure.
+	 * @return array|WP_Error
+	 */
+	private function flush_page_cache() {
+		foreach ( array( '/connect/fraud-config', '/connect/shipping-rates', '/connect/ping' ) as $path ) {
+			delete_transient( 'aisooq_pg_' . md5( $this->get_api_base() . '|' . $this->get_sid() . '|' . $path ) );
+		}
+	}
+
+	private function cached_get( $path, $ttl = 900, $fail_ttl = 60 ) {
+		$key = 'aisooq_pg_' . md5( $this->get_api_base() . '|' . $this->get_sid() . '|' . $path );
+		$hit = get_transient( $key );
+		if ( false !== $hit ) {
+			return ( is_array( $hit ) && isset( $hit['__aisooq_error'] ) )
+				? new WP_Error( 'aisooq_cached_error', (string) $hit['__aisooq_error'] )
+				: $hit;
+		}
+		// Shorter than the background timeout: a human is watching this render.
+		$res = AI_Sooq_Plugin::instance()->api()->get( $path, 8 );
+		if ( is_wp_error( $res ) ) {
+			set_transient( $key, array( '__aisooq_error' => $res->get_error_message() ), $fail_ttl );
+			return $res;
+		}
+		set_transient( $key, $res, $ttl );
+		return $res;
+	}
+
+	/**
+	 * Read the platform fraud config for the settings form.
+	 *
+	 * Three outcomes, kept distinct on purpose. Collapsing them all to null
+	 * meant a store that WAS connected but whose fraud-config read failed was
+	 * told "connect the store" — advice that is both wrong and unactionable —
+	 * while the real error (a missing OAuth scope, most often) went unsaid.
+	 *
+	 * @param array $status Stored connection status.
+	 * @return array{state:string,config:?array,message:string}
 	 */
 	private function load_platform_fraud( $status ) {
 		if ( empty( $status['ok'] ) ) {
-			return null;
+			return array( 'state' => 'disconnected', 'config' => null, 'message' => '' );
 		}
-		$res = AI_Sooq_Plugin::instance()->api()->get( '/connect/fraud-config' );
-		return is_wp_error( $res ) || ! is_array( $res ) ? null : $res;
+		$res = $this->cached_get( '/connect/fraud-config' );
+		if ( is_wp_error( $res ) ) {
+			return array( 'state' => 'error', 'config' => null, 'message' => $res->get_error_message() );
+		}
+		if ( ! is_array( $res ) ) {
+			return array( 'state' => 'error', 'config' => null, 'message' => __( 'The platform returned an unexpected response.', 'aisooq-connector' ) );
+		}
+		return array( 'state' => 'ok', 'config' => $res, 'message' => '' );
 	}
 
 	public function ajax_test_connection() {
@@ -508,6 +681,9 @@ class AI_Sooq_Settings {
 		if ( ! current_user_can( self::CAPABILITY ) ) {
 			wp_send_json_error( array( 'message' => __( 'Permission denied.', 'aisooq-connector' ) ), 403 );
 		}
+		// Verify means "ask the platform now", so it must never be answered
+		// from the render cache — and its result should refresh that cache.
+		$this->flush_page_cache();
 		$api    = AI_Sooq_Plugin::instance()->api();
 		$result = $api->get( '/connect/ping' );
 		if ( is_wp_error( $result ) ) {
@@ -715,7 +891,7 @@ class AI_Sooq_Settings {
 
 		$rates = array();
 		if ( $this->is_configured() ) {
-			$res = AI_Sooq_Plugin::instance()->api()->get( '/connect/shipping-rates' );
+			$res = $this->cached_get( '/connect/shipping-rates' );
 			if ( ! is_wp_error( $res ) && isset( $res['rates'] ) && is_array( $res['rates'] ) ) {
 				$rates = $res['rates'];
 			}
@@ -793,7 +969,7 @@ class AI_Sooq_Settings {
 		// the profile existed (its saved status has no `store`) — one ping, then
 		// cached — so the store name/permissions show without a manual re-verify.
 		if ( ! empty( $status['ok'] ) && empty( $status['store'] ) && $this->is_configured() ) {
-			$ping = AI_Sooq_Plugin::instance()->api()->get( '/connect/ping' );
+			$ping = $this->cached_get( '/connect/ping' );
 			if ( ! is_wp_error( $ping ) && isset( $ping['store'] ) && is_array( $ping['store'] ) ) {
 				$status['store'] = $ping['store'];
 				if ( isset( $ping['scopes'] ) && is_array( $ping['scopes'] ) ) {
@@ -837,7 +1013,14 @@ class AI_Sooq_Settings {
 						<button type="button" class="button aisooq-sync" data-entity="customers"><?php esc_html_e( 'Customers', 'aisooq-connector' ); ?></button>
 						<button type="button" class="button aisooq-sync" data-entity="categories"><?php esc_html_e( 'Categories', 'aisooq-connector' ); ?></button>
 					</span>
-					<span id="aisooq-test-result" style="margin-left:4px;"></span>
+					<?php
+					// role=status + aria-live: the result of Verify/Sync is
+					// written here by script, and without this a screen-reader
+					// user gets no announcement at all — the button appears to
+					// do nothing. `polite` so it waits for a pause rather than
+					// interrupting.
+					?>
+					<span id="aisooq-test-result" role="status" aria-live="polite" aria-atomic="true" style="margin-left:4px;"></span>
 				</div>
 			</div>
 
@@ -856,7 +1039,19 @@ class AI_Sooq_Settings {
 				<div class="aisooq-kpi <?php echo $k['failed'] > 0 ? 'err' : ''; ?>">
 					<div class="aisooq-kpi__label"><span class="dashicons dashicons-warning"></span><?php esc_html_e( 'Failed', 'aisooq-connector' ); ?></div>
 					<div class="aisooq-kpi__num"><?php echo esc_html( $this->kpi_num( $k['failed'] ) ); ?></div>
-					<div class="aisooq-kpi__sub"><?php esc_html_e( 'retrying w/ backoff', 'aisooq-connector' ); ?></div>
+					<div class="aisooq-kpi__sub">
+						<?php
+						// This counts orders that exhausted their retries — they
+						// are NOT still retrying, and saying so was the reason a
+						// merchant could watch this tile read zero-and-fine while
+						// orders quietly stopped syncing.
+						printf(
+							/* translators: %d: the retry limit. */
+							esc_html__( 'gave up after %d attempts', 'aisooq-connector' ),
+							(int) AI_Sooq_Order_Sync::MAX_ATTEMPTS
+						);
+						?>
+					</div>
 				</div>
 				<div class="aisooq-kpi">
 					<div class="aisooq-kpi__label"><span class="dashicons dashicons-archive"></span><?php esc_html_e( 'Abandoned pushed', 'aisooq-connector' ); ?></div>
@@ -1070,11 +1265,30 @@ class AI_Sooq_Settings {
 				<option value="flag" <?php selected( $s['fraud_action'], 'flag' ); ?>><?php esc_html_e( 'Allow, add a flag note', 'aisooq-connector' ); ?></option>
 			</select>
 		</div>
-		<?php if ( null === $fraud ) : ?>
+		<?php
+		$fraud_state  = isset( $fraud['state'] ) ? $fraud['state'] : 'disconnected';
+		$fraud_config = isset( $fraud['config'] ) && is_array( $fraud['config'] ) ? $fraud['config'] : null;
+		?>
+		<?php if ( 'disconnected' === $fraud_state ) : ?>
 			<div class="aisooq-field">
 				<p class="description"><?php esc_html_e( 'Connect the store (Verify connection) to configure the screening layers.', 'aisooq-connector' ); ?></p>
 			</div>
+		<?php elseif ( 'error' === $fraud_state ) : ?>
+			<div class="aisooq-field">
+				<p class="description aisooq-error">
+					<?php
+					printf(
+						/* translators: %s: the error the platform returned. */
+						esc_html__( 'Could not read the screening layers from the platform: %s', 'aisooq-connector' ),
+						esc_html( isset( $fraud['message'] ) ? $fraud['message'] : '' )
+					);
+					?>
+					<br />
+					<?php esc_html_e( 'Check that the OAuth app is registered with the fraud scope, then press Verify connection. The master switch above is still saved and still sent to the platform.', 'aisooq-connector' ); ?>
+				</p>
+			</div>
 		<?php else :
+			$fraud = $fraud_config;
 			$fv = function ( $key, $default ) use ( $fraud ) { return array_key_exists( $key, $fraud ) ? $fraud[ $key ] : $default; };
 			$pm = $fv( 'phoneMode', 'bd' );
 			?>
@@ -1432,7 +1646,19 @@ class AI_Sooq_Settings {
 			/* ── Verify + Sync ───────────────────────────────────────────── */
 			var out   = document.getElementById( 'aisooq-test-result' );
 			var nonce = <?php echo wp_json_encode( wp_create_nonce( self::NONCE ) ); ?>;
+			// Every button that can start one of these requests. Disabling them
+			// for the duration is not cosmetic: without it a second click queues
+			// a second backfill, and `aria-busy` is the only signal a
+			// screen-reader user gets that anything is happening at all.
+			var actionBtns = [].slice.call( document.querySelectorAll( '#aisooq-test-connection, .aisooq-sync' ) );
+			function setBusy( busy ) {
+				actionBtns.forEach( function ( b ) {
+					b.disabled = busy;
+					b.setAttribute( 'aria-busy', busy ? 'true' : 'false' );
+				} );
+			}
 			function call( action, pending, entity ) {
+				setBusy( true );
 				out.textContent = pending;
 				out.className = 'aisooq-result is-pending';
 				var data = new FormData();
@@ -1442,16 +1668,19 @@ class AI_Sooq_Settings {
 				fetch( ajaxurl, { method: 'POST', credentials: 'same-origin', body: data } )
 					.then( function ( r ) { return r.json(); } )
 					.then( function ( j ) {
+						setBusy( false );
 						out.textContent = ( j && j.data && j.data.message ) ? j.data.message : 'Error';
 						out.className = 'aisooq-result ' + ( ( j && j.success ) ? 'is-ok' : 'is-err' );
 						// Verify success returns fresh store profile + permissions;
 						// reload to render the connection panel from the saved status.
 						if ( j && j.success && j.data && j.data.reload ) {
 							isDirty = false;
+							setBusy( true ); // the page is about to go
 							setTimeout( function () { location.reload(); }, 900 );
 						}
 					} )
 					.catch( function () {
+						setBusy( false );
 						out.textContent = <?php echo wp_json_encode( __( 'Request failed', 'aisooq-connector' ) ); ?>;
 						out.className = 'aisooq-result is-err';
 					} );

@@ -41,6 +41,23 @@ class AI_Sooq_Catalog_Sync {
 		$this->logger   = $logger;
 	}
 
+	/**
+	 * Hash of the payload's CONTENT, ignoring fields that change every call.
+	 *
+	 * `sourceUpdatedAt` is stamped with the current time, so hashing the whole
+	 * payload produced a different digest on every run and the unchanged-skip
+	 * gate below could never match. The effect was that every term was
+	 * re-uploaded on every trigger — burning the platform's rate limit on
+	 * payloads identical to the ones already stored.
+	 *
+	 * @param array $payload
+	 * @return string
+	 */
+	private static function content_hash( array $payload ) {
+		unset( $payload['sourceUpdatedAt'] );
+		return md5( (string) wp_json_encode( $payload ) );
+	}
+
 	public function register() {
 		// Categories and brands are independently toggled + directioned. The term
 		// hooks are shared (WordPress fires created_term/edited_term for every
@@ -175,7 +192,7 @@ class AI_Sooq_Catalog_Sync {
 			}
 		);
 
-		$hash = md5( (string) wp_json_encode( $payload ) );
+		$hash = self::content_hash( $payload );
 		if ( get_term_meta( $term_id, self::HASH_META, true ) === $hash ) {
 			return;
 		}
@@ -298,14 +315,28 @@ class AI_Sooq_Catalog_Sync {
 		}
 		if ( $term_id ) {
 			$args['name'] = $name;
-			wp_update_term( $term_id, $taxonomy, $args );
+			// A failed write must NOT be stamped as applied further down, or the
+			// record is marked done and never retried — the term stays wrong on
+			// this store forever while the platform believes it is in sync.
+			// wp_update_term fails routinely here: a duplicate slug is enough.
+			$r = wp_update_term( $term_id, $taxonomy, $args );
+			if ( is_wp_error( $r ) ) {
+				self::$suppress = false;
+				$this->logger->error( 'Pull term update failed (' . $taxonomy . '/' . $handle . '): ' . $r->get_error_message() );
+				return;
+			}
 		} else {
 			$r = wp_insert_term( $name, $taxonomy, $args );
 			if ( is_wp_error( $r ) ) {
 				$ex = get_term_by( 'slug', $handle, $taxonomy );
 				if ( $ex ) {
 					$term_id = $ex->term_id;
-					wp_update_term( $term_id, $taxonomy, $args );
+					$u       = wp_update_term( $term_id, $taxonomy, $args );
+					if ( is_wp_error( $u ) ) {
+						self::$suppress = false;
+						$this->logger->error( 'Pull term adopt failed (' . $taxonomy . '/' . $handle . '): ' . $u->get_error_message() );
+						return;
+					}
 				} else {
 					self::$suppress = false;
 					$this->logger->error( 'Pull term insert failed (' . $taxonomy . '/' . $handle . '): ' . $r->get_error_message() );

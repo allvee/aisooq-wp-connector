@@ -43,8 +43,14 @@ class AI_Sooq_Analytics {
 		if ( ! $this->settings->get( 'enable_analytics' ) ) {
 			return;
 		}
+		// A COD order fires NEITHER of the first two hooks: `payment_complete`
+		// is for gateways that actually take money, and a COD order commonly
+		// lives its whole life in `processing` and is never marked completed.
+		// On a COD-heavy store that silently dropped most Purchase events.
+		// AISOOQ_META_PIXEL_SENT still guarantees exactly one send per order.
 		add_action( 'woocommerce_payment_complete', array( $this, 'track_purchase' ), 20, 1 );
 		add_action( 'woocommerce_order_status_completed', array( $this, 'track_purchase' ), 20, 1 );
+		add_action( 'woocommerce_order_status_processing', array( $this, 'track_purchase' ), 20, 1 );
 		add_action( 'user_register', array( $this, 'track_registration' ), 20, 1 );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
 		add_action( 'wp_ajax_aisooq_track', array( $this, 'ajax_track' ) );
@@ -72,7 +78,10 @@ class AI_Sooq_Analytics {
 			'eventName'      => 'Purchase',
 			'eventId'        => 'order-' . $order->get_id(),
 			'eventTime'      => gmdate( 'c' ),
-			'eventSourceUrl' => $order->get_checkout_order_received_url(),
+			// `get_checkout_order_received_url()` carries `?key=wc_order_…`, the
+			// token that grants guest access to the order. This URL is fanned
+			// out to Meta / TikTok / GA4, so the key is stripped first.
+			'eventSourceUrl' => remove_query_arg( array( 'key', 'order' ), $order->get_checkout_order_received_url() ),
 			'custom'         => array(
 				'currency'    => $order->get_currency(),
 				'value'       => (float) $order->get_total(),
@@ -88,6 +97,18 @@ class AI_Sooq_Analytics {
 				'lastName'  => $order->get_billing_last_name(),
 			)
 		);
+		/**
+		 * Customer identifiers attached to the server-side Purchase event.
+		 *
+		 * These leave the store for third-party ad platforms, so a site with a
+		 * consent manager (or any GDPR obligation) needs a way to drop or hash
+		 * them per order. Return an empty array to send the event without any
+		 * customer identity.
+		 *
+		 * @param array    $user  email / phone / firstName / lastName.
+		 * @param WC_Order $order The order being reported.
+		 */
+		$user = (array) apply_filters( 'aisooq_analytics_purchase_user', $user, $order );
 		// Only attach `user` when non-empty — an empty PHP array serializes as
 		// `[]`, not `{}`, which the server's nested-object validation rejects.
 		if ( ! empty( $user ) ) {
@@ -168,6 +189,16 @@ class AI_Sooq_Analytics {
 		if ( function_exists( 'is_product' ) && is_product() ) {
 			return 'product';
 		}
+		// WooCommerce reports the order-received and order-pay screens as
+		// is_checkout(), so treating that as "checkout" fired InitiateCheckout
+		// on the THANK-YOU page — inflating the merchant's funnel with a step
+		// that happens after the purchase, and doing it again on every refresh.
+		if ( function_exists( 'is_order_received_page' ) && is_order_received_page() ) {
+			return 'thankyou';
+		}
+		if ( function_exists( 'is_checkout_pay_page' ) && is_checkout_pay_page() ) {
+			return 'other';
+		}
 		if ( function_exists( 'is_checkout' ) && is_checkout() ) {
 			return 'checkout';
 		}
@@ -200,26 +231,48 @@ class AI_Sooq_Analytics {
 			wp_send_json_error( array( 'message' => 'invalid event' ), 400 );
 		}
 
+		// Every field below is attacker-shaped: this endpoint is nopriv, so a
+		// caller can post `url[]=x` and hand an ARRAY to a function typed for a
+		// string. On PHP 8 that is a fatal TypeError, not a notice, so each
+		// value is proven scalar before it is used.
 		$event = array(
 			'eventName'      => $name,
 			'eventTime'      => gmdate( 'c' ),
-			'eventSourceUrl' => isset( $_POST['url'] ) ? esc_url_raw( wp_unslash( $_POST['url'] ) ) : '',
+			'eventSourceUrl' => isset( $_POST['url'] ) && is_scalar( $_POST['url'] )
+				? esc_url_raw( wp_unslash( $_POST['url'] ) )
+				: '',
 		);
-		if ( ! empty( $_POST['eventId'] ) ) {
+		if ( ! empty( $_POST['eventId'] ) && is_scalar( $_POST['eventId'] ) ) {
 			$event['eventId'] = substr( sanitize_text_field( wp_unslash( $_POST['eventId'] ) ), 0, 64 );
 		}
-		if ( ! empty( $_POST['custom'] ) ) {
+		if ( ! empty( $_POST['custom'] ) && is_scalar( $_POST['custom'] ) ) {
 			$custom = json_decode( wp_unslash( $_POST['custom'] ), true );
 			if ( is_array( $custom ) ) {
 				$event['custom'] = $this->sanitize_custom( $custom );
 			}
 		}
 		if ( is_user_logged_in() ) {
-			$u             = wp_get_current_user();
-			$event['user'] = array( 'email' => $u->user_email, 'externalId' => (string) $u->ID );
+			$u    = wp_get_current_user();
+			$user = array( 'email' => $u->user_email, 'externalId' => (string) $u->ID );
+			/**
+			 * Identity attached to a browser-side event for a logged-in visitor.
+			 *
+			 * This forwards the visitor's real address to third-party ad
+			 * platforms on ordinary page views, so a store with a consent
+			 * manager needs a way to suppress it. Return an empty array to
+			 * send the event anonymously.
+			 *
+			 * @param array   $user Identity fields.
+			 * @param WP_User $u    The logged-in visitor.
+			 */
+			$user = (array) apply_filters( 'aisooq_analytics_event_user', $user, $u );
+			if ( ! empty( $user ) ) {
+				$event['user'] = $user;
+			}
 		}
 
-		$res = $this->api->public_post( '/pixel/events', array( 'events' => array( $event ) ) );
+		// A browser is waiting on this response, so it uses the short timeout.
+		$res = $this->api->interactive_post( '/pixel/events', array( 'events' => array( $event ) ) );
 		if ( is_wp_error( $res ) ) {
 			wp_send_json_error( array( 'message' => $res->get_error_message() ) );
 		}
@@ -243,7 +296,11 @@ class AI_Sooq_Analytics {
 		foreach ( $custom as $k => $v ) {
 			$key = sanitize_key( $k );
 			if ( is_array( $v ) ) {
-				$out[ $key ] = array_map( 'sanitize_text_field', array_map( 'strval', $v ) );
+				// Only scalars survive: a nested array would fatal strval() on
+				// PHP 8, and the pixel schema has no use for deeper structure.
+				$out[ $key ] = array_values(
+					array_map( 'sanitize_text_field', array_map( 'strval', array_filter( $v, 'is_scalar' ) ) )
+				);
 			} elseif ( is_numeric( $v ) ) {
 				$out[ $key ] = 0 + $v;
 			} else {

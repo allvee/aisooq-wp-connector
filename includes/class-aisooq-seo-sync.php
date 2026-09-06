@@ -140,6 +140,12 @@ class AI_Sooq_Seo_Sync {
 
 	const PUSH_HASHES_OPTION = 'aisooq_redirect_push_hashes';
 
+	/** Redirects pushed per run — the rest go on the next tick. */
+	const PUSH_BATCH = 50;
+
+	/** Persist progress every N successful pushes. */
+	const PUSH_CHECKPOINT = 10;
+
 	/**
 	 * Cron: read WordPress-authored redirects from whichever SEO/redirect plugin
 	 * is active and push changed ones to the platform. Hash-gated per path so
@@ -160,8 +166,17 @@ class AI_Sooq_Seo_Sync {
 		if ( ! is_array( $hashes ) ) {
 			$hashes = array();
 		}
+		// One blocking POST per rule, so a store with hundreds of redirects has
+		// to be done across ticks: bound each run, and persist progress AS IT
+		// GOES. Saving only at the end meant a run killed by a PHP timeout threw
+		// away every rule it had already pushed and started over next tick —
+		// re-sending the same rules forever without ever reaching the tail.
+		$done    = 0;
 		$changed = false;
 		foreach ( $rules as $r ) {
+			if ( $done >= self::PUSH_BATCH ) {
+				break;
+			}
 			$payload = array(
 				'path'     => $r['path'],
 				'target'   => $r['target'],
@@ -175,10 +190,22 @@ class AI_Sooq_Seo_Sync {
 			$res = $this->api->post( '/connect/redirects', $payload );
 			if ( is_wp_error( $res ) ) {
 				$this->logger->error( 'Redirect push failed for ' . $r['path'] . ': ' . $res->get_error_message() );
+				// A rate limit applies to the whole run, not this one rule —
+				// carrying on just burns the window and pushes it further out.
+				if ( 'aisooq_rate_limited' === $res->get_error_code() ) {
+					break;
+				}
 				continue;
 			}
 			$hashes[ $r['path'] ] = $hash;
 			$changed              = true;
+			$done++;
+
+			// Checkpoint, so a killed request keeps what it achieved.
+			if ( 0 === $done % self::PUSH_CHECKPOINT ) {
+				update_option( self::PUSH_HASHES_OPTION, $hashes, false );
+				$changed = false;
+			}
 		}
 		if ( $changed ) {
 			update_option( self::PUSH_HASHES_OPTION, $hashes, false );

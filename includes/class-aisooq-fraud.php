@@ -30,12 +30,24 @@ class AI_Sooq_Fraud {
 
 	const SESSION_KEY = 'aisooq_fraud_verdict';
 
+	/** Inline field-validation previews allowed per IP per minute. */
+	const PREVIEW_MAX_PER_MINUTE = 60;
+
 	/** @var AI_Sooq_Settings */
 	private $settings;
 	/** @var AI_Sooq_Api_Client */
 	private $api;
 	/** @var AI_Sooq_Logger */
 	private $logger;
+
+	/**
+	 * Orders whose fraud hold must survive the payment gateway, keyed by id.
+	 *
+	 * Request-scoped by design — see apply_to_order()/reassert_hold().
+	 *
+	 * @var array<int,bool>
+	 */
+	private $hold_owed = array();
 
 	public function __construct( AI_Sooq_Settings $settings, AI_Sooq_Api_Client $api, AI_Sooq_Logger $logger ) {
 		$this->settings = $settings;
@@ -60,6 +72,12 @@ class AI_Sooq_Fraud {
 		if ( $fraud ) {
 			add_action( 'woocommerce_checkout_order_processed', array( $this, 'apply_to_order' ), 5, 1 );
 			add_action( 'woocommerce_store_api_checkout_order_processed', array( $this, 'apply_to_order_obj' ), 5, 1 );
+			// The hold above lands BEFORE the gateway runs. COD (and any
+			// gateway that sets its own status in process_payment) then moves
+			// the order straight to processing, so a held order quietly stopped
+			// being held seconds after it was flagged. Re-assert it once, after
+			// the gateway has had its say.
+			add_action( 'woocommerce_order_status_changed', array( $this, 'reassert_hold' ), 20, 4 );
 		}
 		// Modern block popup on classic checkout + its stash-reader endpoint.
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_guard' ), 20 );
@@ -100,6 +118,16 @@ class AI_Sooq_Fraud {
 	 */
 	public function ajax_validate() {
 		check_ajax_referer( 'aisooq_validate', 'nonce' );
+		// The nonce is CSRF protection, not authentication: this handler is
+		// nopriv, and any visitor can read a valid anonymous nonce off the
+		// checkout page. Unthrottled, it is a free proxy to the store's
+		// OAuth-authenticated /fraud/preview endpoint — an attacker could burn
+		// the merchant's quota or mine it for which identities the platform
+		// considers known. A shopper typing into a checkout field sends a
+		// debounced handful of these; a script sends thousands.
+		if ( $this->preview_rate_limited() ) {
+			wp_send_json_error( array( 'enabled' => false, 'message' => 'rate limited' ), 429 );
+		}
 		$name    = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
 		$phone   = isset( $_POST['phone'] ) ? sanitize_text_field( wp_unslash( $_POST['phone'] ) ) : '';
 		$address = isset( $_POST['address'] ) ? sanitize_text_field( wp_unslash( $_POST['address'] ) ) : '';
@@ -119,7 +147,7 @@ class AI_Sooq_Fraud {
 			wp_send_json_success( $open );
 		}
 
-		$res = $this->api->storefront_post( '/fraud/preview', $body, true );
+		$res = $this->api->interactive_post( '/fraud/preview', $body, true );
 		if ( is_wp_error( $res ) || ! is_array( $res ) ) {
 			wp_send_json_success( $open );
 		}
@@ -298,9 +326,30 @@ class AI_Sooq_Fraud {
 			array_keys( wc_get_order_statuses() ),
 			array( 'wc-cancelled', 'wc-failed', 'wc-refunded', 'wc-checkout-draft' )
 		);
+		/**
+		 * Order statuses that count as "this shopper already ordered".
+		 *
+		 * `pending` is included by default because on a COD store it is a real
+		 * order — but on a store using a redirect gateway it can also be an
+		 * abandoned payment attempt, and counting it blocks the shopper's
+		 * legitimate retry. Which reading is right depends on the store, so it
+		 * is a decision the merchant can make.
+		 *
+		 * @param string[] $countable Status keys, `wc-` prefixed.
+		 * @param int      $hours     The configured duplicate window.
+		 */
+		$countable = (array) apply_filters( 'aisooq_duplicate_countable_statuses', array_values( $countable ), $hours );
 		$base = array(
-			'limit'        => 1,
-			'return'       => 'ids',
+			// Objects, not ids: any_is_a_real_order() has to look at the status
+			// and the payment method to tell a committed order from a shopper
+			// who bounced off a payment redirect.
+			//
+			// And more than one, because the newest match may be exactly that
+			// abandoned attempt — stopping at the first would then miss the real
+			// order sitting behind it and wave a genuine duplicate through. Five
+			// is plenty to see past a run of failed attempts and still bounded.
+			'limit'        => 5,
+			'return'       => 'objects',
 			'status'       => array_values( $countable ),
 			'date_created' => '>' . ( time() - ( $hours * HOUR_IN_SECONDS ) ),
 		);
@@ -310,7 +359,7 @@ class AI_Sooq_Fraud {
 
 		if ( '' !== $email ) {
 			$hit = wc_get_orders( array_merge( $base, array( 'billing_email' => $email ) ) );
-			if ( is_array( $hit ) && $hit ) {
+			if ( $this->any_is_a_real_order( $hit ) ) {
 				return true;
 			}
 		}
@@ -327,11 +376,79 @@ class AI_Sooq_Fraud {
 				return false;
 			}
 			$hit = wc_get_orders( array_merge( $base, array( 'include' => $ids ) ) );
-			return is_array( $hit ) && (bool) $hit;
+			return $this->any_is_a_real_order( $hit );
 		}
 
-		$hit = wc_get_orders( array_merge( $base, array( 'billing_phone' => $phone ) ) );
-		return is_array( $hit ) && (bool) $hit;
+		// HPOS stores the phone verbatim too, so ask for each written form of the
+		// same number rather than the exact string the shopper typed.
+		$variants = class_exists( 'AI_Sooq_Order_Courier' )
+			? AI_Sooq_Order_Courier::phone_variants( $phone )
+			: array( $phone );
+		foreach ( $variants as $variant ) {
+			$hit = wc_get_orders( array_merge( $base, array( 'billing_phone' => $variant ) ) );
+			if ( $this->any_is_a_real_order( $hit ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Does any of these matched orders actually represent a purchase?
+	 *
+	 * `pending` is the crux. On a COD store it is a real, committed order and
+	 * must count. Behind a redirect gateway it is the opposite: the shopper was
+	 * sent to bKash or a card page and never came back, so the order is a
+	 * husk — and counting it locked that shopper out of the retry that would
+	 * have completed the sale. Same for `on-hold`, which a redirect gateway may
+	 * leave behind while awaiting a callback.
+	 *
+	 * The discriminator is the gateway, not the status: an offline method (cash
+	 * on delivery, bank transfer, cheque) has nothing to come back FROM, so its
+	 * pending order is real. An online gateway that produced no transaction id
+	 * never took the money.
+	 *
+	 * @param mixed $orders Result of wc_get_orders() with return => objects.
+	 * @return bool
+	 */
+	private function any_is_a_real_order( $orders ) {
+		if ( ! is_array( $orders ) || ! $orders ) {
+			return false;
+		}
+		foreach ( $orders as $order ) {
+			if ( ! $order instanceof WC_Order ) {
+				// Ids only — we cannot tell, so fall back to counting it.
+				return true;
+			}
+			if ( ! $order->has_status( array( 'pending', 'on-hold' ) ) ) {
+				return true; // processing/completed/etc — unambiguously real
+			}
+			if ( '' !== (string) $order->get_transaction_id() || $order->is_paid() ) {
+				return true; // money actually moved
+			}
+			$method = (string) $order->get_payment_method();
+			/**
+			 * Payment methods with nothing for a shopper to come back from.
+			 *
+			 * An order left `pending` on one of these is a real order, not an
+			 * abandoned payment attempt.
+			 *
+			 * @param string[] $offline Gateway ids.
+			 */
+			$offline = (array) apply_filters(
+				'aisooq_offline_payment_methods',
+				array( 'cod', 'bacs', 'cheque', 'other' )
+			);
+			if ( '' === $method || in_array( $method, $offline, true ) ) {
+				return true;
+			}
+			// An online gateway, unpaid, no transaction: an abandoned attempt.
+			$this->logger->debug(
+				'Duplicate guard ignoring order ' . $order->get_id() .
+				' (' . $order->get_status() . ' via ' . $method . ', never paid) — abandoned payment attempt.'
+			);
+		}
+		return false;
 	}
 
 	/**
@@ -342,6 +459,15 @@ class AI_Sooq_Fraud {
 	 */
 	public function screen_classic( $data, $errors ) {
 		try {
+		// WooCommerce has already rejected this submission — a missing postcode,
+		// an invalid e-mail, an out-of-stock line. It will not become an order
+		// whatever we decide, so screening it buys a BILLED courier lookup and a
+		// fraud screen for nothing. On a checkout that fails validation a few
+		// times before going through, that was the merchant paying several times
+		// over for one sale.
+		if ( is_wp_error( $errors ) && $errors->get_error_codes() ) {
+			return;
+		}
 		$name    = trim( ( isset( $data['billing_first_name'] ) ? $data['billing_first_name'] : '' ) . ' ' . ( isset( $data['billing_last_name'] ) ? $data['billing_last_name'] : '' ) );
 		$phone   = isset( $data['billing_phone'] ) ? $data['billing_phone'] : '';
 		$address = isset( $data['shipping_address_1'] ) && '' !== $data['shipping_address_1']
@@ -401,6 +527,25 @@ class AI_Sooq_Fraud {
 	 * @param WP_REST_Request $request
 	 */
 	public function screen_blocks( $order, $request ) {
+		// The classic path is already wrapped in a fail-open catch; this one was
+		// not. On the Store API an uncaught Throwable becomes an HTTP 500 and
+		// the shopper simply cannot buy — the exact opposite of the documented
+		// fail-open behaviour. Only a RouteException, which IS the deliberate
+		// block, is allowed out.
+		try {
+			$this->screen_blocks_inner( $order, $request );
+		} catch ( \Automattic\WooCommerce\StoreApi\Exceptions\RouteException $e ) {
+			throw $e;
+		} catch ( \Throwable $e ) {
+			$this->logger->error( 'Fraud/courier block-checkout screen error (allowing checkout): ' . $e->getMessage() );
+		}
+	}
+
+	/**
+	 * @param WC_Order        $order
+	 * @param WP_REST_Request $request
+	 */
+	private function screen_blocks_inner( $order, $request ) {
 		if ( ! $order ) {
 			return;
 		}
@@ -495,7 +640,7 @@ class AI_Sooq_Fraud {
 	 * @return array|null
 	 */
 	private function screen( $ctx ) {
-		$res = $this->api->storefront_post( '/fraud/screen', $ctx, true );
+		$res = $this->api->interactive_post( '/fraud/screen', $ctx, true );
 		if ( is_wp_error( $res ) ) {
 			$this->logger->error( 'Fraud screen unavailable (failing open): ' . $res->get_error_message() );
 			return null;
@@ -531,12 +676,93 @@ class AI_Sooq_Fraud {
 			$layer,
 			$reason
 		);
-		if ( 'hold' === $action && ! $order->has_status( 'on-hold' ) ) {
-			$order->update_status( 'on-hold', $note );
+		if ( 'hold' === $action ) {
+			// Defend this hold for the rest of THIS request only. The flag is
+			// in-memory on purpose: the gateway overwrite happens later in the
+			// same checkout request, whereas an operator moving the order out
+			// of on-hold days later is a different request and must be
+			// respected. Persisting it in meta would fight the operator.
+			$this->hold_owed[ $order->get_id() ] = true;
+			if ( ! $order->has_status( 'on-hold' ) ) {
+				$order->update_status( 'on-hold', $note );
+			} else {
+				$order->add_order_note( $note );
+				$order->save();
+			}
 		} else {
 			$order->add_order_note( $note );
 			$order->save();
 		}
+	}
+
+	/**
+	 * Put a flagged order back on hold after a gateway has overwritten it.
+	 *
+	 * COD's process_payment() runs after `woocommerce_checkout_order_processed`
+	 * and calls update_status('processing'), so the hold applied during
+	 * apply_to_order() lasted only until the next line of WooCommerce ran. This
+	 * fires once — the pending flag is cleared immediately — so the operator can
+	 * still move the order out of on-hold afterwards and have it stay there.
+	 *
+	 * @param int      $order_id
+	 * @param string   $from
+	 * @param string   $to
+	 * @param WC_Order $order
+	 */
+	public function reassert_hold( $order_id, $from, $to, $order ) {
+		try {
+			$order_id = (int) $order_id;
+			if ( empty( $this->hold_owed[ $order_id ] ) ) {
+				return;
+			}
+			// Our own hold landing is the expected state — leave the flag set so
+			// a gateway that overwrites it AFTER us is still caught.
+			if ( 'on-hold' === $to ) {
+				return;
+			}
+			// Terminal states are the operator's (or the shopper's) decision;
+			// re-holding a cancelled, refunded or failed order would be wrong.
+			if ( in_array( $to, array( 'cancelled', 'refunded', 'failed', 'trash' ), true ) ) {
+				unset( $this->hold_owed[ $order_id ] );
+				return;
+			}
+			// Consume before acting: update_status() re-enters this hook.
+			unset( $this->hold_owed[ $order_id ] );
+
+			if ( ! $order instanceof WC_Order ) {
+				$order = wc_get_order( $order_id );
+			}
+			if ( ! $order ) {
+				return;
+			}
+			$order->update_status(
+				'on-hold',
+				__( 'AI Sooq fraud screen: hold re-applied after the payment gateway changed the status.', 'aisooq-connector' )
+			);
+		} catch ( \Throwable $e ) {
+			$this->logger->error( 'Fraud hold re-assert failed: ' . $e->getMessage() );
+		}
+	}
+
+	/**
+	 * Per-IP throttle for the unauthenticated inline-validation proxy.
+	 *
+	 * Deliberately generous — the field validator fires as the shopper types —
+	 * but finite.
+	 *
+	 * @return bool
+	 */
+	private function preview_rate_limited() {
+		$ip = isset( $_SERVER['REMOTE_ADDR'] )
+			? preg_replace( '/[^0-9a-fA-F:.]/', '', wp_unslash( $_SERVER['REMOTE_ADDR'] ) )
+			: '0';
+		$key = 'aisooq_fp_rl_' . md5( (string) $ip );
+		$n   = (int) get_transient( $key );
+		if ( $n >= self::PREVIEW_MAX_PER_MINUTE ) {
+			return true;
+		}
+		set_transient( $key, $n + 1, MINUTE_IN_SECONDS );
+		return false;
 	}
 
 	/** Build the /fraud/screen body, forwarding the SHOPPER's ip/ua. */
@@ -610,7 +836,11 @@ class AI_Sooq_Fraud {
 			return ''; // nothing to check yet
 		}
 
-		$res = $this->api->get( '/connect/courier?phone=' . rawurlencode( $phone ) );
+		// Shared with the queued per-order check and the admin recheck, so one
+		// shopper costs one billed lookup rather than one per call site.
+		$res = class_exists( 'AI_Sooq_Order_Courier' )
+			? AI_Sooq_Order_Courier::cached_lookup( $this->api, $phone )
+			: $this->api->post( '/connect/courier', array( 'phone' => $phone ) );
 		if ( is_wp_error( $res ) || ! is_array( $res ) ) {
 			$this->logger->error(
 				'Courier gate unavailable (failing open): ' .
@@ -673,7 +903,28 @@ class AI_Sooq_Fraud {
 	}
 
 	private function client_ip() {
-		$candidates = array( 'HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR' );
+		// Proxy headers are CLIENT-SUPPLIED unless a trusted proxy sets them.
+		//
+		// Layer 2 blocks on IP velocity, so trusting `X-Forwarded-For` by
+		// default meant the check was defeated by sending a different value on
+		// each request — and, worse, could be used to get an innocent
+		// customer's IP blocked. REMOTE_ADDR is the only value the web server
+		// vouches for, so it is the default; a site genuinely behind Cloudflare
+		// or a load balancer opts in.
+		/**
+		 * Whether to believe `CF-Connecting-IP` / `X-Forwarded-For`.
+		 *
+		 * Enable ONLY when every request reaches PHP through a proxy that
+		 * overwrites these headers. If visitors can reach the origin directly,
+		 * turning this on makes the velocity gate spoofable.
+		 *
+		 * @param bool $trust Default false.
+		 */
+		$trust_proxy = (bool) apply_filters( 'aisooq_trust_proxy_headers', false );
+
+		$candidates = $trust_proxy
+			? array( 'HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR' )
+			: array( 'REMOTE_ADDR' );
 		foreach ( $candidates as $key ) {
 			if ( empty( $_SERVER[ $key ] ) ) {
 				continue;

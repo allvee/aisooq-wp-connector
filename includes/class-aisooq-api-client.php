@@ -19,8 +19,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class AI_Sooq_Api_Client {
 
+	/** Background work — Action Scheduler jobs, crons, admin buttons. */
 	const TIMEOUT = 20;
 
+	/**
+	 * Calls made while a shopper waits.
+	 *
+	 * The fraud screen and the courier gate run inside checkout validation, one
+	 * after another, and the pixel proxy runs on ordinary page views. At the
+	 * background timeout a single stalled platform could hold a checkout for
+	 * more than a minute before failing open — by which point the shopper has
+	 * long since given up, which is the outcome fail-open exists to prevent.
+	 */
+	const TIMEOUT_INTERACTIVE = 5;
 
 	/** Used when a 429 carries no `Retry-After` — matches the platform's 60s window. */
 	const RATE_LIMIT_FALLBACK = 60;
@@ -103,6 +114,16 @@ class AI_Sooq_Api_Client {
 		}
 		$code = (int) wp_remote_retrieve_response_code( $response );
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+		// A throttled token mint is a rate limit like any other. Reporting it as
+		// `aisooq_token_failed` sent it down the generic failure path, where it
+		// spent one of the order's five attempts — so a busy window could still
+		// permanently abandon orders despite the 429 handling in send().
+		if ( 429 === $code ) {
+			$this->logger->debug( 'Token mint rate limited.' );
+			return $this->rate_limit_error( $response, $body );
+		}
+
 		if ( $code < 200 || $code >= 300 || empty( $body['access_token'] ) ) {
 			$msg = isset( $body['message'] ) ? ( is_array( $body['message'] ) ? implode( '; ', $body['message'] ) : $body['message'] ) : 'HTTP ' . $code;
 			$this->logger->error( 'Token mint rejected: ' . $msg );
@@ -129,7 +150,7 @@ class AI_Sooq_Api_Client {
 	 * @param bool       $retry  internal — false on the retry pass
 	 * @return array|WP_Error
 	 */
-	private function send( $base, $method, $path, $body, $auth, $retry = true ) {
+	private function send( $base, $method, $path, $body, $auth, $retry = true, $timeout = self::TIMEOUT ) {
 		if ( '' === $this->settings->get_sid() ) {
 			return new WP_Error( 'aisooq_not_configured', __( 'Missing Store SID.', 'aisooq-connector' ) );
 		}
@@ -148,7 +169,7 @@ class AI_Sooq_Api_Client {
 
 		$args = array(
 			'method'  => strtoupper( $method ),
-			'timeout' => self::TIMEOUT,
+			'timeout' => (int) $timeout,
 			'headers' => $headers,
 		);
 		if ( null !== $body ) {
@@ -166,7 +187,7 @@ class AI_Sooq_Api_Client {
 			// Token expired or app re-enabled — mint fresh and retry once.
 			delete_transient( AISOOQ_TOKEN_TRANSIENT );
 			$this->get_token( true );
-			return $this->send( $base, $method, $path, $body, $auth, false );
+			return $this->send( $base, $method, $path, $body, $auth, false, $timeout );
 		}
 
 		$decoded = json_decode( wp_remote_retrieve_body( $response ), true );
@@ -186,29 +207,8 @@ class AI_Sooq_Api_Client {
 		// about retrying would name the wrong culprit on the one path where a
 		// person is reading the message, and there is no retry to describe.
 		if ( 429 === $code ) {
-			$after = (int) wp_remote_retrieve_header( $response, 'retry-after' );
-			if ( $after <= 0 ) {
-				// The platform runs Nest's throttler unnamed, which emits a
-				// plain `Retry-After` in SECONDS; a proxy in front of it may
-				// drop the header, so fall back to its 60s window.
-				$after = self::RATE_LIMIT_FALLBACK;
-			}
-			// Cap it: a mis-set header must not park an order for a day.
-			$after = min( $after, self::RATE_LIMIT_MAX_WAIT );
-
-			$server_msg = ( is_array( $decoded ) && isset( $decoded['message'] ) )
-				? ( is_array( $decoded['message'] ) ? implode( '; ', $decoded['message'] ) : $decoded['message'] )
-				: '';
-			$msg = ( '' !== $server_msg )
-				? $server_msg
-				: __( 'Rate limited by the platform; the sync will retry automatically.', 'aisooq-connector' );
-
-			$this->logger->debug( $method . ' ' . $path . ' rate limited; retry in ' . $after . 's.' );
-			return new WP_Error(
-				'aisooq_rate_limited',
-				$msg,
-				array( 'status' => 429, 'retry_after' => $after, 'body' => $decoded )
-			);
+			$this->logger->debug( $method . ' ' . $path . ' rate limited.' );
+			return $this->rate_limit_error( $response, $decoded );
 		}
 
 		if ( $code < 200 || $code >= 300 ) {
@@ -221,13 +221,65 @@ class AI_Sooq_Api_Client {
 		return is_array( $decoded ) ? $decoded : array();
 	}
 
-	/** Authenticated request against the ADMIN host (/connect/*). */
-	public function request( $method, $path, $body = null ) {
-		return $this->send( $this->admin_base(), $method, $path, $body, true );
+	/**
+	 * Turn a 429 response into the shared `aisooq_rate_limited` error.
+	 *
+	 * Kept in one place so the token mint and the ordinary request path cannot
+	 * drift — they did, and a throttled token mint quietly burned an order's
+	 * retry budget while a throttled request did not.
+	 *
+	 * @param array      $response Raw wp_remote_* response.
+	 * @param array|null $decoded  Already-decoded body, if the caller has it.
+	 * @return WP_Error
+	 */
+	private function rate_limit_error( $response, $decoded ) {
+		// `Retry-After` may legally be an HTTP-date rather than seconds, and a
+		// proxy may return the header more than once (an array). Both cast to
+		// something unusable, so anything non-positive falls back to the
+		// throttler's own 60s window.
+		$header = wp_remote_retrieve_header( $response, 'retry-after' );
+		if ( is_array( $header ) ) {
+			$header = reset( $header );
+		}
+		$after = (int) $header;
+		if ( $after <= 0 && is_string( $header ) && '' !== $header ) {
+			// HTTP-date form: convert to a delta, ignoring anything in the past.
+			$ts = strtotime( $header );
+			if ( $ts ) {
+				$after = max( 0, $ts - time() );
+			}
+		}
+		if ( $after <= 0 ) {
+			$after = self::RATE_LIMIT_FALLBACK;
+		}
+		// Cap it: a mis-set header must not park an order for a day.
+		$after = min( $after, self::RATE_LIMIT_MAX_WAIT );
+
+		// Keep the SERVER's message whenever it sent one. A 429 is not always
+		// this platform throttling us — the courier lookup's 429 body says
+		// `bdcourier rate limited`, the upstream provider — and that is the one
+		// path where a person is reading the message.
+		$server_msg = ( is_array( $decoded ) && isset( $decoded['message'] ) )
+			? ( is_array( $decoded['message'] ) ? implode( '; ', $decoded['message'] ) : $decoded['message'] )
+			: '';
+		$msg = ( '' !== $server_msg )
+			? $server_msg
+			: __( 'Rate limited by the platform; the sync will retry automatically.', 'aisooq-connector' );
+
+		return new WP_Error(
+			'aisooq_rate_limited',
+			$msg,
+			array( 'status' => 429, 'retry_after' => $after, 'body' => $decoded )
+		);
 	}
 
-	public function get( $path ) {
-		return $this->request( 'GET', $path, null );
+	/** Authenticated request against the ADMIN host (/connect/*). */
+	public function request( $method, $path, $body = null, $timeout = self::TIMEOUT ) {
+		return $this->send( $this->admin_base(), $method, $path, $body, true, true, $timeout );
+	}
+
+	public function get( $path, $timeout = self::TIMEOUT ) {
+		return $this->request( 'GET', $path, null, $timeout );
 	}
 
 	public function post( $path, $body ) {
@@ -241,8 +293,20 @@ class AI_Sooq_Api_Client {
 	 *
 	 * @return array|WP_Error
 	 */
-	public function storefront_post( $path, $body, $auth = false ) {
-		return $this->send( $this->storefront_base(), 'POST', $path, $body, $auth );
+	public function storefront_post( $path, $body, $auth = false, $timeout = self::TIMEOUT ) {
+		return $this->send( $this->storefront_base(), 'POST', $path, $body, $auth, true, $timeout );
+	}
+
+	/**
+	 * Storefront POST on the shopper's clock.
+	 *
+	 * Same call, short timeout — for anything running inside checkout
+	 * validation or on a front-end page view.
+	 *
+	 * @return array|WP_Error
+	 */
+	public function interactive_post( $path, $body, $auth = false ) {
+		return $this->storefront_post( $path, $body, $auth, self::TIMEOUT_INTERACTIVE );
 	}
 
 	/** Back-compat alias: public (unauthenticated) storefront POST. */
