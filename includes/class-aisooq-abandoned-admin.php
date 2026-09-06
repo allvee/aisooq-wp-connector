@@ -569,7 +569,7 @@ class AI_Sooq_Abandoned_Admin {
 				</td>
 				<td class="aisooq-cart-cell" data-label="<?php esc_attr_e( 'Cart', 'aisooq-connector' ); ?>">
 					<div class="aisooq-td-val">
-						<div class="aisooq-mono"><?php echo esc_html( sprintf( _n( '%d item', '%d items', $count, 'aisooq-connector' ), $count ) ); ?></div>
+						<div class="aisooq-mono"><?php /* translators: %d: number of items in the cart. */ echo esc_html( sprintf( _n( '%d item', '%d items', $count, 'aisooq-connector' ), $count ) ); ?></div>
 						<?php if ( $first ) : ?><div class="aisooq-contact"><?php echo esc_html( wp_html_excerpt( $first, 42, '…' ) ); ?></div><?php endif; ?>
 					</div>
 				</td>
@@ -723,6 +723,7 @@ class AI_Sooq_Abandoned_Admin {
 					wp_send_json_error( array( 'message' => $res->get_error_message() ) );
 				}
 				wp_send_json_success( array(
+					/* translators: %d: the WooCommerce order number just created. */
 					'message'  => sprintf( __( 'Order #%d created', 'aisooq-connector' ), $res ),
 					'orderId'  => (int) $res,
 					'orderUrl' => $this->order_edit_url( $res ),
@@ -874,7 +875,7 @@ class AI_Sooq_Abandoned_Admin {
 						<div class="aisooq-dl-cust">
 							<span class="dashicons dashicons-admin-users"></span>
 							<a href="<?php echo esc_url( get_edit_user_link( $wc_user->ID ) ); ?>"><?php echo esc_html( $wc_user->display_name ); ?></a>
-							<?php if ( $order_count ) : ?><span class="aisooq-dim">· <?php echo esc_html( sprintf( _n( '%d order', '%d orders', $order_count, 'aisooq-connector' ), $order_count ) ); ?></span><?php endif; ?>
+							<?php /* translators: %d: number of orders. */ if ( $order_count ) : ?><span class="aisooq-dim">· <?php echo esc_html( sprintf( _n( '%d order', '%d orders', $order_count, 'aisooq-connector' ), $order_count ) ); ?></span><?php endif; ?>
 						</div>
 					<?php endif; ?>
 				</div>
@@ -993,218 +994,7 @@ class AI_Sooq_Abandoned_Admin {
 		}
 		?>
 		<div class="wrap aisooq-ab">
-			<style>
-				.aisooq-ab{--pri:#2271b1;--ok:#00844a;--warn:#996800;--err:#b32d2e;--info:#1d6ad4;--bd:#dcdcde;--muted:#646970}
-				.aisooq-ab .aisooq-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:12px 0 4px}
-				.aisooq-ab h1{margin:0;font-size:22px}
-				.aisooq-ab .aisooq-sub{color:var(--muted);font-size:13px;margin:2px 0 0}
-				.aisooq-dim{color:var(--muted)}.aisooq-nowrap{white-space:nowrap}
-				.aisooq-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin:16px 0 18px}
-				.aisooq-kpi{background:#fff;border:1px solid var(--bd);border-left:3px solid var(--pri);border-radius:10px;padding:13px 15px;display:flex;flex-direction:column;min-height:88px}
-				.aisooq-kpi.ok{border-left-color:var(--ok)}.aisooq-kpi.warn{border-left-color:var(--warn)}.aisooq-kpi.muted{border-left-color:var(--muted)}.aisooq-kpi.info{border-left-color:var(--info)}.aisooq-kpi.err{border-left-color:var(--err)}
-				.aisooq-kpi__label{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600}
-				.aisooq-kpi__num{font-size:26px;font-weight:700;line-height:1.1;margin-top:auto;padding-top:8px;font-variant-numeric:tabular-nums;color:#1d2327}
-				.aisooq-kpi__sub{font-size:12px;color:var(--muted);margin-top:3px;min-height:15px}
-				.aisooq-panel{background:#fff;border:1px solid var(--bd);border-radius:10px;margin:0 0 18px;overflow:hidden}
-				.aisooq-panel__head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 15px;border-bottom:1px solid var(--bd);font-weight:600;flex-wrap:wrap}
-				.aisooq-panel__body{padding:14px}
-				.aisooq-funnel{display:flex;flex-direction:column;gap:8px}
-				.aisooq-funnel__row{display:grid;grid-template-columns:120px 1fr 48px;align-items:center;gap:10px;font-size:13px}
-				.aisooq-funnel__bar{height:10px;border-radius:999px;background:linear-gradient(90deg,#2271b1,#4a9fe0);min-width:3px}
-				.aisooq-funnel__track{background:#f0f0f1;border-radius:999px;overflow:hidden}
-				.aisooq-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;padding:12px 14px;border-bottom:1px solid var(--bd);background:#fbfbfc}
-				.aisooq-toolbar label{display:block;font-size:11px;font-weight:600;color:var(--muted);margin-bottom:3px}
-				.aisooq-toolbar input,.aisooq-toolbar select{min-height:30px}
-				.aisooq-bulkbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--bd);background:#fff}
-				.aisooq-cb-cell{width:28px;text-align:center}
-				.aisooq-filters{display:flex;gap:6px;flex-wrap:wrap}
-				.aisooq-filters a{text-decoration:none;font-size:13px;padding:4px 10px;border:1px solid var(--bd);border-radius:999px;color:#1d2327;background:#fff}
-				.aisooq-filters a.on{background:var(--pri);border-color:var(--pri);color:#fff}
-				.aisooq-tbl{width:100%;border-collapse:collapse;background:#fff}
-				.aisooq-tbl th,.aisooq-tbl td{text-align:left;padding:10px 12px;border-bottom:1px solid #f0f0f1;font-size:13px;vertical-align:top}
-				.aisooq-tbl th{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);background:#fbfbfc;position:sticky;top:0}
-				.aisooq-tbl tbody tr{transition:background .12s}
-				.aisooq-tbl tbody tr:hover{background:#f7f9fb}
-				.aisooq-tbl td .aisooq-td-val{display:block}
-				.aisooq-badge{display:inline-flex;align-items:center;gap:6px;font-weight:600;padding:3px 9px;border-radius:999px;font-size:12px}
-				.aisooq-badge::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor}
-				.aisooq-badge.ok{background:#edfaef;color:var(--ok)}.aisooq-badge.warn{background:#fcf5e6;color:var(--warn)}.aisooq-badge.err{background:#fcebea;color:var(--err)}.aisooq-badge.info{background:#e9f2fd;color:var(--info)}.aisooq-badge.muted{background:#f0f0f1;color:var(--muted)}
-				.aisooq-ratio{display:inline-flex;align-items:center;gap:5px;font-weight:600;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid}
-				.aisooq-ratio.g{background:#edfaef;color:var(--ok);border-color:#00844a33}.aisooq-ratio.a{background:#fcf5e6;color:var(--warn);border-color:#99680033}.aisooq-ratio.r{background:#fcebea;color:var(--err);border-color:#b32d2e33}
-				.aisooq-cust{font-weight:600}
-				.aisooq-contact{color:var(--muted);font-size:12px;margin-top:2px;line-height:1.5}
-				.aisooq-courier{margin-top:4px}
-				/* Three stacked rows, same as the orders list: the figures, the
-				   bar they describe, then the controls. An operator moves
-				   between the two screens all day and the same measurement
-				   should not be laid out two different ways. */
-				.aisooq-courier-head{display:flex;flex-direction:column;align-items:stretch;gap:5px;min-width:0}
-				/* The figures stay on one line — wrapping them mid-set turns
-				   three related numbers into two unrelated groups. */
-				.aisooq-courier-counts{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;min-width:0}
-				.aisooq-courier-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-				.aisooq-pill{position:relative;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
-					min-width:18px;padding:0 6px;border-radius:999px;font-size:11px;font-weight:600;
-					line-height:17px;font-variant-numeric:tabular-nums;white-space:nowrap}
-				.aisooq-pill + .aisooq-pill::before{content:":";position:absolute;left:-6px;top:50%;
-					transform:translateY(-50%);color:#8c8f94;font-weight:600;line-height:1}
-				.aisooq-pill.total{background:#e9f0f8;color:#2c5c8f}
-				.aisooq-pill.ok{background:#e8f3ec;color:#2f6b45}
-				.aisooq-pill.err{background:#f7ece9;color:#964a3f}
-				/* `.aisooq-ratio` is a PILL elsewhere on this screen (the
-				   breakdown table still uses it that way). The direct-child
-				   selector turns only the headline instance into the bar, so
-				   the table's pills are untouched. */
-				.aisooq-courier-head > .aisooq-ratio{display:flex;align-items:center;gap:6px;width:100%;
-					max-width:168px;padding:0;border:0;background:none;border-radius:0}
-				.aisooq-courier-head .aisooq-ratio-track{position:relative;flex:1 1 auto;height:16px;border-radius:999px;
-					background:#f0f0f1;border:1px solid #dcdcde;overflow:hidden;min-width:56px}
-				.aisooq-courier-head .aisooq-ratio-fill{position:absolute;top:0;bottom:0;left:0;
-					transition:width .35s cubic-bezier(.32,.72,0,1)}
-				.aisooq-courier-head .aisooq-ratio-fill.is-ok{background:#45805a;border-radius:999px 0 0 999px}
-				.aisooq-courier-head .aisooq-ratio-fill.is-err{background:#a85a4e}
-				.aisooq-courier-head .aisooq-ratio-fill.is-full{border-radius:999px}
-				.aisooq-courier-head .aisooq-ratio-fill.is-err.is-full{border-radius:0 999px 999px 0}
-				.aisooq-courier-head .aisooq-ratio-val{position:absolute;top:0;line-height:16px;font-size:10px;
-					font-weight:700;font-variant-numeric:tabular-nums}
-				.aisooq-courier-head .aisooq-ratio.inside .aisooq-ratio-val{left:0;width:100%;text-align:center;
-					color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.28)}
-				.aisooq-courier-head .aisooq-ratio.outside .aisooq-ratio-val{right:6px;color:#1d2327}
-				.aisooq-courier-head .aisooq-ratio-meta{font-size:11px;color:var(--muted);white-space:nowrap}
-				/* Icon controls, paired on the row under the bar. */
-				/* Two classes deep: `.wp-core-ui .button-link` underlines its
-				   link-buttons and a single-class rule loses to it. */
-				.aisooq-courier .aisooq-icon-btn,.aisooq-courier-actions .aisooq-icon-btn{display:inline-flex;align-items:center;justify-content:center;
-					width:24px;min-width:24px;height:24px;padding:0;border-radius:4px;flex:0 0 auto;
-					color:#2271b1;text-decoration:none;cursor:pointer;touch-action:manipulation;
-					transition:background-color .18s cubic-bezier(.32,.72,0,1),color .18s cubic-bezier(.32,.72,0,1)}
-				.aisooq-icon-btn:hover:not([disabled]),.aisooq-icon-btn:focus-visible{background:#f0f6fc;color:#135e96}
-				.aisooq-icon-btn:focus-visible{outline:2px solid #2271b1;outline-offset:1px}
-				.aisooq-icon-btn .dashicons{width:16px;height:16px;font-size:16px;line-height:16px}
-				.aisooq-courier-head .button-link{font-size:11px;text-decoration:none}
-				@media (prefers-reduced-motion:reduce){
-					.aisooq-courier-head .aisooq-ratio-fill,.aisooq-icon-btn{transition:none}
-				}
-				/* Touch: both icons get a real target — 26px is well under the
-				   44px WCAG 2.5.5 asks for. */
-				@media (max-width:782px),(pointer:coarse){
-					.aisooq-courier .aisooq-icon-btn{width:40px;min-width:40px;height:40px}
-					.aisooq-courier .aisooq-icon-btn .dashicons{width:20px;height:20px;font-size:20px;line-height:20px}
-					.aisooq-courier-head > .aisooq-ratio{max-width:200px}
-					.aisooq-courier-head .aisooq-ratio-track{height:20px}
-					.aisooq-courier-head .aisooq-ratio-val{line-height:20px;font-size:11px}
-					.aisooq-courier-counts{gap:9px}
-					.aisooq-pill{font-size:13px;line-height:22px;min-width:24px}
-					.aisooq-pill + .aisooq-pill::before{left:-5px;height:14px}
-				}
-				.aisooq-courier-when{font-size:11px;margin-top:2px}
-				.aisooq-courier-why{font-size:11px;color:var(--warn);margin-left:6px;font-style:italic}
-				.aisooq-check-courier[disabled]{opacity:.45;cursor:not-allowed}
-				.aisooq-courier-detail{margin-top:6px;border:1px solid var(--bd);border-radius:8px;overflow:hidden;background:#fbfbfc}
-				.aisooq-courier-detail[hidden]{display:none}
-				.aisooq-courier-tbl{width:100%;border-collapse:collapse;font-size:12px}
-				.aisooq-courier-tbl th,.aisooq-courier-tbl td{padding:5px 8px;text-align:left;border-bottom:1px solid #f0f0f1;white-space:nowrap}
-				.aisooq-courier-tbl th{font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:600;background:#f6f7f7}
-				.aisooq-courier-tbl td:not(:first-child),.aisooq-courier-tbl th:not(:first-child){text-align:right}
-				.aisooq-courier-tbl tfoot td{font-weight:600;border-bottom:0;border-top:1px solid var(--bd);background:#f6f7f7}
-				.aisooq-courier-tbl .aisooq-ratio{font-size:11px;padding:1px 6px}
-				.aisooq-mono{font-variant-numeric:tabular-nums}
-				.aisooq-actions-cell{text-align:right;white-space:nowrap}
-				.aisooq-menu-wrap{position:relative;display:inline-block}
-				.aisooq-menu-btn .aisooq-caret{font-size:10px;opacity:.7}
-				.aisooq-menu{position:absolute;right:0;top:calc(100% + 4px);z-index:50;min-width:180px;background:#fff;border:1px solid var(--bd);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.14);padding:5px;display:flex;flex-direction:column;gap:1px}
-				.aisooq-menu[hidden]{display:none}
-				.aisooq-menu .aisooq-act{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:0;border-radius:5px;padding:7px 9px;font-size:13px;color:#1d2327;cursor:pointer}
-				.aisooq-menu .aisooq-act:hover{background:#f0f6fc}
-				.aisooq-menu .aisooq-act[disabled]{opacity:.4;cursor:not-allowed}
-				.aisooq-menu .aisooq-act .dashicons{font-size:16px;width:16px;height:16px;color:var(--muted)}
-				.aisooq-menu .aisooq-primary{color:var(--pri);font-weight:600}.aisooq-menu .aisooq-primary .dashicons{color:var(--pri)}
-				.aisooq-menu .aisooq-danger{color:var(--err)}.aisooq-menu .aisooq-danger .dashicons{color:var(--err)}
-				.aisooq-empty{padding:40px 16px;text-align:center;color:var(--muted)}
-				.aisooq-ab .aisooq-msg{font-size:12px}
-				.aisooq-modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px)}
-				.aisooq-modal{background:#fff;border-radius:12px;max-width:640px;width:100%;max-height:88vh;overflow:auto;padding:22px;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.3)}
-				.aisooq-modal .aisooq-x{position:absolute;top:12px;right:14px;cursor:pointer;font-size:22px;line-height:1;color:var(--muted);background:none;border:0}
-				.aisooq-dl h3{margin:0;font-size:17px}
-				.aisooq-dl-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:14px;margin-bottom:14px;border-bottom:1px solid #f0f0f1}
-				.aisooq-dl-sub{color:var(--muted);font-size:12px;margin-top:3px;font-variant-numeric:tabular-nums}
-				.aisooq-dl-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:0 0 14px}
-				.aisooq-dl-sec{min-width:0}
-				.aisooq-dl-sec>div{margin-top:3px;font-size:13px;word-break:break-word}
-				.aisooq-dl-sec .dashicons{font-size:15px;width:15px;height:15px;color:var(--muted);vertical-align:-3px}
-				.aisooq-dl-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);display:block;margin-bottom:2px}
-				.aisooq-dl-cust{margin-top:6px !important;padding-top:6px;border-top:1px dashed #e5e5e5}
-				.aisooq-dl-cart{margin:6px 0 4px}
-				.aisooq-dl-cart td{padding:7px 8px;vertical-align:middle}
-				.aisooq-dl-cart tfoot td{border-top:1px solid var(--bd);border-bottom:0}
-				.aisooq-dl-thumb{width:48px}
-				.aisooq-thumb{width:40px;height:40px;object-fit:cover;border-radius:8px;display:block;background:#f0f0f1}
-				.aisooq-thumb--ph{border:1px solid var(--bd)}
-				.aisooq-dl-meta{grid-template-columns:repeat(2,1fr);gap:10px 14px;background:#fbfbfc;border:1px solid var(--bd);border-radius:8px;padding:12px 14px;margin-top:6px;font-size:13px}
-				.aisooq-dl-meta>div{min-width:0}
-				.aisooq-dl-foot{margin-top:12px;font-size:11px;word-break:break-all}
-				@media(max-width:560px){.aisooq-dl-grid,.aisooq-dl-meta{grid-template-columns:1fr}}
-				.aisooq-contact .dashicons{font-size:13px;width:13px;height:13px;vertical-align:-2px;opacity:.7}
-				/* Accessibility + interaction polish (data-dense dashboard). */
-				.aisooq-ab .aisooq-filters a,.aisooq-ab .aisooq-menu-btn,.aisooq-ab .aisooq-act,.aisooq-ab .aisooq-cb,.aisooq-ab .button,.aisooq-ab .aisooq-check-courier{cursor:pointer}
-				.aisooq-ab a:focus-visible,.aisooq-ab button:focus-visible,.aisooq-ab input:focus-visible,.aisooq-ab select:focus-visible,.aisooq-ab .aisooq-filters a:focus-visible{outline:2px solid var(--pri);outline-offset:1px;border-radius:4px}
-				.aisooq-ab .aisooq-cb:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
-				@media(prefers-reduced-motion:reduce){.aisooq-ab *{transition:none !important;animation:none !important}}
-				@media(max-width:860px){
-					.aisooq-funnel__row{grid-template-columns:90px 1fr 40px}
-					.aisooq-toolbar{gap:8px}.aisooq-toolbar>div{flex:1 1 140px}.aisooq-toolbar input,.aisooq-toolbar select{width:100%}
-					/* ── The cart card ────────────────────────────────────────
-					   Nine label/value rows made a 492px card that had to be
-					   scrolled to read one cart, with every value pinned to the
-					   right edge and a column of dead space down the middle.
-					   The same nine cells now form a card: who it is on top, the
-					   courier evidence under it, then the four short facts as a
-					   2-up grid where a label sits above its value instead of
-					   across the card from it. Nothing is dropped — every cell,
-					   control and label is still here, just placed. */
-					.aisooq-tbl thead{display:none}
-					.aisooq-tbl,.aisooq-tbl tbody{display:block;width:100%}
-					.aisooq-tbl tr{position:relative;display:grid;grid-template-columns:1fr 1fr;
-						gap:8px 12px;border:1px solid var(--bd);border-radius:10px;margin:0 0 10px;padding:12px 12px 10px}
-					.aisooq-tbl td{display:block;border:0;padding:0;text-align:left;min-width:0}
-					/* Label above value: in a half-width cell there is no room to
-					   put them side by side without one of them wrapping. */
-					.aisooq-tbl td::before{display:block;content:attr(data-label);font-size:10px;font-weight:600;
-						text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:2px}
-					.aisooq-tbl td .aisooq-td-val{display:block;text-align:left;font-size:13px}
-
-					/* Who it is, and the evidence about them: full width. */
-					.aisooq-tbl td.aisooq-cust-cell{grid-column:1/-1;padding-right:44px}
-					.aisooq-tbl td.aisooq-cust-cell::before{content:none}
-					.aisooq-tbl td.aisooq-cust-cell .aisooq-cust{font-size:15px}
-					/* The courier block reads left-to-right like everything else
-					   here; right-aligned it looked like a different component. */
-					.aisooq-tbl td.aisooq-cust-cell .aisooq-courier{margin-top:8px;text-align:left}
-					.aisooq-tbl td.aisooq-cust-cell .aisooq-courier-head{align-items:flex-start}
-
-					/* The address is prose and wraps; it gets its own full row. */
-					.aisooq-tbl td.aisooq-addr{grid-column:1/-1}
-
-					/* Selection is chrome, not content — out of the flow, in the
-					   card's corner, still a real target. */
-					.aisooq-tbl td.aisooq-cb-cell{position:absolute;top:0;right:0;margin:0;
-						display:flex;align-items:center;justify-content:center;
-						width:44px;height:44px;padding:0}
-					.aisooq-tbl td.aisooq-cb-cell::before{content:none}
-					/* The box stays 22px because a giant checkbox looks broken,
-					   but the cell around it is a full 44px target — the space
-					   is already reserved by the name cell's padding. */
-					.aisooq-tbl td.aisooq-cb-cell .aisooq-cb{width:22px;height:22px;margin:0}
-
-					/* Actions close the card, right-aligned where a thumb is —
-					   sharing the last row with "updated" rather than each
-					   taking a full row to hold one short thing. */
-					.aisooq-tbl td.aisooq-actions-cell{justify-self:end;align-self:end;margin-top:2px}
-					.aisooq-tbl td.aisooq-actions-cell::before{content:none}
-					.aisooq-menu{right:0;left:auto}
-				}
-				@media(max-width:480px){.aisooq-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
-			</style>
+			<?php // The layout for this screen lives in assets/css/aisooq-admin.css — see the "Abandoned-carts screen" section there. ?>
 
 			<div class="aisooq-top">
 				<div>
@@ -1229,10 +1019,10 @@ class AI_Sooq_Abandoned_Admin {
 			<div class="aisooq-kpis">
 				<div class="aisooq-kpi"><div class="aisooq-kpi__label"><?php esc_html_e( 'Total', 'aisooq-connector' ); ?></div><div class="aisooq-kpi__num"><?php echo esc_html( number_format_i18n( $k['total'] ) ); ?></div></div>
 				<div class="aisooq-kpi warn"><div class="aisooq-kpi__label"><?php esc_html_e( 'Open', 'aisooq-connector' ); ?></div><div class="aisooq-kpi__num"><?php echo esc_html( number_format_i18n( $k['open'] ) ); ?></div><div class="aisooq-kpi__sub"><?php esc_html_e( 'incomplete orders', 'aisooq-connector' ); ?></div></div>
-				<div class="aisooq-kpi info"><div class="aisooq-kpi__label"><?php esc_html_e( 'Pushed', 'aisooq-connector' ); ?></div><div class="aisooq-kpi__num"><?php echo esc_html( number_format_i18n( $k['pushed'] ) ); ?></div><div class="aisooq-kpi__sub"><?php echo esc_html( sprintf( __( '%s pending', 'aisooq-connector' ), number_format_i18n( $k['pending'] ) ) ); ?></div></div>
-				<div class="aisooq-kpi ok"><div class="aisooq-kpi__label"><?php esc_html_e( 'Recovered', 'aisooq-connector' ); ?></div><div class="aisooq-kpi__num"><?php echo esc_html( number_format_i18n( $k['recovered'] ) ); ?></div><div class="aisooq-kpi__sub"><?php echo esc_html( sprintf( __( '%s rate', 'aisooq-connector' ), number_format_i18n( $k['recovery_rate'] * 100, 1 ) . '%' ) ); ?></div></div>
+				<div class="aisooq-kpi info"><div class="aisooq-kpi__label"><?php /* translators: %s: formatted count of carts not yet pushed. */ esc_html_e( 'Pushed', 'aisooq-connector' ); ?></div><div class="aisooq-kpi__num"><?php echo esc_html( number_format_i18n( $k['pushed'] ) ); ?></div><div class="aisooq-kpi__sub"><?php echo esc_html( sprintf( __( '%s pending', 'aisooq-connector' ), number_format_i18n( $k['pending'] ) ) ); ?></div></div>
+				<div class="aisooq-kpi ok"><div class="aisooq-kpi__label"><?php /* translators: %s: recovery rate as a percentage. */ esc_html_e( 'Recovered', 'aisooq-connector' ); ?></div><div class="aisooq-kpi__num"><?php echo esc_html( number_format_i18n( $k['recovered'] ) ); ?></div><div class="aisooq-kpi__sub"><?php echo esc_html( sprintf( __( '%s rate', 'aisooq-connector' ), number_format_i18n( $k['recovery_rate'] * 100, 1 ) . '%' ) ); ?></div></div>
 				<div class="aisooq-kpi err"><div class="aisooq-kpi__label"><?php esc_html_e( 'Cancelled / Fake', 'aisooq-connector' ); ?></div><div class="aisooq-kpi__num"><?php echo esc_html( number_format_i18n( $k['cancelled'] + $k['fake'] ) ); ?></div></div>
-				<div class="aisooq-kpi"><div class="aisooq-kpi__label"><?php esc_html_e( 'Open value', 'aisooq-connector' ); ?></div><div class="aisooq-kpi__num aisooq-mono"><?php echo esc_html( $this->money( $k['open_value'], $currency ) ); ?></div><div class="aisooq-kpi__sub"><?php echo esc_html( sprintf( __( 'avg %s', 'aisooq-connector' ), $this->money( $k['avg_open'], $currency ) ) ); ?></div></div>
+				<div class="aisooq-kpi"><div class="aisooq-kpi__label"><?php /* translators: %s: average cart value, already money-formatted. */ esc_html_e( 'Open value', 'aisooq-connector' ); ?></div><div class="aisooq-kpi__num aisooq-mono"><?php echo esc_html( $this->money( $k['open_value'], $currency ) ); ?></div><div class="aisooq-kpi__sub"><?php echo esc_html( sprintf( __( 'avg %s', 'aisooq-connector' ), $this->money( $k['avg_open'], $currency ) ) ); ?></div></div>
 			</div>
 
 			<?php
@@ -1361,11 +1151,14 @@ class AI_Sooq_Abandoned_Admin {
 				'confirmDel' => __( 'Delete this cart from the worklist? (Does not affect the platform.)', 'aisooq-connector' ),
 				'confirmFake'=> __( 'Mark this cart as fake?', 'aisooq-connector' ),
 				'working'    => __( 'Working…', 'aisooq-connector' ),
+				/* translators: %d: number of rows currently listed. */
 				'count'      => __( '%d shown', 'aisooq-connector' ),
 				'queryFailed' => __( 'Could not refresh the list — the page may have expired. Reload and try again.', 'aisooq-connector' ),
+				/* translators: %d: number of rows the operator has ticked. */
 				'selected'   => __( '%d selected', 'aisooq-connector' ),
 				'pickOp'     => __( 'Choose a bulk action first.', 'aisooq-connector' ),
 				'pickRows'   => __( 'Select at least one cart.', 'aisooq-connector' ),
+				/* translators: 1: the bulk action's label, 2: number of selected carts. */
 				'confirmBulk'=> __( 'Apply "%1$s" to %2$d selected cart(s)?', 'aisooq-connector' ),
 				'detailsTitle'=> __( 'Cart details', 'aisooq-connector' ),
 				'close'      => __( 'Close', 'aisooq-connector' ),
