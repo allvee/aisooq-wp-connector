@@ -1,0 +1,1506 @@
+# Copyright (C) 2026 AI Sooq
+# This file is distributed under the GPL-2.0-or-later.
+msgid ""
+msgstr ""
+"Project-Id-Version: AI Sooq Connector 2.11.0\n"
+"Report-Msgid-Bugs-To: https://github.com/allvee/aisooq-wp-connector/issues\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: AI Sooq <https://github.com/allvee/aisooq-wp-connector>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: \n"
+"X-Domain: aisooq-connector\n"
+
+#. Plugin Name of the plugin
+msgid "AI Sooq Connector"
+msgstr ""
+
+#. Plugin URI of the plugin
+msgid "https://github.com/allvee/aisooq-wp-connector"
+msgstr ""
+
+#. Description of the plugin
+msgid "Mirrors WooCommerce orders, incomplete/abandoned carts and analytics into the AI Sooq platform so a store can be managed from there. Connects any WooCommerce site to one AI Sooq store via OAuth."
+msgstr ""
+
+#. Author of the plugin
+msgid "AI Sooq"
+msgstr ""
+
+msgid "AI Sooq Connector requires WooCommerce to be installed and active."
+msgstr ""
+
+msgid "Abandoned carts"
+msgstr ""
+
+msgid "Stopped at contact"
+msgstr ""
+
+msgid "Started checkout, nothing else filled in"
+msgstr ""
+
+msgid "Stopped at address"
+msgstr ""
+
+msgid "Knows where it should go — worth a call"
+msgstr ""
+
+msgid "Stopped at payment"
+msgstr ""
+
+msgid "One tap from ordering"
+msgstr ""
+
+msgid "Stopped at review"
+msgstr ""
+
+msgid "Everything filled in and still stopped"
+msgstr ""
+
+msgid "Never checked out"
+msgstr ""
+
+msgid "Cart built, checkout never opened"
+msgstr ""
+
+#. translators: %s: recovery rate as a percentage.
+msgid "Recovered"
+msgstr ""
+
+msgid "Cancelled"
+msgstr ""
+
+msgid "Fake"
+msgstr ""
+
+msgid "Unreachable"
+msgstr ""
+
+#. translators: %s: formatted count of carts not yet pushed.
+msgid "Pushed"
+msgstr ""
+
+msgid "Pending push"
+msgstr ""
+
+msgid "Look up this number's courier delivery history (BDCourier, via the platform)"
+msgstr ""
+
+msgid "Connection is paused — activate it in AI Sooq → Settings to check courier history"
+msgstr ""
+
+msgid "Check ratio"
+msgstr ""
+
+msgid "connection paused"
+msgstr ""
+
+msgid "Parcels this number has been sent, across all couriers"
+msgstr ""
+
+msgid "Delivered"
+msgstr ""
+
+msgid "Returned / refused"
+msgstr ""
+
+msgid "No BDCourier history for this number, or BDCourier is not configured for this store on the platform."
+msgstr ""
+
+msgid "No data"
+msgstr ""
+
+msgid "Show the per-courier breakdown"
+msgstr ""
+
+msgid "Breakdown"
+msgstr ""
+
+msgid "Recheck courier history"
+msgstr ""
+
+msgid "Courier"
+msgstr ""
+
+msgid "Total"
+msgstr ""
+
+msgid "Returned"
+msgstr ""
+
+msgid "Rate"
+msgstr ""
+
+msgid "All couriers"
+msgstr ""
+
+#. translators: %s: human-readable time difference, e.g. "3 hours"
+#, php-format
+msgid "Checked %s ago"
+msgstr ""
+
+msgid "No carts match this filter."
+msgstr ""
+
+msgid "Select cart"
+msgstr ""
+
+msgid "Customer"
+msgstr ""
+
+msgid "Anonymous"
+msgstr ""
+
+msgid "Address"
+msgstr ""
+
+msgid "Cart"
+msgstr ""
+
+#. translators: %d: number of items in the cart.
+#, php-format
+msgid "%d item"
+msgid_plural "%d items"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Value"
+msgstr ""
+
+msgid "Step"
+msgstr ""
+
+msgid "Status"
+msgstr ""
+
+msgid "Updated"
+msgstr ""
+
+msgid "ago"
+msgstr ""
+
+msgid "Actions"
+msgstr ""
+
+msgid "Details"
+msgstr ""
+
+msgid "Convert to order"
+msgstr ""
+
+msgid "Resync"
+msgstr ""
+
+msgid "Cancel"
+msgstr ""
+
+msgid "Mark fake"
+msgstr ""
+
+msgid "Reopen"
+msgstr ""
+
+msgid "Delete"
+msgstr ""
+
+msgid "Permission denied."
+msgstr ""
+
+msgid "Connection is paused. Activate it first."
+msgstr ""
+
+msgid "Cart not found."
+msgstr ""
+
+msgid "No phone on this cart."
+msgstr ""
+
+msgid "no data"
+msgstr ""
+
+#. translators: %s: the delivery-success ratio just looked up, e.g. "76%"
+#, php-format
+msgid "Looked up %s, but it could not be saved — it would be lost on reload. Deactivate and reactivate AI Sooq Connector to finish the database upgrade, then try again."
+msgstr ""
+
+msgid "Missing cart reference."
+msgstr ""
+
+#. translators: %d: the WooCommerce order number just created.
+#, php-format
+msgid "Order #%d created"
+msgstr ""
+
+msgid "Marked fake"
+msgstr ""
+
+msgid "Reopened"
+msgstr ""
+
+msgid "Deleted"
+msgstr ""
+
+msgid "Unknown action."
+msgstr ""
+
+msgid "Abandoned-cart sync is turned off in settings."
+msgstr ""
+
+msgid "Unknown bulk action."
+msgstr ""
+
+msgid "No carts selected."
+msgstr ""
+
+#. translators: 1: succeeded count, 2: failed count
+#, php-format
+msgid "%1$d done, %2$d skipped."
+msgstr ""
+
+msgid "Anonymous shopper"
+msgstr ""
+
+msgid "Contact"
+msgstr ""
+
+msgid "No contact captured"
+msgstr ""
+
+#. translators: %d: number of orders.
+#, php-format
+msgid "%d order"
+msgid_plural "%d orders"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Subtotal"
+msgstr ""
+
+msgid "Furthest step"
+msgstr ""
+
+msgid "Captured"
+msgstr ""
+
+msgid "Last activity"
+msgstr ""
+
+msgid "Order"
+msgstr ""
+
+msgid "Cart ref"
+msgstr ""
+
+#. translators: %d: number of carts
+#, php-format
+msgid "Resynced %d cart."
+msgid_plural "Resynced %d carts."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Resynced"
+msgstr ""
+
+msgid "Could not resync — no contact captured, or the API rejected it. Check the logs."
+msgstr ""
+
+msgid "No capture table yet. Enable \"Abandoned carts\" in AI Sooq settings, then re-save to create it."
+msgstr ""
+
+msgid "Incomplete orders captured on this store and mirrored to AI Sooq. Convert to a WooCommerce order, check courier ratio, or dispose locally — cancel / fake / delete stay on this site."
+msgstr ""
+
+#. translators: %d: number of carts awaiting push
+#, php-format
+msgid "Resync all pending (%d)"
+msgstr ""
+
+msgid "Abandoned-cart sync is paused or disabled. Resync + courier check need an active connection; the rest of the worklist still works."
+msgstr ""
+
+msgid "Open"
+msgstr ""
+
+msgid "incomplete orders"
+msgstr ""
+
+#. translators: %s: formatted count of carts not yet pushed.
+#, php-format
+msgid "%s pending"
+msgstr ""
+
+#. translators: %s: recovery rate as a percentage.
+#, php-format
+msgid "%s rate"
+msgstr ""
+
+#. translators: %s: recovery rate as a percentage.
+msgid "Cancelled / Fake"
+msgstr ""
+
+#. translators: %s: average cart value, already money-formatted.
+msgid "Open value"
+msgstr ""
+
+#. translators: %s: average cart value, already money-formatted.
+#, php-format
+msgid "avg %s"
+msgstr ""
+
+#. translators: %s: percentage of open carts
+#, php-format
+msgid "%s%% of open"
+msgstr ""
+
+msgid "Active"
+msgstr ""
+
+msgid "Pending"
+msgstr ""
+
+msgid "All"
+msgstr ""
+
+msgid "Search"
+msgstr ""
+
+msgid "name, phone, email, product…"
+msgstr ""
+
+msgid "Product"
+msgstr ""
+
+msgid "Any product"
+msgstr ""
+
+msgid "From"
+msgstr ""
+
+msgid "To"
+msgstr ""
+
+msgid "Clear"
+msgstr ""
+
+msgid "Bulk actions"
+msgstr ""
+
+msgid "Apply"
+msgstr ""
+
+msgid "Select all"
+msgstr ""
+
+msgid "Resyncing…"
+msgstr ""
+
+msgid "Failed"
+msgstr ""
+
+msgid "Delete this cart from the worklist? (Does not affect the platform.)"
+msgstr ""
+
+msgid "Mark this cart as fake?"
+msgstr ""
+
+msgid "Working…"
+msgstr ""
+
+#. translators: %d: number of rows currently listed.
+#, php-format
+msgid "%d shown"
+msgstr ""
+
+msgid "Could not refresh the list — the page may have expired. Reload and try again."
+msgstr ""
+
+#. translators: %d: number of rows the operator has ticked.
+#, php-format
+msgid "%d selected"
+msgstr ""
+
+msgid "Choose a bulk action first."
+msgstr ""
+
+msgid "Select at least one cart."
+msgstr ""
+
+#. translators: 1: the bulk action's label, 2: number of selected carts.
+#, php-format
+msgid "Apply \"%1$s\" to %2$d selected cart(s)?"
+msgstr ""
+
+msgid "Cart details"
+msgstr ""
+
+msgid "Close"
+msgstr ""
+
+msgid "Item"
+msgstr ""
+
+msgid "WooCommerce is not active."
+msgstr ""
+
+msgid "This cart has no items to convert."
+msgstr ""
+
+msgid "Created from an abandoned cart by AI Sooq."
+msgstr ""
+
+msgid "Recovered from abandoned cart."
+msgstr ""
+
+msgid "Connector is not configured (API base, SID, client id/secret required)."
+msgstr ""
+
+msgid "Missing Store SID."
+msgstr ""
+
+msgid "Rate limited by the platform; the sync will retry automatically."
+msgstr ""
+
+msgid "Blocked"
+msgstr ""
+
+msgid "Added to the always-allow list."
+msgstr ""
+
+msgid "Added to the block list."
+msgstr ""
+
+msgid "Missing entry."
+msgstr ""
+
+msgid "Could not remove that entry."
+msgstr ""
+
+msgid "Removed."
+msgstr ""
+
+msgid "Your list"
+msgstr ""
+
+msgid "Duplicate order"
+msgstr ""
+
+msgid "Fraud screen"
+msgstr ""
+
+msgid "Courier history"
+msgstr ""
+
+msgid "Blocked checkouts"
+msgstr ""
+
+msgid "Every checkout this plugin refused, and the list you control. A number climbing here that turns out to be a real customer is the signal to loosen a threshold or add an always-allow entry."
+msgstr ""
+
+msgid "The block list table is missing. Deactivate and reactivate the plugin to create it."
+msgstr ""
+
+msgid "Refused, last 7 days"
+msgstr ""
+
+msgid "By your list"
+msgstr ""
+
+msgid "Duplicate orders"
+msgstr ""
+
+msgid "Add an entry"
+msgstr ""
+
+msgid "Match on"
+msgstr ""
+
+msgid "Mobile number"
+msgstr ""
+
+msgid "IP address or range"
+msgstr ""
+
+msgid "Email"
+msgstr ""
+
+msgid "Action"
+msgstr ""
+
+msgid "Always block"
+msgstr ""
+
+msgid "Always allow"
+msgstr ""
+
+msgid "Expires in (days)"
+msgstr ""
+
+msgid "Note (only you see this)"
+msgstr ""
+
+msgid "Add"
+msgstr ""
+
+msgid "Always allow wins over every other check, including the platform's — it is how you rescue a real customer the automatic layers keep rejecting. 0 days means the entry never expires."
+msgstr ""
+
+msgid "Note"
+msgstr ""
+
+msgid "Times hit"
+msgstr ""
+
+msgid "Expires"
+msgstr ""
+
+msgid "Nothing on your list yet."
+msgstr ""
+
+msgid "Allow"
+msgstr ""
+
+msgid "Block"
+msgstr ""
+
+msgid "Never"
+msgstr ""
+
+msgid "Remove"
+msgstr ""
+
+msgid "Refused checkouts"
+msgstr ""
+
+msgid "Search number, email, IP or name"
+msgstr ""
+
+msgid "When"
+msgstr ""
+
+msgid "Refused by"
+msgstr ""
+
+msgid "Reason"
+msgstr ""
+
+msgid "Decide"
+msgstr ""
+
+msgid "No refused checkouts recorded yet."
+msgstr ""
+
+msgid "Block this IP"
+msgstr ""
+
+msgid "Request failed."
+msgstr ""
+
+msgid "Remove this entry?"
+msgstr ""
+
+msgid "Unknown identifier type."
+msgstr ""
+
+#. translators: %s: the identifier type, e.g. phone.
+#, php-format
+msgid "That does not look like a valid %s."
+msgstr ""
+
+msgid "Could not save that entry."
+msgstr ""
+
+msgid "Failed syncs"
+msgstr ""
+
+msgid "Missing order."
+msgstr ""
+
+msgid "Not recorded — this order gave up before the update that started keeping reasons."
+msgstr ""
+
+#. translators: %d: the number of attempts an order makes before giving up.
+#, php-format
+msgid "Orders that tried %d times and stopped. Nothing will push them again on its own — they are here so you can see why, fix the cause, and send them."
+msgstr ""
+
+msgid "The connection is paused, so retrying is disabled. Activate it in Settings first."
+msgstr ""
+
+msgid "Nothing has given up"
+msgstr ""
+
+msgid "Every order either synced or is still retrying."
+msgstr ""
+
+msgid "Given up"
+msgstr ""
+
+msgid "Try all again"
+msgstr ""
+
+msgid "Retrying does not reset an order's attempt count, so an order that fails again stays on this list with a fresh reason rather than disappearing."
+msgstr ""
+
+msgid "Why it stopped"
+msgstr ""
+
+msgid "Attempts"
+msgstr ""
+
+msgid "Last tried"
+msgstr ""
+
+msgid "Cannot retry"
+msgstr ""
+
+msgid "Try again"
+msgstr ""
+
+#. translators: 1: number queued, 2: number skipped.
+#, php-format
+msgid "%1$d queued, %2$d could not be retried. Reloading…"
+msgstr ""
+
+msgid "Need help completing your order? Reach us:"
+msgstr ""
+
+msgid "We can’t place this order"
+msgstr ""
+
+msgid "Call"
+msgstr ""
+
+msgid "WhatsApp us"
+msgstr ""
+
+msgid "Messenger"
+msgstr ""
+
+msgid "You already have an order with us. A repeat order from the same contact is not accepted within {hours} hours — please contact us to add to or change your existing order."
+msgstr ""
+
+#. translators: 1: fraud layer, 2: reason
+#, php-format
+msgid "AI Sooq fraud screen: flagged by layer \"%1$s\" (%2$s)."
+msgstr ""
+
+msgid "AI Sooq fraud screen: hold re-applied after the payment gateway changed the status."
+msgstr ""
+
+msgid "Sorry, we are unable to accept this order. Please contact us if you think this is a mistake."
+msgstr ""
+
+msgid "This order could not be accepted. Please contact support."
+msgstr ""
+
+#. translators: %s: store contact phone number
+#, php-format
+msgid "Contact us: %s"
+msgstr ""
+
+msgid "We are unable to accept this order for delivery right now (courier delivery-success rate {ratio}% over {parcels} past parcels). Please contact us to complete your purchase."
+msgstr ""
+
+msgid "Every 10 minutes (AI Sooq)"
+msgstr ""
+
+msgid "Every 15 minutes (AI Sooq)"
+msgstr ""
+
+#. translators: %s: comma-separated list of database table names.
+#, php-format
+msgid "AI Sooq Connector could not create these database tables: %s. The features that depend on them are disabled until this is fixed — check the database user's CREATE TABLE permission, then deactivate and reactivate the plugin."
+msgstr ""
+
+msgid "Unknown courier"
+msgstr ""
+
+#. translators: 1: success percentage, 2: delivered count, 3: returned count, 4: total parcels
+#, php-format
+msgid "Courier delivery success %1$s%% — %2$s delivered, %3$s returned, of %4$s parcels"
+msgstr ""
+
+#. translators: %s: delivery success percentage
+#, php-format
+msgid "Courier delivery success %s%%"
+msgstr ""
+
+#. translators: 1: success percentage, 2: number of past parcels
+#, php-format
+msgid "Courier delivery success %1$s%% over %2$s parcels"
+msgstr ""
+
+#. translators: %s: number of parcels
+#, php-format
+msgid "%s parcel"
+msgid_plural "%s parcels"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "No phone on this order"
+msgstr ""
+
+msgid "Look up this number's courier delivery history"
+msgstr ""
+
+msgid "Connection is paused — activate it in AI Sooq → Settings"
+msgstr ""
+
+msgid "Check courier history"
+msgstr ""
+
+msgid "Orders this customer has placed at this shop before"
+msgstr ""
+
+#. translators: %s: number of past orders at this shop
+#, php-format
+msgid "%s order"
+msgid_plural "%s orders"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "No previous order at this shop"
+msgstr ""
+
+msgid "first"
+msgstr ""
+
+msgid "No BDCourier history for this number, or BDCourier is not configured for this store."
+msgstr ""
+
+msgid "No history"
+msgstr ""
+
+msgid "See the full courier history and this customer's past orders"
+msgstr ""
+
+msgid "See the full courier history"
+msgstr ""
+
+msgid "Sent"
+msgstr ""
+
+msgid "Got"
+msgstr ""
+
+msgid "Back"
+msgstr ""
+
+#. translators: %s: number of previous orders this customer has at this shop.
+#, php-format
+msgid "%s past order here"
+msgid_plural "%s past orders here"
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %s: number of past orders the customer kept.
+#, php-format
+msgid "%s kept"
+msgstr ""
+
+#. translators: %s: number of past orders the customer cancelled.
+#, php-format
+msgid "%s cancelled"
+msgstr ""
+
+msgid "First order from this customer."
+msgstr ""
+
+msgid "From Steadfast only — the national lookup was unavailable."
+msgstr ""
+
+msgid "From your own deliveries — the national lookup was unavailable."
+msgstr ""
+
+msgid "Steadfast only"
+msgstr ""
+
+msgid "Your orders only"
+msgstr ""
+
+msgid "Checking…"
+msgstr ""
+
+msgid "Check failed"
+msgstr ""
+
+msgid "Loading…"
+msgstr ""
+
+msgid "Order not found."
+msgstr ""
+
+msgid "No phone on this order."
+msgstr ""
+
+msgid "Looked it up, but the result could not be saved."
+msgstr ""
+
+#. translators: %s: order number
+#, php-format
+msgid "Order #%s — courier history"
+msgstr ""
+
+msgid "Fee"
+msgstr ""
+
+msgid "WooCommerce order"
+msgstr ""
+
+msgid "Shipping"
+msgstr ""
+
+#. translators: %d: seconds to wait before trying again.
+#, php-format
+msgid "The platform is rate limiting this store. Try again in about %d seconds."
+msgstr ""
+
+msgid "Synced."
+msgstr ""
+
+msgid "Order sync is switched off in settings."
+msgstr ""
+
+msgid "This order's status is not in the list you chose to push."
+msgstr ""
+
+msgid "Queued for another attempt."
+msgstr ""
+
+msgid "Synced"
+msgstr ""
+
+msgid "Push this order again — use after editing the address or items"
+msgstr ""
+
+msgid "Push this order to AI Sooq now"
+msgstr ""
+
+msgid "Sync"
+msgstr ""
+
+msgid "Syncing…"
+msgstr ""
+
+msgid "Sync failed"
+msgstr ""
+
+msgid "AI Sooq Connector — abandoned carts"
+msgstr ""
+
+msgid "Captured at"
+msgstr ""
+
+msgid "Name"
+msgstr ""
+
+msgid "Phone"
+msgstr ""
+
+msgid "Cart contents"
+msgstr ""
+
+msgid "Referrer"
+msgstr ""
+
+msgid "Landing page"
+msgstr ""
+
+msgid "Campaign"
+msgstr ""
+
+#. translators: %d: number of abandoned-cart records removed.
+#, php-format
+msgid "Removed %d abandoned-cart record(s) held by AI Sooq Connector."
+msgstr ""
+
+msgid "Carts already mirrored to the AI Sooq platform must be erased there separately."
+msgstr ""
+
+msgid "This site uses AI Sooq Connector, which sends order, customer, cart and analytics data to the AI Sooq platform so the store can be managed from there. That includes names, e-mail addresses, phone numbers, delivery addresses and cart contents — for incomplete checkouts as well as completed orders. Analytics events may be forwarded on to third-party advertising platforms."
+msgstr ""
+
+msgid "WooCommerce not available."
+msgstr ""
+
+msgid "Product not found."
+msgstr ""
+
+msgid "Nothing to sync on this product."
+msgstr ""
+
+msgid "Missing product."
+msgstr ""
+
+msgid "Settings"
+msgstr ""
+
+msgid "Settings saved."
+msgstr ""
+
+msgid "Fraud layers not saved to the platform — connect the store first (Verify connection)."
+msgstr ""
+
+#. translators: %s: error
+#, php-format
+msgid "The fraud master switch could not be sent to the platform: %s"
+msgstr ""
+
+#. translators: %s: error
+#, php-format
+msgid "Fraud layers could not be saved to the platform: %s"
+msgstr ""
+
+msgid "The platform returned an unexpected response."
+msgstr ""
+
+#. translators: 1: store name, 2: number of permissions
+#, php-format
+msgid "Connected to \"%1$s\" — %2$d permissions granted. Reloading…"
+msgstr ""
+
+msgid "Currency"
+msgstr ""
+
+msgid "Country"
+msgstr ""
+
+msgid "Domain"
+msgstr ""
+
+msgid "Verified"
+msgstr ""
+
+#. translators: %d: number of OAuth scopes the platform granted.
+#, php-format
+msgid "%d permission granted to this plugin"
+msgid_plural "%d permissions granted to this plugin"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Product sync is turned off."
+msgstr ""
+
+#. translators: %d: number of products queued.
+#, php-format
+msgid "Queued %d product for sync."
+msgid_plural "Queued %d products for sync."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Customer sync is turned off."
+msgstr ""
+
+#. translators: %d: number of customers queued.
+#, php-format
+msgid "Queued %d customer for sync."
+msgid_plural "Queued %d customers for sync."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Category sync is turned off."
+msgstr ""
+
+#. translators: %d: number of categories queued.
+#, php-format
+msgid "Queued %d category for sync."
+msgid_plural "Queued %d categories for sync."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Order sync is turned off."
+msgstr ""
+
+#. translators: %d: number of orders queued.
+#, php-format
+msgid "Queued %d order for sync."
+msgid_plural "Queued %d orders for sync."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Rest of the World"
+msgstr ""
+
+msgid "Connection"
+msgstr ""
+
+msgid "Fraud & courier"
+msgstr ""
+
+msgid "Checkout messages"
+msgstr ""
+
+msgid "Advanced"
+msgstr ""
+
+msgid "Paused"
+msgstr ""
+
+#. translators: %s: store sid
+#, php-format
+msgid "Connected · %s"
+msgstr ""
+
+msgid "Not verified"
+msgstr ""
+
+#. translators: %s: when the connection was last verified.
+#, php-format
+msgid "Last verified %s"
+msgstr ""
+
+#. translators: %s: when the connection was last verified.
+msgid "Two-way sync between WooCommerce and your AI Sooq store."
+msgstr ""
+
+msgid "Verify connection"
+msgstr ""
+
+msgid "Sync:"
+msgstr ""
+
+msgid "Orders"
+msgstr ""
+
+msgid "Products"
+msgstr ""
+
+msgid "Customers"
+msgstr ""
+
+msgid "Categories"
+msgstr ""
+
+msgid "Orders synced"
+msgstr ""
+
+msgid "In queue"
+msgstr ""
+
+msgid "awaiting push"
+msgstr ""
+
+#. translators: %d: the retry limit.
+#, php-format
+msgid "gave up after %d attempts"
+msgstr ""
+
+msgid "Abandoned pushed"
+msgstr ""
+
+msgid "Products synced"
+msgstr ""
+
+msgid "Customers synced"
+msgstr ""
+
+msgid "Quick setup guide"
+msgstr ""
+
+msgid "Register an OAuth app for this store on the AI Sooq platform (scopes below). Copy the Client ID, Client Secret (shown once) and Store SID."
+msgstr ""
+
+msgid "Admin API base URL = your admin host (host only — /api/v1 is added). Storefront base = your storefront host, or blank if same."
+msgstr ""
+
+msgid "Paste credentials, tick Active, choose what to sync, Save, then Verify connection. Use the Sync buttons to backfill orders, products, customers or categories."
+msgstr ""
+
+msgid "Settings sections"
+msgstr ""
+
+msgid "Find a setting"
+msgstr ""
+
+msgid "Find a setting…"
+msgstr ""
+
+msgid "No setting matches that search."
+msgstr ""
+
+msgid "Save changes"
+msgstr ""
+
+msgid "Unsaved changes"
+msgstr ""
+
+msgid "Save first, then use Verify / Sync now above."
+msgstr ""
+
+msgid "sync orders, carts, analytics & fraud"
+msgstr ""
+
+msgid "Uncheck to pause all syncing without losing settings."
+msgstr ""
+
+msgid "Admin API base URL"
+msgstr ""
+
+msgid "Host only — /api/v1 is appended. Handles OAuth + /connect/*."
+msgstr ""
+
+msgid "Storefront API base URL"
+msgstr ""
+
+msgid "Handles analytics + fraud. Blank = same host as admin."
+msgstr ""
+
+msgid "Store SID"
+msgstr ""
+
+msgid "OAuth Client ID"
+msgstr ""
+
+msgid "OAuth Client Secret"
+msgstr ""
+
+msgid "•••••••• (stored — leave blank to keep)"
+msgstr ""
+
+msgid "Shown once when you register the app. Leave blank to keep the stored one."
+msgstr ""
+
+msgid "Push to the platform"
+msgstr ""
+
+msgid "Orders (incl. incomplete/unpaid)"
+msgstr ""
+
+msgid "Abandoned carts (pushed instantly)"
+msgstr ""
+
+msgid "Analytics events (pixel / CAPI)"
+msgstr ""
+
+msgid "Orders sync is off"
+msgstr ""
+
+msgid "Order statuses to push"
+msgstr ""
+
+msgid "Abandoned-cart sync is off"
+msgstr ""
+
+msgid "Treat a cart as abandoned after"
+msgstr ""
+
+msgid "minutes idle"
+msgstr ""
+
+msgid "Two-way sync"
+msgstr ""
+
+msgid "Matched by email/phone. Needs customers.read + customers.write."
+msgstr ""
+
+msgid "Product categories + hierarchy. Matched to the platform by handle/slug. Needs categories.read + categories.write."
+msgstr ""
+
+msgid "Brands"
+msgstr ""
+
+msgid "Any brand taxonomy (native WC, Perfect Brands, YITH…). Matched by handle/slug. Needs brands.read + brands.write."
+msgstr ""
+
+msgid "Products + variants, mapped to existing platform products by SKU/handle. On pull, a product’s categories + brand are linked too. Needs products.read + products.write."
+msgstr ""
+
+msgid "Two-way (last edit wins)"
+msgstr ""
+
+msgid "WooCommerce → Platform"
+msgstr ""
+
+msgid "Platform → WooCommerce"
+msgstr ""
+
+#. translators: %s: entity name
+#, php-format
+msgid "%s sync direction"
+msgstr ""
+
+msgid "Auto-generate missing SKUs"
+msgstr ""
+
+msgid "A product/variant with no SKU gets a unique one (SP-<id>) written to WooCommerce at sync time, so the platform can map it. Turn off if you manage SKUs yourself."
+msgstr ""
+
+msgid "Let the platform update WooCommerce order status"
+msgstr ""
+
+msgid "When an order is progressed on the platform, mirror that status back onto the WooCommerce order."
+msgstr ""
+
+msgid "Screen checkouts for fraud"
+msgstr ""
+
+msgid "Phone/name/address, IP velocity, courier history. Fails open if the API is unreachable."
+msgstr ""
+
+msgid "Fraud screening is off"
+msgstr ""
+
+msgid "When fraud is detected"
+msgstr ""
+
+msgid "Block checkout"
+msgstr ""
+
+msgid "Allow, set order On hold"
+msgstr ""
+
+msgid "Allow, add a flag note"
+msgstr ""
+
+msgid "Connect the store (Verify connection) to configure the screening layers."
+msgstr ""
+
+#. translators: %s: the error the platform returned.
+#, php-format
+msgid "Could not read the screening layers from the platform: %s"
+msgstr ""
+
+msgid "Check that the OAuth app is registered with the fraud scope, then press Verify connection. The master switch above is still saved and still sent to the platform."
+msgstr ""
+
+msgid "Layer 1 — basic validation"
+msgstr ""
+
+msgid "Block fake / gibberish customer names"
+msgstr ""
+
+msgid "Block fake / gibberish delivery addresses"
+msgstr ""
+
+msgid "Smart heuristics reject keyboard-mash names (\"Ahshs Hsjs\"), junk addresses and malformed numbers instantly."
+msgstr ""
+
+msgid "Phone number check"
+msgstr ""
+
+msgid "Bangladesh mobile only (recommended)"
+msgstr ""
+
+msgid "International"
+msgstr ""
+
+msgid "Off"
+msgstr ""
+
+msgid "Layer 2 — IP rate limiting"
+msgstr ""
+
+msgid "Auto-block after"
+msgstr ""
+
+msgid "Blocked attempts before an IP is auto-blocked"
+msgstr ""
+
+msgid "blocked attempts within"
+msgstr ""
+
+msgid "Window in hours"
+msgstr ""
+
+msgid "hours from one IP"
+msgstr ""
+
+msgid "Detects spam bursts from a single IP."
+msgstr ""
+
+msgid "Layer 3 — courier delivery history"
+msgstr ""
+
+msgid "BDCourier knows how many past parcels a phone number accepted and how many came back. Each lookup is billed to your store, so both settings below are about when it is worth spending one."
+msgstr ""
+
+msgid "Block checkout below a success rate"
+msgstr ""
+
+msgid "Block orders below"
+msgstr ""
+
+msgid "success, once the customer has"
+msgstr ""
+
+msgid "Minimum parcel history before the gate applies"
+msgstr ""
+
+msgid "parcels"
+msgstr ""
+
+msgid "Set 0 to disable. e.g. 60 or 75 — customers whose delivery-success ratio is below this (with enough parcel history) are blocked at checkout. Fails open if the API is unreachable."
+msgstr ""
+
+msgid "Look up courier history automatically on every new order"
+msgstr ""
+
+msgid "The result appears in a Courier column on WooCommerce → Orders and on the order screen, so nobody has to press a button per order. Looked up once in the background, kept until you press Recheck. Leave off to check by hand only."
+msgstr ""
+
+msgid "One billed lookup per order that has a phone number."
+msgstr ""
+
+msgid "Disable duplicate orders for the same customer"
+msgstr ""
+
+msgid "Refuses a second checkout from the same mobile number or e-mail inside the window below. Checked against this store’s own orders — no API call, nothing billed, and it keeps working if the platform is unreachable."
+msgstr ""
+
+msgid "Duplicate-order blocking is off"
+msgstr ""
+
+msgid "Time period"
+msgstr ""
+
+msgid "Block a repeat order within"
+msgstr ""
+
+msgid "hours"
+msgstr ""
+
+msgid "Time period in hours to prevent duplicate orders from the same customer. Cancelled, failed and refunded orders never count — a shopper whose payment failed must be able to try again."
+msgstr ""
+
+msgid "When a shopper is blocked"
+msgstr ""
+
+msgid "Support contacts"
+msgstr ""
+
+msgid "Call number, e.g. 01XXXXXXXXX"
+msgstr ""
+
+msgid "Support phone number"
+msgstr ""
+
+msgid "WhatsApp, e.g. 8801XXXXXXXXX"
+msgstr ""
+
+msgid "Support WhatsApp number"
+msgstr ""
+
+msgid "Messenger, e.g. https://m.me/yourpage"
+msgstr ""
+
+msgid "Support Messenger link"
+msgstr ""
+
+msgid "A blocked shopper sees a popup with these Call / WhatsApp buttons, so a genuine buyer can still reach you. Leave blank to use the connected store’s contact number."
+msgstr ""
+
+msgid "The exact text a shopper sees when checkout is blocked. Write it in Bangla, English, or both. Leave a box blank to use the built-in default."
+msgstr ""
+
+msgid "Courier delivery gate"
+msgstr ""
+
+msgid "Tokens: {ratio} = delivery-success %, {parcels} = past parcel count."
+msgstr ""
+
+msgid "Fraud — details could not be verified"
+msgstr ""
+
+msgid "Fraud — too many attempts"
+msgstr ""
+
+msgid "Fraud — other / fallback"
+msgstr ""
+
+msgid "{hours} is replaced with the configured window."
+msgstr ""
+
+msgid "Blocked by your list"
+msgstr ""
+
+msgid "Shown when a checkout matches an entry on your own block list. Keep it vague about the reason — naming it tells an abuser which detail to change. Blank uses the built-in wording."
+msgstr ""
+
+msgid "Popup contact prompt"
+msgstr ""
+
+msgid "Line shown above the Call / WhatsApp buttons in the blocked-checkout popup."
+msgstr ""
+
+msgid "Shipping mapping"
+msgstr ""
+
+msgid "No WooCommerce shipping methods found. Add zones + methods in WooCommerce › Settings › Shipping."
+msgstr ""
+
+msgid "Map each WooCommerce shipping method to a platform shipping rate. Mapped charges link to that rate on the platform; unmapped ones raise a reconciliation alert."
+msgstr ""
+
+msgid "— not mapped —"
+msgstr ""
+
+msgid "platform rate id"
+msgstr ""
+
+msgid "Could not load platform rates — Verify the connection, or create shipping rates on the platform first. You can enter rate ids manually meanwhile."
+msgstr ""
+
+#. translators: %s: the version available on GitHub.
+#, php-format
+msgid "Version %s is available"
+msgstr ""
+
+msgid "Up to date"
+msgstr ""
+
+msgid "Could not reach GitHub last time it looked"
+msgstr ""
+
+msgid "Turned off"
+msgstr ""
+
+msgid "Disabled on this server"
+msgstr ""
+
+msgid "Not checked yet"
+msgstr ""
+
+msgid "Offer plugin updates from GitHub"
+msgstr ""
+
+msgid "This plugin is not on WordPress.org, so without this it can only be updated by uploading a zip by hand — which is how security fixes stop reaching stores. Updates appear on Dashboard › Updates like any other plugin."
+msgstr ""
+
+msgid "Only a user who can install plugin updates may change this."
+msgstr ""
+
+msgid "Verbose debug logging"
+msgstr ""
+
+msgid "Every request and response is written to WooCommerce › Status › Logs. Useful while setting up; noisy afterwards."
+msgstr ""
+
+msgid "Open logs"
+msgstr ""
+
+msgid "Background queue"
+msgstr ""
+
+msgid "Syncs run through Action Scheduler. A stuck queue is almost always a paused WP-Cron."
+msgstr ""
+
+msgid "Inspect scheduled actions"
+msgstr ""
+
+msgid "Request failed"
+msgstr ""
+
+msgid "Verifying…"
+msgstr ""
+
+msgid "Queueing…"
+msgstr ""
+
+msgid "Updated from AI Sooq."
+msgstr ""
+
+msgid "Release notes are published on GitHub."
+msgstr ""
