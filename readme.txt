@@ -6,7 +6,7 @@ Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 2.10.0
+Stable tag: 2.11.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,41 @@ No — one WooCommerce site connects to one AI Sooq store (one OAuth app = one
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 2.11.0 =
+* **The plugin can update itself.** It is not on WordPress.org, so until now the
+  only way to update it was to upload a zip by hand — which is how security
+  fixes stop reaching stores. New releases now appear on **Dashboard →
+  Updates** like any other plugin. It can be switched off in **Settings →
+  Advanced** (only by a user who is allowed to install plugin updates).
+* This also closes a real hazard: without an `Update URI` header, WordPress
+  matched this plugin to WordPress.org **by folder name**, so an unrelated
+  plugin there with the same folder could have been offered as an "update" and
+  overwritten it.
+* The update channel is deliberately narrow. The release listing chooses *which*
+  version; the download address is rebuilt by the plugin from fixed parts, so a
+  tampered listing cannot point your site at someone else's file. Anything that
+  cannot be verified is simply not offered — no half-update, no error.
+* **New: Failed syncs.** An order that fails five times stops trying and is
+  never pushed again. You could see a count and nothing else — not which orders,
+  not why. There is now a screen listing them with the reason each one stopped,
+  when it last tried, and a button to send it again, one at a time or all at
+  once. Retrying does not reset an order's attempt count, so one that fails
+  again stays on the list with a fresh reason instead of quietly vanishing.
+* **Courier logos are no longer bundled.** They are the carriers' trademarks,
+  and shipping them inside a GPL-licensed zip put a redistribution question on
+  every store that installed the plugin. Couriers now show as a monogram tile —
+  the carrier's initials on its own colours — which reads the same at a glance
+  in a list. Nothing to do; the change is cosmetic. See NOTICE.md.
+* **The plugin can now be translated.** It ships a translation template
+  (`languages/aisooq-connector.pot`) covering all 448 of its strings, and every
+  placeholder now carries a note explaining what it stands for. Your Bangla
+  checkout messages are unaffected: those are settings you edit per store, not
+  translations.
+* A licence file and a notices file are included in the download, as GPL
+  distribution expects.
+* Housekeeping: the abandoned-carts screen's styling moved out of PHP and into
+  the shared stylesheet, so all three screens are described in one place.
 
 = 2.10.0 =
 * **New: a block list you control, and a record of who was turned away.**
