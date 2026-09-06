@@ -35,6 +35,25 @@ if [[ -z "${VERSION:-}" ]]; then
 	exit 1
 fi
 
+# The version lives in four places and WordPress reads three of them. A
+# mismatch is silent and nasty: the header drives the installed version, the
+# constant drives asset cache-busting and the upgrade routine, and readme.txt's
+# Stable tag drives what an update checker offers. Fail the build rather than
+# ship a zip whose parts disagree.
+CONST_VERSION="$(grep -m1 -Eo "define\\( 'AISOOQ_VERSION', '[^']+'" "$MAIN_FILE" | grep -Eo "[0-9A-Za-z.\\-]+'$" | tr -d "'" || true)"
+if [[ "$CONST_VERSION" != "$VERSION" ]]; then
+	echo "error: plugin header says $VERSION but AISOOQ_VERSION says ${CONST_VERSION:-<unset>}" >&2
+	exit 1
+fi
+
+if [[ -f readme.txt ]]; then
+	README_VERSION="$(grep -m1 -Eo '^Stable tag:[[:space:]]*[0-9A-Za-z.\-]+' readme.txt | grep -Eo '[0-9A-Za-z.\-]+$' || true)"
+	if [[ "$README_VERSION" != "$VERSION" ]]; then
+		echo "error: plugin header says $VERSION but readme.txt Stable tag says ${README_VERSION:-<unset>}" >&2
+		exit 1
+	fi
+fi
+
 OUT_DIR="$ROOT/dist"
 OUT="$OUT_DIR/${SLUG}-${VERSION}.zip"
 mkdir -p "$OUT_DIR"
