@@ -18,6 +18,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Verify the tag matches the plugin version
+        run: |
+          # An accidental `git tag v2.9.1` on a tree that still says 2.9.0 would
+          # publish a release whose zip installs as the OLD version, and WordPress
+          # would never offer the update. Catch it before anything is published.
+          HEADER="$(grep -m1 -Eo '^[[:space:]]*\*[[:space:]]*Version:[[:space:]]*[0-9A-Za-z.-]+' aisooq-connector.php | grep -Eo '[0-9A-Za-z.-]+$')"
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$HEADER" != "$TAG" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match plugin version $HEADER"
+            exit 1
+          fi
+
       - name: Build plugin zip
         run: bash bin/build-zip.sh
 
