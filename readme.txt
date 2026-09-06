@@ -6,7 +6,7 @@ Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 2.9.1
+Stable tag: 2.10.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,40 @@ No — one WooCommerce site connects to one AI Sooq store (one OAuth app = one
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 2.10.0 =
+* **New: a block list you control, and a record of who was turned away.**
+  A new **AI Sooq → Blocked** screen. Until now every block came from a rule
+  and there was no way to block a specific number yourself, no way to rescue a
+  customer the rules got wrong, and — the part that mattered most — no record
+  at all. A blocked checkout never becomes an order, so nothing was written
+  anywhere: you could not answer "how many customers did we turn away
+  yesterday, and were any of them real?"
+* Block or always-allow by **mobile number, IP address or e-mail**. IP entries
+  accept a range (`203.0.113.0/24`), because blocking one address rarely helps.
+* Numbers are matched as NUMBERS, so `01712-345678`, `+8801712345678` and
+  `01712345678` are one entry rather than three.
+* **Always-allow beats every other check**, including the platform's own
+  verdict. It is how you rescue a real customer the automatic layers keep
+  rejecting.
+* Entries can expire on their own after a set number of days, so a judgement
+  made in a hurry does not quietly exclude someone forever.
+* The list runs before every other gate, so a number you have already decided
+  about never spends a paid courier lookup.
+* Every refusal is now recorded — by your list, the duplicate guard, the fraud
+  screen or the courier gate — with one-click "always allow" / "always block"
+  beside it, and 7-day counts per gate. It is all local: no API call, nothing
+  billed, and it keeps working while the platform is unreachable.
+* **Fixed: fraud screening was silently skipped for some customers.** The
+  shopper's name and address were trimmed by bytes rather than by characters
+  before being sent for screening. A Bangla name is three bytes per character,
+  so a long one was cut mid-character, the request could not be encoded, and
+  the screen quietly did not run — for exactly those customers, with no error
+  anywhere. Long Bangla names and addresses are now trimmed correctly.
+* **Redesigned admin screens.** Settings, Abandoned carts and Blocked share one
+  look: flat surfaces, hairline dividers, pill buttons, denser type, and a
+  single gold accent that marks the tab you are on and any unsaved work. Same
+  screens, same controls — easier to scan, and readable on a phone.
 
 = 2.9.1 =
 An audit of the whole plugin raised 133 issues; 39 held up under scrutiny and
