@@ -22,7 +22,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class AI_Sooq_Failed_Admin {
 
-	const PARENT_SLUG = 'aisooq';
+	/**
+	 * The menu this screen hangs under.
+	 *
+	 * Taken from the settings screen's own constant rather than repeated as
+	 * a literal: the top-level slug is `aisooq-connector`, and a submenu
+	 * registered under a parent that does not exist is still reachable by
+	 * URL but never appears in the menu — so it looks like it works right up
+	 * until someone tries to find it.
+	 */
+	const PARENT_SLUG = AI_Sooq_Settings::PAGE_SLUG;
 	const PAGE_SLUG   = 'aisooq-failed';
 	const CAPABILITY  = 'manage_woocommerce';
 	const NONCE       = 'aisooq_failed';

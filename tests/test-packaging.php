@@ -70,6 +70,37 @@ class Test_Packaging extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Every screen must hang off the menu that actually exists.
+	 *
+	 * add_submenu_page() with an unknown parent still REGISTERS the page — it
+	 * is reachable by URL and its capability check works — but it never appears
+	 * in the menu. So the screen tests fine, the code looks right, and the only
+	 * symptom is that nobody can find it. Two screens shipped that way: the
+	 * top-level slug is `aisooq-connector` and they declared `aisooq`.
+	 */
+	public function test_every_screen_hangs_off_the_real_menu() {
+		foreach ( array( 'AI_Sooq_Blocklist_Admin', 'AI_Sooq_Failed_Admin', 'AI_Sooq_Abandoned_Admin' ) as $class ) {
+			$this->assertTrue( class_exists( $class ), "{$class} should be loaded." );
+			$this->assertSame(
+				AI_Sooq_Settings::PAGE_SLUG,
+				constant( $class . '::PARENT_SLUG' ),
+				"{$class}::PARENT_SLUG must be the settings page's slug, or its menu entry silently never renders."
+			);
+		}
+	}
+
+	/** Each screen needs its own slug, or one shadows another. */
+	public function test_every_screen_has_a_distinct_slug() {
+		$slugs = array(
+			AI_Sooq_Settings::PAGE_SLUG,
+			AI_Sooq_Blocklist_Admin::PAGE_SLUG,
+			AI_Sooq_Failed_Admin::PAGE_SLUG,
+			AI_Sooq_Abandoned_Admin::PAGE_SLUG,
+		);
+		$this->assertSame( $slugs, array_unique( $slugs ) );
+	}
+
+	/**
 	 * A hook the documentation names but the code does not fire is worse than
 	 * no documentation: it silently does nothing for whoever wrote against it.
 	 * README documented `aisooq_connector_order_payload`, which never existed.

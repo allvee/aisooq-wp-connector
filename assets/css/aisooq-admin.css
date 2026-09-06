@@ -679,6 +679,8 @@ link-buttons and a single-class rule loses to it. */
 	color: var(--muted);
 	font-weight: 700;
 	font-size: 13px;
+	text-transform: none;
+	letter-spacing: 0;
 	border-bottom: 1px solid var(--line);
 }
 .wrap.aisooq-ab .aisooq-tbl td,
@@ -778,7 +780,12 @@ link-buttons and a single-class rule loses to it. */
 	gap: 12px;
 	margin: 0 0 24px;
 }
+/* All three screens, not two. The abandoned screen's own base rule (migrated
+   above, from its old inline block) still says 11px uppercase with letter
+   spacing — the previous design's label. Leaving it out here is how one screen
+   ends up shouting TOTAL while the other two say Total. */
 .wrap.aisooq .aisooq-kpi__label,
+.wrap.aisooq-ab .aisooq-kpi__label,
 .wrap.aisooq-bl .aisooq-kpi__label {
 	display: flex;
 	align-items: center;
