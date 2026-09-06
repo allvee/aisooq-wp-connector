@@ -41,6 +41,23 @@ class AI_Sooq_Customer_Sync {
 		$this->logger   = $logger;
 	}
 
+	/**
+	 * Hash of the payload's CONTENT, ignoring fields that change every call.
+	 *
+	 * `sourceUpdatedAt` is stamped with the current time, so hashing the whole
+	 * payload produced a different digest on every run and the unchanged-skip
+	 * gate below could never match. The effect was that every customer was
+	 * re-uploaded on every trigger — burning the platform's rate limit on
+	 * payloads identical to the ones already stored.
+	 *
+	 * @param array $payload
+	 * @return string
+	 */
+	private static function content_hash( array $payload ) {
+		unset( $payload['sourceUpdatedAt'] );
+		return md5( (string) wp_json_encode( $payload ) );
+	}
+
 	public function register() {
 		if ( ! $this->settings->get( 'enable_customer_sync' ) ) {
 			return;
@@ -113,8 +130,28 @@ class AI_Sooq_Customer_Sync {
 		if ( ! $user ) {
 			return;
 		}
+		// `on_change` is bound to user_register/profile_update, which fire for
+		// EVERY account — so without this an administrator editing their own
+		// profile shipped their name, e-mail and address to the platform as a
+		// "customer". backfill() already restricts itself to the customer role;
+		// this makes the hooked path agree with it.
+		if ( ! self::is_writable_customer( $user ) ) {
+			return;
+		}
+		/**
+		 * Whether a WordPress user should be mirrored as a platform customer.
+		 *
+		 * Stores that use a custom role for shoppers, or that want to exclude
+		 * staff accounts more aggressively, can decide here.
+		 *
+		 * @param bool    $sync Whether to push this user.
+		 * @param WP_User $user The user in question.
+		 */
+		if ( ! apply_filters( 'aisooq_should_sync_customer', true, $user ) ) {
+			return;
+		}
 		$payload = $this->map_user( $user );
-		$hash    = md5( (string) wp_json_encode( $payload ) );
+		$hash    = self::content_hash( $payload );
 		if ( get_user_meta( $user_id, self::META_HASH, true ) === $hash ) {
 			return; // unchanged since last sync (incl. a value we just pulled)
 		}
@@ -181,6 +218,27 @@ class AI_Sooq_Customer_Sync {
 		}
 	}
 
+	/**
+	 * A pull may only write to ordinary shoppers.
+	 *
+	 * Anything that can edit content, manage the shop, or manage the site is
+	 * out of scope for a customer record — that includes administrators, shop
+	 * managers, editors and authors. This is deliberately a capability test
+	 * rather than a role-name test, so a custom or renamed role with elevated
+	 * capabilities is still protected.
+	 *
+	 * @param WP_User $user
+	 * @return bool
+	 */
+	private static function is_writable_customer( $user ) {
+		foreach ( array( 'manage_options', 'manage_woocommerce', 'edit_posts', 'edit_shop_orders', 'promote_users', 'edit_users' ) as $cap ) {
+			if ( user_can( $user, $cap ) ) {
+				return false;
+			}
+		}
+		return true;
+	}
+
 	private function apply_platform_customer( $c ) {
 		$platform_updated = isset( $c['updatedAt'] ) ? (string) $c['updatedAt'] : '';
 		$source           = isset( $c['externalSource'] ) ? $c['externalSource'] : '';
@@ -194,6 +252,22 @@ class AI_Sooq_Customer_Sync {
 		}
 
 		if ( $user ) {
+			// NEVER let a remote record rewrite a privileged account.
+			//
+			// The match is by WordPress user id (`externalId`) or by e-mail, and
+			// both are values the platform holds — so a bad row, a re-keyed
+			// site, or a compromised platform response could hand back an
+			// administrator's id and rewrite `user_email`. Whoever controls the
+			// address controls the password-reset link, i.e. the whole site.
+			// Only accounts that cannot manage the site are writable here.
+			if ( ! self::is_writable_customer( $user ) ) {
+				$this->logger->error(
+					'Refused platform customer write to privileged user ' . $user->ID .
+					' (' . $user->user_login . '); only non-privileged customer accounts are writable.'
+				);
+				return;
+			}
+
 			// Last-write-wins: skip anything we've already applied or older.
 			$last = get_user_meta( $user->ID, self::META_PLATFORM_UPDATED, true );
 			if ( $last && $platform_updated && $platform_updated <= $last ) {
@@ -216,7 +290,7 @@ class AI_Sooq_Customer_Sync {
 			// Refresh the push hash so this pulled state isn't pushed straight back.
 			$fresh = get_userdata( $user->ID );
 			if ( $fresh ) {
-				update_user_meta( $user->ID, self::META_HASH, md5( (string) wp_json_encode( $this->map_user( $fresh ) ) ) );
+				update_user_meta( $user->ID, self::META_HASH, self::content_hash( $this->map_user( $fresh ) ) );
 			}
 			self::$suppress = false;
 			$this->logger->debug( 'Customer WP#' . $user->ID . ' updated from platform.' );

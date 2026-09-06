@@ -4,8 +4,9 @@
  * WooCommerce Blocks fires no server hook while the shopper fills the checkout
  * form — only at order placement — so we read the contact + address + cart from
  * the `wc/store/cart` data store client-side and POST a snapshot to the plugin
- * once a contact (email or phone) is present. The platform dedupes on a stable
- * per-browser key, so repeated posts update the same cart, never duplicate it.
+ * once a contact (email or phone) is present. The row is keyed server-side on
+ * the WooCommerce session, so repeated posts update the same cart, never
+ * duplicate it — and a caller can only ever reach its own.
  *
  * @package AISooq
  */
@@ -16,22 +17,15 @@
 		return;
 	}
 	var cfg = window.AISooqBeacon;
-	var STORAGE_KEY = 'aisooq_cart_key';
 	var lastHash = '';
 	var timer = null;
 
-	function cartKey() {
-		try {
-			var k = window.localStorage.getItem( STORAGE_KEY );
-			if ( ! k ) {
-				k = 'k' + Math.random().toString( 36 ).slice( 2 ) + Date.now().toString( 36 );
-				window.localStorage.setItem( STORAGE_KEY, k );
-			}
-			return k;
-		} catch ( e ) {
-			return 'k-nostorage';
-		}
-	}
+	// No cart key is sent any more. It used to be a value this script invented
+	// and stored in localStorage, which meant the server wrote rows under a key
+	// the client chose — so any caller could address any row, and every browser
+	// with localStorage unavailable shared the one literal key and therefore one
+	// row. The server now derives the key from the WooCommerce session that
+	// carries this request, which is the only thing here it can actually verify.
 
 	function num( v ) {
 		var n = Number( v );
@@ -76,7 +70,6 @@
 		var subtotal = totals.total_items != null ? num( totals.total_items ) / Math.pow( 10, minorT ) : 0;
 
 		return {
-			key: cartKey(),
 			email: email,
 			phone: phone,
 			first_name: b.first_name || s.first_name || '',

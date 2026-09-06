@@ -17,6 +17,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 class AI_Sooq_Product_Sync {
 
 	const HASH_META     = '_aisooq_prod_hash';
+
+	/** Products requested per pull tick. */
+	const PULL_PAGE = 50;
+
+	/** Consecutive rate-limit deferrals for one product. */
+	const DEFER_META = '_aisooq_prod_rate_deferrals';
+
+	/** Ceiling on those deferrals, so a throttled platform cannot loop forever. */
+	const MAX_RATE_DEFERRALS = 50;
 	const PLATFORM_META = '_aisooq_platform_id';
 
 	private static $brand_tax = array( 'product_brand', 'pwb-brand', 'pa_brand', 'yith_product_brand' );
@@ -37,6 +46,23 @@ class AI_Sooq_Product_Sync {
 		$this->logger   = $logger;
 	}
 
+	/**
+	 * Hash of the payload's CONTENT, ignoring fields that change every call.
+	 *
+	 * `sourceUpdatedAt` is stamped with the current time, so hashing the whole
+	 * payload produced a different digest on every run and the unchanged-skip
+	 * gate below could never match. The effect was that every product was
+	 * re-uploaded on every trigger — burning the platform's rate limit on
+	 * payloads identical to the ones already stored.
+	 *
+	 * @param array $payload
+	 * @return string
+	 */
+	private static function content_hash( array $payload ) {
+		unset( $payload['sourceUpdatedAt'] );
+		return md5( (string) wp_json_encode( $payload ) );
+	}
+
 	public function register() {
 		if ( ! $this->settings->get( 'enable_product_sync' ) ) {
 			return;
@@ -46,6 +72,12 @@ class AI_Sooq_Product_Sync {
 			add_action( 'woocommerce_new_product', array( $this, 'on_product' ), 20, 1 );
 			add_action( 'woocommerce_update_product', array( $this, 'on_product' ), 20, 1 );
 			add_action( AISOOQ_PRODUCT_SYNC_ACTION, array( $this, 'handle_product' ), 10, 1 );
+			// Deletion is a change too. Nothing propagated it, so a product
+			// removed here stayed live and buyable on the platform forever.
+			// `before_delete_post` — not `deleted_post` — because the platform
+			// id lives in post meta, which is gone by the time the row is.
+			add_action( 'before_delete_post', array( $this, 'on_delete' ), 10, 1 );
+			add_action( AISOOQ_PRODUCT_DELETE_ACTION, array( $this, 'handle_delete' ), 10, 1 );
 		}
 		if ( 'pull' === $dir || 'both' === $dir ) {
 			add_action( AISOOQ_CATALOG_PULL_CRON, array( $this, 'pull' ) );
@@ -88,13 +120,41 @@ class AI_Sooq_Product_Sync {
 		if ( ! function_exists( 'wc_get_products' ) ) {
 			return 0;
 		}
+		$limit = max( 1, (int) $limit );
+
+		// Take the products that have NEVER reached the platform first.
+		//
+		// Always querying the newest N meant a store with more products than
+		// one batch could never finish: every press of "Sync products" re-walked
+		// the same newest 200 and everything older stayed invisible forever.
+		// Selecting on the absence of the platform-id meta makes repeated
+		// presses converge — each one picks up the next unsynced batch.
 		$ids = wc_get_products( array(
-			'limit'   => max( 1, (int) $limit ),
-			'status'  => array( 'publish', 'private' ),
-			'orderby' => 'date',
-			'order'   => 'DESC',
-			'return'  => 'ids',
+			'limit'      => $limit,
+			'status'     => array( 'publish', 'private' ),
+			'orderby'    => 'date',
+			'order'      => 'DESC',
+			'return'     => 'ids',
+			'meta_query' => array( // phpcs:ignore WordPress.DB.SlowDBQuery
+				array(
+					'key'     => self::PLATFORM_META,
+					'compare' => 'NOT EXISTS',
+				),
+			),
 		) );
+
+		// Everything has synced at least once — fall back to the newest batch so
+		// the button still means "push these again". The unchanged-hash gate
+		// makes that cheap for anything that really is unchanged.
+		if ( empty( $ids ) ) {
+			$ids = wc_get_products( array(
+				'limit'   => $limit,
+				'status'  => array( 'publish', 'private' ),
+				'orderby' => 'date',
+				'order'   => 'DESC',
+				'return'  => 'ids',
+			) );
+		}
 		$n = 0;
 		foreach ( (array) $ids as $id ) {
 			$this->on_product( (int) $id );
@@ -102,6 +162,43 @@ class AI_Sooq_Product_Sync {
 		}
 		$this->logger->debug( 'Backfill queued ' . $n . ' products.' );
 		return $n;
+	}
+
+	/**
+	 * A product is about to be deleted for good — capture its platform id now
+	 * and queue the removal, because the meta will not exist a moment later.
+	 *
+	 * @param int $post_id
+	 */
+	public function on_delete( $post_id ) {
+		if ( 'product' !== get_post_type( $post_id ) ) {
+			return;
+		}
+		$platform_id = (int) get_post_meta( $post_id, self::PLATFORM_META, true );
+		if ( ! $platform_id ) {
+			return; // never reached the platform, nothing to remove
+		}
+		if ( function_exists( 'as_enqueue_async_action' ) ) {
+			as_enqueue_async_action( AISOOQ_PRODUCT_DELETE_ACTION, array( $platform_id ), AISOOQ_AS_GROUP );
+		} else {
+			$this->handle_delete( $platform_id );
+		}
+	}
+
+	/**
+	 * @param int $platform_id
+	 */
+	public function handle_delete( $platform_id ) {
+		$platform_id = (int) $platform_id;
+		if ( ! $platform_id ) {
+			return;
+		}
+		$res = $this->api->request( 'DELETE', '/connect/products/' . $platform_id );
+		if ( is_wp_error( $res ) ) {
+			$this->logger->error( 'Product ' . $platform_id . ' delete failed on the platform: ' . $res->get_error_message() );
+			return;
+		}
+		$this->logger->debug( 'Product ' . $platform_id . ' removed from the platform.' );
 	}
 
 	public function push_product( $product_id ) {
@@ -117,15 +214,36 @@ class AI_Sooq_Product_Sync {
 			return; // nothing to sync
 		}
 
-		$hash = md5( (string) wp_json_encode( $payload ) );
+		$hash = self::content_hash( $payload );
 		if ( get_post_meta( $product_id, self::HASH_META, true ) === $hash ) {
 			return;
 		}
 		$res = $this->api->post( '/connect/products', $payload );
 		if ( is_wp_error( $res ) ) {
 			$this->logger->error( 'Product ' . $product_id . ' push failed: ' . $res->get_error_message() );
+			// A rate limit is not a bad payload — the same push succeeds once the
+			// window opens. Dropping it here lost the edit permanently, because
+			// the hash is only stamped on success and nothing re-triggers a
+			// product whose content has not changed again. Re-queue it, bounded,
+			// so a busy hour does not silently strand catalogue updates.
+			$data = $res->get_error_data();
+			if ( 'aisooq_rate_limited' === $res->get_error_code()
+				&& is_array( $data ) && ! empty( $data['retry_after'] )
+				&& function_exists( 'as_schedule_single_action' ) ) {
+				$deferrals = (int) get_post_meta( $product_id, self::DEFER_META, true ) + 1;
+				if ( $deferrals <= self::MAX_RATE_DEFERRALS ) {
+					update_post_meta( $product_id, self::DEFER_META, $deferrals );
+					$wait = (int) $data['retry_after'];
+					$wait += wp_rand( 0, max( 1, (int) round( $wait * 0.2 ) ) );
+					as_schedule_single_action( time() + $wait, AISOOQ_PRODUCT_SYNC_ACTION, array( $product_id ), AISOOQ_AS_GROUP );
+					$this->logger->debug( 'Product ' . $product_id . ' rate limited; re-queued in ' . $wait . 's.' );
+				} else {
+					$this->logger->error( 'Product ' . $product_id . ' rate limited past ' . self::MAX_RATE_DEFERRALS . ' deferrals; giving up.' );
+				}
+			}
 			return;
 		}
+		delete_post_meta( $product_id, self::DEFER_META );
 		update_post_meta( $product_id, self::HASH_META, $hash );
 		if ( ! empty( $res['id'] ) ) {
 			update_post_meta( $product_id, self::PLATFORM_META, (int) $res['id'] );
@@ -158,7 +276,7 @@ class AI_Sooq_Product_Sync {
 			$this->logger->error( 'Product ' . $product_id . ' manual sync failed: ' . $res->get_error_message() );
 			return array( 'ok' => false, 'message' => $res->get_error_message() );
 		}
-		update_post_meta( $product_id, self::HASH_META, md5( (string) wp_json_encode( $payload ) ) );
+		update_post_meta( $product_id, self::HASH_META, self::content_hash( $payload ) );
 		if ( ! empty( $res['id'] ) ) {
 			update_post_meta( $product_id, self::PLATFORM_META, (int) $res['id'] );
 		}
@@ -242,7 +360,21 @@ class AI_Sooq_Product_Sync {
 			$sku = $base . '-' . $i;
 			$i++;
 		}
+		// The postmeta write is deliberate — going through $product->save()
+		// here would re-fire the product-sync save hook from inside a push. But
+		// WooCommerce keeps a denormalised copy of the SKU in
+		// wc_product_meta_lookup, and writing the meta directly leaves that copy
+		// stale: wc_get_product_id_by_sku() (which this very loop uses to test
+		// uniqueness) reads the lookup table, so the generated SKU stayed
+		// invisible to it and admin SKU search never found the product.
 		update_post_meta( $product->get_id(), '_sku', $sku );
+		if ( class_exists( 'WC_Data_Store' ) ) {
+			try {
+				WC_Data_Store::load( 'product' )->update_lookup_table( $product->get_id(), 'wc_product_meta_lookup' );
+			} catch ( \Exception $e ) {
+				$this->logger->error( 'SKU lookup-table refresh failed for product ' . $product->get_id() . ': ' . $e->getMessage() );
+			}
+		}
 		if ( function_exists( 'wc_delete_product_transients' ) ) {
 			wc_delete_product_transients( $product->get_id() );
 		}
@@ -375,7 +507,9 @@ class AI_Sooq_Product_Sync {
 			return;
 		}
 		$cursor = get_option( 'aisooq_prod_pull_cursor', '' );
-		$res    = $this->api->get( '/connect/products?limit=50' . ( $cursor ? '&updatedSince=' . rawurlencode( $cursor ) : '' ) );
+		$res    = $this->api->get(
+			'/connect/products?limit=' . self::PULL_PAGE . ( $cursor ? '&updatedSince=' . rawurlencode( $cursor ) : '' )
+		);
 		if ( is_wp_error( $res ) ) {
 			$this->logger->error( 'Product pull failed: ' . $res->get_error_message() );
 			return;
@@ -388,8 +522,29 @@ class AI_Sooq_Product_Sync {
 				$max = $p['updatedAt'];
 			}
 		}
+
 		if ( $max && $max !== $cursor ) {
 			update_option( 'aisooq_prod_pull_cursor', $max, false );
+			return;
+		}
+
+		// The cursor did not move, and the page came back FULL.
+		//
+		// `updatedSince` is inclusive, so a batch of products sharing one
+		// timestamp — a bulk edit, an import, a scripted price change — fills
+		// the page with rows whose updatedAt equals the cursor. Nothing
+		// advances, the same page is re-applied on every tick forever, and no
+		// product past that timestamp is ever pulled again. Step over the tie
+		// by one second so the pull can make progress.
+		if ( count( $rows ) >= self::PULL_PAGE ) {
+			$ts = $cursor ? strtotime( (string) $cursor ) : 0;
+			if ( $ts ) {
+				$next = gmdate( 'c', $ts + 1 );
+				$this->logger->error(
+					'Product pull cursor stalled at ' . $cursor . ' (a full page shares that timestamp); advancing to ' . $next . '.'
+				);
+				update_option( 'aisooq_prod_pull_cursor', $next, false );
+			}
 		}
 	}
 
@@ -445,9 +600,7 @@ class AI_Sooq_Product_Sync {
 					$product->set_status( $this->wc_status( $p['status'] ) );
 				}
 				if ( $product->is_type( 'simple' ) && 1 === count( $variants ) ) {
-					if ( isset( $variants[0]['price'] ) ) {
-						$product->set_regular_price( (string) $variants[0]['price'] );
-					}
+					$this->apply_prices( $product, $variants[0] );
 				}
 				$product->save();
 				if ( $product->is_type( 'variable' ) ) {
@@ -466,9 +619,7 @@ class AI_Sooq_Product_Sync {
 			}
 			$product->set_status( $this->wc_status( isset( $p['status'] ) ? $p['status'] : 'draft' ) );
 			if ( ! empty( $variants ) ) {
-				if ( isset( $variants[0]['price'] ) ) {
-					$product->set_regular_price( (string) $variants[0]['price'] );
-				}
+				$this->apply_prices( $product, $variants[0] );
 				if ( ! empty( $variants[0]['sku'] ) ) {
 					$product->set_sku( $variants[0]['sku'] );
 				}
@@ -483,6 +634,43 @@ class AI_Sooq_Product_Sync {
 		self::$suppress = false;
 	}
 
+	/**
+	 * Apply one platform variant's pricing to a WooCommerce product/variation.
+	 *
+	 * The platform uses the Shopify shape, which is the INVERSE of WooCommerce:
+	 * its `price` is what the customer pays right now (the sale price during a
+	 * sale) and `compareAtPrice` is the struck-through original. push() already
+	 * encodes it that way — see simple_variant() and compare_at().
+	 *
+	 * Writing `price` straight into regular_price therefore destroyed data: a
+	 * product on sale at 800 with a regular price of 1000 came back as a
+	 * regular price of 800, the 1000 was lost, and because the default sync
+	 * direction is `both` the markdown ratcheted again on every cron tick.
+	 *
+	 * @param WC_Product $product Product or variation to price.
+	 * @param array      $variant Platform variant row.
+	 */
+	private function apply_prices( $product, array $variant ) {
+		if ( ! isset( $variant['price'] ) ) {
+			return;
+		}
+		$price   = (float) $variant['price'];
+		$compare = isset( $variant['compareAtPrice'] ) && null !== $variant['compareAtPrice']
+			? (float) $variant['compareAtPrice']
+			: 0.0;
+
+		if ( $compare > $price ) {
+			// On sale: compareAtPrice is the real regular price.
+			$product->set_regular_price( (string) $compare );
+			$product->set_sale_price( (string) $price );
+		} else {
+			// Not on sale. Clear any stale sale price, or the product would
+			// keep an old discount that the platform no longer knows about.
+			$product->set_regular_price( (string) $price );
+			$product->set_sale_price( '' );
+		}
+	}
+
 	private function apply_variation_prices( $product, $variants ) {
 		$by_sku = array();
 		foreach ( $product->get_children() as $vid ) {
@@ -493,7 +681,7 @@ class AI_Sooq_Product_Sync {
 		}
 		foreach ( $variants as $v ) {
 			if ( ! empty( $v['sku'] ) && isset( $by_sku[ $v['sku'] ] ) && isset( $v['price'] ) ) {
-				$by_sku[ $v['sku'] ]->set_regular_price( (string) $v['price'] );
+				$this->apply_prices( $by_sku[ $v['sku'] ], $v );
 				$by_sku[ $v['sku'] ]->save();
 			}
 		}

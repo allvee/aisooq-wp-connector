@@ -103,6 +103,8 @@ class AI_Sooq_Install {
 		}
 
 		foreach ( $eras as $era ) {
+			$old_table = $wpdb->prefix . $era['table'];
+
 			// 1. Options. Only adopt an old value when we don't already have one,
 			//    so a re-run can't clobber settings edited under the new name.
 			$options = array(
@@ -120,22 +122,47 @@ class AI_Sooq_Install {
 
 			// 2. Rename the abandoned-cart table (preserves rows). Guarded on the
 			//    destination not existing, so this runs at most once.
-			$old_table = $wpdb->prefix . $era['table'];
 			if ( $old_table === $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $old_table ) ) // phpcs:ignore WordPress.DB
 				&& $new_table !== $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $new_table ) ) ) { // phpcs:ignore WordPress.DB
 				$wpdb->query( "RENAME TABLE `{$old_table}` TO `{$new_table}`" ); // phpcs:ignore WordPress.DB
 			}
 
 			// 3. Re-key our meta onto `_aisooq_` in every meta store.
-			$prefix = $era['meta'];
-			$len    = strlen( $prefix );
+			//
+			// Renaming EVERY key that merely starts with the era prefix was
+			// data loss waiting to happen: `_sp_` is generic enough that other
+			// plugins use it, and their meta was being silently renamed into
+			// this plugin's namespace with no way back. Only the keys this
+			// plugin has ever written are touched, matched exactly.
+			//
+			// Exact `meta_key IN (...)` is also sargable, so it uses the
+			// meta_key index instead of scanning the whole table — the old
+			// SUBSTRING() predicate could not.
+			$prefix   = $era['meta'];
+			$old_keys = array();
+			foreach ( self::owned_meta_keys() as $k ) {
+				$old_keys[ $prefix . substr( $k, strlen( '_aisooq_' ) ) ] = $k;
+			}
+
+			// One statement per table: a CASE over an IN() list. Exact-match
+			// keys use the meta_key index, where the old
+			// `SUBSTRING(meta_key, 1, n) = prefix` predicate could not and
+			// scanned the entire table.
+			$case = '';
+			$args = array();
+			foreach ( $old_keys as $from => $to ) {
+				$case  .= ' WHEN %s THEN %s';
+				$args[] = $from;
+				$args[] = $to;
+			}
+			$in   = implode( ', ', array_fill( 0, count( $old_keys ), '%s' ) );
+			$args = array_merge( $args, array_keys( $old_keys ) );
+
 			foreach ( $meta_tables as $t ) {
 				$wpdb->query( // phpcs:ignore WordPress.DB
 					$wpdb->prepare(
-						"UPDATE `{$t}` SET meta_key = CONCAT('_aisooq_', SUBSTRING(meta_key, %d)) WHERE SUBSTRING(meta_key, 1, %d) = %s", // phpcs:ignore WordPress.DB
-						$len + 1,
-						$len,
-						$prefix
+						"UPDATE `{$t}` SET meta_key = CASE meta_key{$case} ELSE meta_key END WHERE meta_key IN ({$in})", // phpcs:ignore WordPress.DB.PreparedSQL
+						$args
 					)
 				);
 			}
@@ -154,6 +181,44 @@ class AI_Sooq_Install {
 		foreach ( array( AISOOQ_ABANDONED_CRON, AISOOQ_POLL_CRON, AISOOQ_CUSTOMER_PULL_CRON, AISOOQ_CATALOG_PULL_CRON ) as $hook ) {
 			wp_clear_scheduled_hook( $hook );
 		}
+
+	}
+
+	/**
+	 * Every meta key this plugin has ever written, on the current `_aisooq_`
+	 * namespace. Used to re-key a legacy install exactly, without touching meta
+	 * that merely shares the old prefix.
+	 *
+	 * @return string[]
+	 */
+	private static function owned_meta_keys() {
+		return array(
+			'_aisooq_attribution',
+			'_aisooq_cart_fingerprint',
+			'_aisooq_courier_checked_at',
+			'_aisooq_courier_json',
+			'_aisooq_courier_parcels',
+			'_aisooq_courier_phone',
+			'_aisooq_courier_ratio',
+			'_aisooq_cust_hash',
+			'_aisooq_cust_platform_updated',
+			'_aisooq_cust_synced_at',
+			'_aisooq_fraud_flagged',
+			'_aisooq_fraud_layer',
+			'_aisooq_fraud_reason',
+			'_aisooq_order_id',
+			'_aisooq_platform_customer_id',
+			'_aisooq_platform_id',
+			'_aisooq_prod_hash',
+			'_aisooq_prod_platform_updated',
+			'_aisooq_purchase_pixel_sent',
+			'_aisooq_rate_deferrals',
+			'_aisooq_sync_attempts',
+			'_aisooq_sync_hash',
+			'_aisooq_synced_at',
+			'_aisooq_term_hash',
+			'_aisooq_term_platform_updated',
+		);
 	}
 
 	/**
@@ -167,13 +232,43 @@ class AI_Sooq_Install {
 		if ( AISOOQ_VERSION === get_option( 'aisooq_version' ) ) {
 			return;
 		}
+		// Stamp the version FIRST.
+		//
+		// This runs on `plugins_loaded`, so the request that pays for it is
+		// whatever hit the site first after the files were replaced — usually a
+		// shopper, not an admin. Stamping only at the end meant that if any step
+		// below timed out or fatalled, the very next request started the whole
+		// upgrade again, and the site could sit in that loop indefinitely.
+		// Each step below is independently guarded and idempotent, so losing one
+		// to a crash is recoverable; an unbounded retry loop is not.
+		update_option( 'aisooq_version', AISOOQ_VERSION, false );
+
 		self::migrate_legacy();
 		self::create_table();
 		self::schedule_crons();
 		// Drop any cached access token so the next request re-mints with the
 		// current scope logic (an old token may carry a stale narrow scope).
 		delete_transient( AISOOQ_TOKEN_TRANSIENT );
-		update_option( 'aisooq_version', AISOOQ_VERSION, false );
+	}
+
+	/**
+	 * Surface a failed table creation to the operator.
+	 *
+	 * dbDelta() reports nothing useful on failure, so a CREATE TABLE that the
+	 * database refused (no permission, disk full, row-size limit) used to leave
+	 * the plugin silently writing abandoned carts nowhere, forever, with a
+	 * perfectly healthy-looking settings screen.
+	 */
+	public static function admin_notices() {
+		if ( ! get_option( 'aisooq_table_missing' ) || ! current_user_can( 'manage_woocommerce' ) ) {
+			return;
+		}
+		echo '<div class="notice notice-error"><p>';
+		echo esc_html__(
+			'AI Sooq Connector could not create its abandoned-carts database table. Cart capture and recovery are disabled until this is fixed — check the database user\'s CREATE TABLE permission, then deactivate and reactivate the plugin.',
+			'aisooq-connector'
+		);
+		echo '</p></div>';
 	}
 
 	public static function deactivate() {
@@ -240,6 +335,15 @@ class AI_Sooq_Install {
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql );
+
+		// dbDelta() swallows failures, so verify the table is really there.
+		// Without this a refused CREATE TABLE left every cart capture writing
+		// into nothing, indefinitely and invisibly.
+		if ( $table !== $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) ) { // phpcs:ignore WordPress.DB
+			update_option( 'aisooq_table_missing', '1', false );
+			return;
+		}
+		delete_option( 'aisooq_table_missing' );
 
 		// Back-fill the disposition column on installs upgrading from a build
 		// that only had the `converted` flag, so an already-recovered cart keeps

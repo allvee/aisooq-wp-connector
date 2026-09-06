@@ -26,6 +26,14 @@ class AI_Sooq_Abandoned_Admin {
 	const PAGE_SLUG   = 'aisooq-abandoned';
 	const PARENT_SLUG = 'aisooq-connector';
 	const NONCE       = 'aisooq_abandoned';
+
+	/** Cached headline aggregates for the worklist screen. */
+	const STATS_TRANSIENT = 'aisooq_ab_stats';
+	const STATS_TTL       = 120;
+
+	/** Cached product filter options. */
+	const PRODUCTS_TRANSIENT = 'aisooq_ab_products';
+	const PRODUCTS_TTL       = 600;
 	const PER_PAGE    = 100;
 
 	/** @var AI_Sooq_Settings */
@@ -80,6 +88,16 @@ class AI_Sooq_Abandoned_Admin {
 	 * @return array<string,mixed>
 	 */
 	private function stats() {
+		// These are two unindexed aggregates over the WHOLE table, run before a
+		// single row of the worklist is drawn. On a busy store the table grows
+		// with traffic, so the screen got slower the more successful the shop
+		// was. Cache briefly and invalidate on any write, so the numbers stay
+		// honest without being recomputed on every page view and every filter.
+		$cached = get_transient( self::STATS_TRANSIENT );
+		if ( is_array( $cached ) ) {
+			return $cached;
+		}
+
 		global $wpdb;
 		$t         = AI_Sooq_Abandoned_Sync::table_name();
 		$reachable = $this->reachable_sql();
@@ -118,7 +136,7 @@ class AI_Sooq_Abandoned_Admin {
 		$open      = (int) ( $row['open_count'] ?? 0 );
 		$open_val  = (float) ( $row['open_value'] ?? 0 );
 
-		return array(
+		$stats = array(
 			'total'           => $total,
 			'open'            => $open,
 			'recovered'       => $recovered,
@@ -132,6 +150,17 @@ class AI_Sooq_Abandoned_Admin {
 			'recovery_rate'   => $total > 0 ? $recovered / $total : 0,
 			'funnel'          => is_array( $funnel ) ? $funnel : array(),
 		);
+		set_transient( self::STATS_TRANSIENT, $stats, self::STATS_TTL );
+		return $stats;
+	}
+
+	/**
+	 * Drop the cached aggregates. Called after anything that changes a row, so
+	 * an operator never acts on a number their own click just invalidated.
+	 */
+	public static function flush_stats_cache() {
+		delete_transient( self::STATS_TRANSIENT );
+		delete_transient( self::PRODUCTS_TRANSIENT );
 	}
 
 	/**
@@ -215,6 +244,15 @@ class AI_Sooq_Abandoned_Admin {
 	 * @return array<int,string> product_id => label
 	 */
 	private function product_options() {
+		// Building this dropdown reads a thousand longtext blobs off disk and
+		// JSON-decodes every one of them, on every render of the page, purely to
+		// populate a filter most visits never touch. Cached for the same reason
+		// as stats(), and invalidated by the same writes.
+		$cached = get_transient( self::PRODUCTS_TRANSIENT );
+		if ( is_array( $cached ) ) {
+			return $cached;
+		}
+
 		global $wpdb;
 		$t    = AI_Sooq_Abandoned_Sync::table_name();
 		$rows = (array) $wpdb->get_col( "SELECT cart_json FROM {$t} ORDER BY updated_at DESC LIMIT 1000" ); // phpcs:ignore WordPress.DB
@@ -235,6 +273,7 @@ class AI_Sooq_Abandoned_Admin {
 			}
 		}
 		natcasesort( $out );
+		set_transient( self::PRODUCTS_TRANSIENT, $out, self::PRODUCTS_TTL );
 		return $out;
 	}
 
@@ -617,6 +656,7 @@ class AI_Sooq_Abandoned_Admin {
 	 */
 	public function ajax_courier() {
 		$this->guard_ajax( true );
+		AI_Sooq_Abandoned_Admin::flush_stats_cache();
 		$key = isset( $_POST['session_key'] ) ? sanitize_text_field( wp_unslash( $_POST['session_key'] ) ) : '';
 		$row = $this->abandoned->get_row( $key );
 		if ( ! $row ) {
@@ -630,7 +670,14 @@ class AI_Sooq_Abandoned_Admin {
 			wp_send_json_error( array( 'message' => __( 'No phone on this cart.', 'aisooq-connector' ) ) );
 		}
 
-		$res = AI_Sooq_Plugin::instance()->api()->get( '/connect/courier?phone=' . rawurlencode( $phone ) );
+		// Shared with the order-side checks: same number, same paid answer, and
+		// the phone stays out of the request URL (and therefore out of every
+		// access log between here and the platform).
+		// Forced: this handler only runs because an operator clicked Check on a
+		// row, so the stored answer is exactly what they are replacing.
+		$res = class_exists( 'AI_Sooq_Order_Courier' )
+			? AI_Sooq_Order_Courier::cached_lookup( AI_Sooq_Plugin::instance()->api(), $phone, true )
+			: AI_Sooq_Plugin::instance()->api()->get( '/connect/courier?phone=' . rawurlencode( $phone ) );
 		if ( is_wp_error( $res ) ) {
 			wp_send_json_error( array( 'message' => $res->get_error_message() ) );
 		}
@@ -663,6 +710,7 @@ class AI_Sooq_Abandoned_Admin {
 	public function ajax_action() {
 		$op = isset( $_POST['op'] ) ? sanitize_key( wp_unslash( $_POST['op'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
 		$this->guard_ajax( 'resync' === $op );
+		AI_Sooq_Abandoned_Admin::flush_stats_cache();
 		$key = isset( $_POST['session_key'] ) ? sanitize_text_field( wp_unslash( $_POST['session_key'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
 		if ( '' === $key ) {
 			wp_send_json_error( array( 'message' => __( 'Missing cart reference.', 'aisooq-connector' ) ) );
@@ -710,6 +758,7 @@ class AI_Sooq_Abandoned_Admin {
 	public function ajax_bulk() {
 		$op = isset( $_POST['op'] ) ? sanitize_key( wp_unslash( $_POST['op'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
 		$this->guard_ajax( 'resync' === $op );
+		AI_Sooq_Abandoned_Admin::flush_stats_cache();
 		if ( 'resync' === $op && ! $this->settings->get( 'enable_abandoned' ) ) {
 			wp_send_json_error( array( 'message' => __( 'Abandoned-cart sync is turned off in settings.', 'aisooq-connector' ) ) );
 		}
@@ -885,6 +934,7 @@ class AI_Sooq_Abandoned_Admin {
 
 	public function ajax_resync() {
 		$this->guard_ajax( true );
+		AI_Sooq_Abandoned_Admin::flush_stats_cache();
 		if ( ! $this->settings->get( 'enable_abandoned' ) ) {
 			wp_send_json_error( array( 'message' => __( 'Abandoned-cart sync is turned off in settings.', 'aisooq-connector' ) ) );
 		}
@@ -1242,6 +1292,7 @@ class AI_Sooq_Abandoned_Admin {
 						<?php endforeach; ?>
 					</span>
 					<span id="aisooq-count" class="aisooq-dim" aria-live="polite"></span>
+					<span id="aisooq-query-error" class="aisooq-error" role="alert" hidden></span>
 				</div>
 
 				<div class="aisooq-toolbar">
@@ -1311,6 +1362,7 @@ class AI_Sooq_Abandoned_Admin {
 				'confirmFake'=> __( 'Mark this cart as fake?', 'aisooq-connector' ),
 				'working'    => __( 'Working…', 'aisooq-connector' ),
 				'count'      => __( '%d shown', 'aisooq-connector' ),
+				'queryFailed' => __( 'Could not refresh the list — the page may have expired. Reload and try again.', 'aisooq-connector' ),
 				'selected'   => __( '%d selected', 'aisooq-connector' ),
 				'pickOp'     => __( 'Choose a bulk action first.', 'aisooq-connector' ),
 				'pickRows'   => __( 'Select at least one cart.', 'aisooq-connector' ),
@@ -1354,13 +1406,30 @@ class AI_Sooq_Abandoned_Admin {
 				} ) ).then( function ( j ) {
 					spin.classList.remove( 'is-active' );
 					if ( j && j.success ) {
+						showQueryError( '' );
 						rowsBody.innerHTML = j.data.html;
 						countEl.textContent = strings.count.replace( '%d', j.data.count );
 						if ( cbAll ) { cbAll.checked = false; }
 						bindRows();
 						updateBulkCount();
+						return;
 					}
-				} ).catch( function () { spin.classList.remove( 'is-active' ); } );
+					// A failed search used to do NOTHING visible: the spinner stopped
+					// and the previous results stayed on screen, so an expired nonce or
+					// a server error looked exactly like "no matching carts" — and the
+					// operator would go on acting on rows that no longer answer the
+					// filter they can see.
+					showQueryError( ( j && j.data && j.data.message ) ? j.data.message : strings.queryFailed );
+				} ).catch( function () {
+					spin.classList.remove( 'is-active' );
+					showQueryError( strings.queryFailed );
+				} );
+			}
+			function showQueryError( msg ) {
+				var box = document.getElementById( 'aisooq-query-error' );
+				if ( ! box ) { return; }
+				box.textContent = msg || '';
+				box.hidden = ! msg;
 			}
 			function debounced() { clearTimeout( t ); t = setTimeout( runQuery, 300 ); }
 			if ( search ) { search.addEventListener( 'input', debounced ); }

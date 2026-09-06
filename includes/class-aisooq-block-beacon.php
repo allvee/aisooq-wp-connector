@@ -35,6 +35,12 @@ class AI_Sooq_Block_Beacon {
 		$this->logger    = $logger;
 	}
 
+	/** Beacon posts allowed per IP per minute (storefront debounce is 4s). */
+	const MAX_PER_MINUTE = 30;
+
+	/** Cart lines accepted in one beacon payload. */
+	const MAX_LINES = 100;
+
 	public function register() {
 		add_action( 'rest_api_init', array( $this, 'routes' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue' ), 20 );
@@ -66,12 +72,46 @@ class AI_Sooq_Block_Beacon {
 		if ( ! $this->settings->is_active() || ! $this->settings->get( 'enable_abandoned' ) ) {
 			return new WP_REST_Response( array( 'ok' => false ), 200 );
 		}
+		// The nonce above is CSRF protection, not authentication: any anonymous
+		// visitor can load the checkout page and read a valid `wp_rest` nonce.
+		// Without a throttle, one scripted client could insert unbounded rows
+		// into the carts table — each carrying attacker-supplied contact
+		// details, and each pushed on to the platform.
+		if ( $this->rate_limited() ) {
+			return new WP_REST_Response( array( 'ok' => false ), 429 );
+		}
 		$data = $req->get_json_params();
 		if ( ! is_array( $data ) ) {
 			return new WP_REST_Response( array( 'ok' => false ), 400 );
 		}
+		// A cart is a handful of lines. Anything larger is not a real checkout,
+		// and capture_beacon() would otherwise json_encode it into a longtext.
+		if ( isset( $data['lines'] ) && is_array( $data['lines'] ) && count( $data['lines'] ) > self::MAX_LINES ) {
+			$data['lines'] = array_slice( $data['lines'], 0, self::MAX_LINES );
+		}
 		$ok = $this->abandoned->capture_beacon( $data );
 		return new WP_REST_Response( array( 'ok' => (bool) $ok ), 200 );
+	}
+
+	/**
+	 * Per-IP throttle for the public beacon.
+	 *
+	 * The storefront debounces to one post every 4s, so a real shopper stays
+	 * far under this even on a long checkout.
+	 *
+	 * @return bool
+	 */
+	private function rate_limited() {
+		$ip  = isset( $_SERVER['REMOTE_ADDR'] )
+			? preg_replace( '/[^0-9a-fA-F:.]/', '', wp_unslash( $_SERVER['REMOTE_ADDR'] ) )
+			: '0';
+		$key = 'aisooq_bcn_rl_' . md5( (string) $ip );
+		$n   = (int) get_transient( $key );
+		if ( $n >= self::MAX_PER_MINUTE ) {
+			return true;
+		}
+		set_transient( $key, $n + 1, MINUTE_IN_SECONDS );
+		return false;
 	}
 
 	public function enqueue() {
