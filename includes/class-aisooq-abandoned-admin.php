@@ -24,7 +24,7 @@ class AI_Sooq_Abandoned_Admin {
 
 	const CAPABILITY  = 'manage_woocommerce';
 	const PAGE_SLUG   = 'aisooq-abandoned';
-	const PARENT_SLUG = 'aisooq-connector';
+	const PARENT_SLUG = AI_Sooq_Settings::PAGE_SLUG;
 	const NONCE       = 'aisooq_abandoned';
 
 	/** Cached headline aggregates for the worklist screen. */

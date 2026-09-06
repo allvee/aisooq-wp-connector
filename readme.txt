@@ -6,7 +6,7 @@ Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 2.11.0
+Stable tag: 2.11.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,16 @@ No — one WooCommerce site connects to one AI Sooq store (one OAuth app = one
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 2.11.1 =
+* **Fixed: "Blocked" and "Failed syncs" were missing from the AI Sooq menu.**
+  Both screens attached themselves to a menu that does not exist, so they never
+  appeared — the pages worked if you knew the URL, and were invisible if you
+  did not. Found by installing the plugin on a real WordPress site, which is
+  the only place this shows up: nothing about the code looks wrong.
+* The abandoned-carts screen's headings now match the other two screens —
+  sentence case rather than uppercase. It was the last thing still wearing the
+  previous design.
 
 = 2.11.0 =
 * **The plugin can update itself.** It is not on WordPress.org, so until now the
