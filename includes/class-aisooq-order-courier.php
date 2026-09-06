@@ -265,23 +265,27 @@ class AI_Sooq_Order_Courier {
 	 * Courier brand marks, mirroring the platform console's `courier-chip.tsx`
 	 * so the same parcel looks the same in both places.
 	 *
-	 * `logo` is a file under assets/img/couriers/. Where we have no artwork the
-	 * monogram box stands in — a coloured tile with the courier's initials,
-	 * which is still recognisable at a glance in a list and never renders as a
-	 * broken image. Upgrading a courier from monogram to real logo is dropping
-	 * the file in and adding `logo` here.
+	 * Each courier is a monogram tile: its initials on its own colours. That is
+	 * deliberate, and please do NOT add logo files here.
+	 *
+	 * This plugin used to bundle the couriers' actual logos. They are the
+	 * companies' registered trademarks, and shipping them inside a GPL-licensed
+	 * zip put a redistribution question on every store that installed it — one
+	 * nobody had answered and nobody needed to be asked. The monogram carries
+	 * the same information (you can tell Pathao from RedX at a glance in a
+	 * list), never renders as a broken image, and belongs to us.
 	 *
 	 * BDCourier returns lowercase slugs; keep the keys lowercase.
 	 */
 	const COURIER_BRAND = array(
-		'steadfast' => array( 'label' => 'Steadfast', 'mono' => 'SF', 'bg' => '#e7f0fb', 'fg' => '#14539a', 'logo' => 'steadfast.svg' ),
-		'pathao'    => array( 'label' => 'Pathao',    'mono' => 'P',  'bg' => '#fdeaef', 'fg' => '#b21f45', 'logo' => 'pathao.svg' ),
-		'redx'      => array( 'label' => 'RedX',      'mono' => 'RX', 'bg' => '#fdeaea', 'fg' => '#b32d2e', 'logo' => 'redx.svg' ),
-		'paperfly'  => array( 'label' => 'Paperfly',  'mono' => 'Pf', 'bg' => '#e8f4fd', 'fg' => '#12628f', 'logo' => 'paperfly.svg' ),
-		'ecourier'  => array( 'label' => 'eCourier',  'mono' => 'eC', 'bg' => '#e6f6ee', 'fg' => '#00844a', 'logo' => 'ecourier.svg' ),
-		'sundarban' => array( 'label' => 'Sundarban', 'mono' => 'Sb', 'bg' => '#e5f5f4', 'fg' => '#0f6f6a', 'logo' => 'sundarban.jpg' ),
-		'carrybee'  => array( 'label' => 'CarryBee',  'mono' => 'CB', 'bg' => '#fdf3e0', 'fg' => '#8a5a00', 'logo' => 'carrybee.png' ),
-		'parceldex' => array( 'label' => 'ParcelDex', 'mono' => 'Px', 'bg' => '#ecebfb', 'fg' => '#3f38a8', 'logo' => '' ),
+		'steadfast' => array( 'label' => 'Steadfast', 'mono' => 'SF', 'bg' => '#e7f0fb', 'fg' => '#14539a' ),
+		'pathao'    => array( 'label' => 'Pathao',    'mono' => 'P',  'bg' => '#fdeaef', 'fg' => '#b21f45' ),
+		'redx'      => array( 'label' => 'RedX',      'mono' => 'RX', 'bg' => '#fdeaea', 'fg' => '#b32d2e' ),
+		'paperfly'  => array( 'label' => 'Paperfly',  'mono' => 'Pf', 'bg' => '#e8f4fd', 'fg' => '#12628f' ),
+		'ecourier'  => array( 'label' => 'eCourier',  'mono' => 'eC', 'bg' => '#e6f6ee', 'fg' => '#00844a' ),
+		'sundarban' => array( 'label' => 'Sundarban', 'mono' => 'Sb', 'bg' => '#e5f5f4', 'fg' => '#0f6f6a' ),
+		'carrybee'  => array( 'label' => 'CarryBee',  'mono' => 'CB', 'bg' => '#fdf3e0', 'fg' => '#8a5a00' ),
+		'parceldex' => array( 'label' => 'ParcelDex', 'mono' => 'Px', 'bg' => '#ecebfb', 'fg' => '#3f38a8' ),
 	);
 
 	/**
@@ -299,12 +303,13 @@ class AI_Sooq_Order_Courier {
 			'mono'  => '' === $slug ? '?' : strtoupper( substr( $slug, 0, 1 ) ),
 			'bg'    => '#f0f0f1',
 			'fg'    => '#646970',
-			'logo'  => '',
 		);
 	}
 
 	/**
-	 * The courier's logo, or its monogram tile when we ship no artwork for it.
+	 * The courier's monogram tile — its initials on its own colours.
+	 *
+	 * See COURIER_BRAND for why there is no artwork to render instead.
 	 *
 	 * @param string $slug BDCourier courier slug.
 	 * @param string $name Name as the API gave it, used when the slug is unknown.
@@ -312,19 +317,6 @@ class AI_Sooq_Order_Courier {
 	public static function courier_mark( $slug, $name = '' ) {
 		$b     = self::brand_of( $slug );
 		$label = '' !== trim( (string) $name ) ? trim( (string) $name ) : $b['label'];
-
-		// Guarded on the constants so the mark still renders (as a monogram) in
-		// a unit test, where the plugin bootstrap has not run.
-		if ( '' !== $b['logo'] && defined( 'AISOOQ_URL' ) && defined( 'AISOOQ_DIR' ) ) {
-			$file = AISOOQ_DIR . 'assets/img/couriers/' . $b['logo'];
-			if ( file_exists( $file ) ) {
-				return sprintf(
-					'<span class="aisooq-cmark has-logo"><img src="%s" alt="%s" loading="lazy" decoding="async" /></span>',
-					esc_url( AISOOQ_URL . 'assets/img/couriers/' . $b['logo'] ),
-					esc_attr( $label )
-				);
-			}
-		}
 
 		return sprintf(
 			'<span class="aisooq-cmark" style="background:%s;color:%s" title="%s" aria-hidden="true">%s</span>',
@@ -643,9 +635,15 @@ class AI_Sooq_Order_Courier {
 				if ( $hist && $hist['total'] > 0 ) :
 					?>
 					<div class="aisooq-ordc-hist">
-						<strong><?php echo esc_html( sprintf( _n( '%s past order here', '%s past orders here', $hist['total'], 'aisooq-connector' ), number_format_i18n( $hist['total'] ) ) ); ?></strong>
-						<span class="aisooq-num-ok"><?php echo esc_html( sprintf( __( '%s kept', 'aisooq-connector' ), number_format_i18n( $hist['completed'] ) ) ); ?></span>
-						<span class="aisooq-num-err"><?php echo esc_html( sprintf( __( '%s cancelled', 'aisooq-connector' ), number_format_i18n( $hist['cancelled'] ) ) ); ?></span>
+						<strong><?php
+						/* translators: %s: number of previous orders this customer has at this shop. */
+						echo esc_html( sprintf( _n( '%s past order here', '%s past orders here', $hist['total'], 'aisooq-connector' ), number_format_i18n( $hist['total'] ) ) ); ?></strong>
+						<span class="aisooq-num-ok"><?php
+						/* translators: %s: number of past orders the customer kept. */
+						echo esc_html( sprintf( __( '%s kept', 'aisooq-connector' ), number_format_i18n( $hist['completed'] ) ) ); ?></span>
+						<span class="aisooq-num-err"><?php
+						/* translators: %s: number of past orders the customer cancelled. */
+						echo esc_html( sprintf( __( '%s cancelled', 'aisooq-connector' ), number_format_i18n( $hist['cancelled'] ) ) ); ?></span>
 						<?php if ( $hist['spent'] > 0 ) : ?>
 							<span class="aisooq-dim"><?php echo wp_kses_post( wc_price( $hist['spent'] ) ); ?></span>
 						<?php endif; ?>
@@ -695,7 +693,7 @@ class AI_Sooq_Order_Courier {
 				<?php if ( $detailed && $checked ) : ?>
 					<div class="aisooq-dim aisooq-ordc-when">
 						<?php
-						/* translators: %s: human-readable time difference */
+						/* translators: %s: human-readable time difference, e.g. "3 hours" */
 						echo esc_html( sprintf( __( 'Checked %s ago', 'aisooq-connector' ), $checked ) );
 						?>
 					</div>
@@ -786,7 +784,6 @@ class AI_Sooq_Order_Courier {
 			/* ── Courier brand mark ────────────────────────────────────────── */
 			.aisooq-cmark{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
 				width:34px;height:20px;border-radius:4px;font-size:10px;font-weight:700;overflow:hidden}
-			.aisooq-cmark.has-logo{background:#fff;border:1px solid #e0e0e0;padding:1px}
 			.aisooq-cmark img{max-width:100%;max-height:100%;object-fit:contain;display:block}
 			.aisooq-ordc-courier{display:flex;align-items:center;gap:6px}
 			.aisooq-ordc-cname{overflow:hidden;text-overflow:ellipsis}

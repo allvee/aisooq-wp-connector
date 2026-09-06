@@ -233,15 +233,35 @@ uninstall.php                      Cleans options, token, cron, and the capture 
 
 ## Extending
 
-Use the `aisooq_connector_order_payload` filter to mutate the order payload before it is pushed.
+Use the `aisooq_order_payload` filter to mutate the order payload before it is pushed.
 
 ```php
-add_filter( 'aisooq_connector_order_payload', function ( array $payload, WC_Order $order ) {
+add_filter( 'aisooq_order_payload', function ( array $payload, WC_Order $order ) {
     // Attach a custom field to every mirrored order.
     $payload['metafields']['app:woocommerce/gift_note'] = $order->get_customer_note();
 
     return $payload;
 }, 10, 2 );
+```
+
+`shopify_pulse_order_payload` and `wafi_connector_order_payload` still fire as
+deprecated aliases, so a filter written against an older release keeps working.
+
+### Other filters
+
+| Filter | Default | What it decides |
+| --- | --- | --- |
+| `aisooq_order_payload` | payload | The order body, before it is pushed. |
+| `aisooq_analytics_purchase_user` | email/phone/name | Customer identifiers on the server-side `Purchase` event. Return `[]` to send it without identity — the hook for a consent manager. |
+| `aisooq_analytics_event_user` | email/id | The same, for browser events from a logged-in visitor. |
+| `aisooq_should_sync_customer` | `true` | Whether a WordPress user is mirrored as a platform customer. Staff accounts are already excluded. |
+| `aisooq_duplicate_countable_statuses` | 7 statuses | Which order statuses count as "this shopper already ordered". `pending` is included, which is right for cash on delivery and wrong behind a redirect gateway. |
+| `aisooq_offline_payment_methods` | `cod, bacs, cheque, other` | Gateways with nothing to come back from, so a `pending` order on one is a real order rather than an abandoned payment attempt. |
+| `aisooq_trust_proxy_headers` | `false` | Whether to believe `X-Forwarded-For` / `CF-Connecting-IP` for the IP-velocity gate. Enable **only** if every request reaches PHP through a proxy that overwrites them — otherwise the gate becomes spoofable. |
+
+```php
+// Example: a store behind Cloudflare, where the real client IP is in a header.
+add_filter( 'aisooq_trust_proxy_headers', '__return_true' );
 ```
 
 ## Notes

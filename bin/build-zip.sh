@@ -93,6 +93,26 @@ rsync -a \
 	--exclude='*.log' \
 	./ "$STAGE/"
 
+# Gate the PACKAGE, not the repo.
+#
+# The test suite runs against the working tree, so it can assert a file is in
+# git but never that it reached the zip — and the zip is what a merchant
+# installs. These checks run in both release workflows, so nothing publishes
+# without them.
+for required in LICENSE NOTICE.md readme.txt; do
+	if [[ ! -f "$STAGE/$required" ]]; then
+		echo "error: $required is missing from the package" >&2
+		exit 1
+	fi
+done
+
+# Courier logos are the carriers' trademarks and are deliberately not shipped
+# (see NOTICE.md). If a directory of them reappears, stop before publishing.
+if [[ -d "$STAGE/assets/img/couriers" ]]; then
+	echo "error: courier artwork is in the package — see NOTICE.md" >&2
+	exit 1
+fi
+
 ( cd "$STAGE_ROOT" && zip -rq "$OUT" "$SLUG" )
 rm -rf "$STAGE_ROOT"
 
