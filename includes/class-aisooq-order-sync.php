@@ -201,6 +201,7 @@ class AI_Sooq_Order_Sync {
 		$order->update_meta_data( AISOOQ_META_SYNCED_AT, current_time( 'mysql' ) );
 		$order->delete_meta_data( AISOOQ_META_ATTEMPTS );
 		$order->delete_meta_data( AISOOQ_META_RATE_DEFERRALS );
+		self::forget_failure( $order );
 		$order->save();
 		return array(
 			'ok'      => true,
@@ -238,6 +239,7 @@ class AI_Sooq_Order_Sync {
 		$order->update_meta_data( AISOOQ_META_SYNCED_AT, current_time( 'mysql' ) );
 		$order->delete_meta_data( AISOOQ_META_ATTEMPTS );
 		$order->delete_meta_data( AISOOQ_META_RATE_DEFERRALS );
+		self::forget_failure( $order );
 		$order->save();
 
 		// Close the in-flight window.
@@ -321,6 +323,13 @@ class AI_Sooq_Order_Sync {
 
 		$attempts = (int) $order->get_meta( AISOOQ_META_ATTEMPTS ) + 1;
 		$order->update_meta_data( AISOOQ_META_ATTEMPTS, $attempts );
+		// Keep the reason. A count with no reason tells an operator that
+		// something is wrong and nothing about what, which is the state this
+		// plugin was in: the dashboard could say "3 failed" and there was no
+		// way, anywhere, to find out why.
+		$order->update_meta_data( AISOOQ_META_ERROR, self::clamp_error( $err->get_error_message() ) );
+		$order->update_meta_data( AISOOQ_META_ERROR_CODE, (string) $err->get_error_code() );
+		$order->update_meta_data( AISOOQ_META_LAST_TRY, current_time( 'mysql' ) );
 		$order->save();
 
 		$this->logger->error(
@@ -336,5 +345,211 @@ class AI_Sooq_Order_Sync {
 				AISOOQ_AS_GROUP
 			);
 		}
+	}
+
+	// ── The dead letter office ──────────────────────────────────────────────
+
+	/** Error text is for a human reading one table cell, not a log. */
+	private static function clamp_error( $message ) {
+		$message = trim( wp_strip_all_tags( (string) $message ) );
+		// Characters, not bytes: a platform error can come back in Bangla.
+		return function_exists( 'mb_substr' ) ? mb_substr( $message, 0, 250, 'UTF-8' ) : substr( $message, 0, 250 );
+	}
+
+	/** Forget why an order failed, because it just succeeded. */
+	private static function forget_failure( WC_Order $order ) {
+		$order->delete_meta_data( AISOOQ_META_ERROR );
+		$order->delete_meta_data( AISOOQ_META_ERROR_CODE );
+		$order->delete_meta_data( AISOOQ_META_LAST_TRY );
+	}
+
+	/**
+	 * The one query shape for "orders that gave up", so the count on the
+	 * dashboard and the rows on the screen can never describe different sets.
+	 *
+	 * HPOS-safe: wc_get_orders() maps meta_query onto whichever store is
+	 * active, and `offset` is supported by both.
+	 *
+	 * @param array $extra limit / offset / return / paginate.
+	 * @return array
+	 */
+	public static function failed_query_args( array $extra = array() ) {
+		return array_merge(
+			array(
+				'limit'        => 25,
+				'orderby'      => 'date',
+				'order'        => 'DESC',
+				'meta_key'     => AISOOQ_META_ATTEMPTS, // phpcs:ignore WordPress.DB.SlowDBQuery
+				'meta_value'   => self::MAX_ATTEMPTS,   // phpcs:ignore WordPress.DB.SlowDBQuery
+				'meta_compare' => '>=',
+				'meta_type'    => 'NUMERIC',
+			),
+			$extra
+		);
+	}
+
+	/**
+	 * How many orders have given up.
+	 *
+	 * Cached, and by default it will NOT run the query to fill an empty cache —
+	 * this number is wanted by an admin notice that would otherwise put a
+	 * COUNT over the whole order-meta table (unindexable on a numeric value)
+	 * on the dashboard and the orders list of the largest stores. Only the
+	 * screens that exist to show it ask for a fresh one.
+	 *
+	 * @param bool $fresh Recompute rather than answer 0 on a cold cache.
+	 * @return int
+	 */
+	public static function failed_count( $fresh = false ) {
+		$cached = get_transient( 'aisooq_failed_count' );
+		if ( false !== $cached && ! $fresh ) {
+			return (int) $cached;
+		}
+		if ( ! $fresh && false === $cached ) {
+			return 0;
+		}
+		if ( ! function_exists( 'wc_get_orders' ) ) {
+			return 0;
+		}
+		$q = wc_get_orders( self::failed_query_args( array( 'limit' => 1, 'paginate' => true, 'return' => 'ids' ) ) );
+		$n = ( is_object( $q ) && isset( $q->total ) ) ? (int) $q->total : 0;
+		set_transient( 'aisooq_failed_count', $n, HOUR_IN_SECONDS );
+		return $n;
+	}
+
+	/** Drop the cached count — anything that changes the set calls this. */
+	public static function flush_failed_count() {
+		delete_transient( 'aisooq_failed_count' );
+	}
+
+	/**
+	 * Why this order cannot be retried right now, or '' if it can.
+	 *
+	 * @param WC_Abstract_Order $order
+	 * @return string
+	 */
+	public function retry_blocker( $order ) {
+		if ( ! $this->settings->get( 'enable_orders' ) ) {
+			return __( 'Order sync is switched off in settings.', 'aisooq-connector' );
+		}
+		$allowed = (array) $this->settings->get( 'order_statuses' );
+		if ( ! in_array( $order->get_status(), $allowed, true ) ) {
+			return __( 'This order\'s status is not in the list you chose to push.', 'aisooq-connector' );
+		}
+		return '';
+	}
+
+	/**
+	 * Push one given-up order again, at the operator's request.
+	 *
+	 * Deliberately does NOT reset the attempt counter or the rate-limit
+	 * deferrals.
+	 *
+	 * Resetting attempts would remove the order from this very screen before
+	 * anything had actually been pushed — and if the queued job then never ran
+	 * (cron disabled, a wedged Action Scheduler, the connection paused a minute
+	 * later) the order would be gone from the list, gone from the count, and
+	 * nothing would ever push it. That is worse than leaving it where it is.
+	 *
+	 * Resetting the deferral counter would be worse still in bulk: it re-arms
+	 * MAX_RATE_DEFERRALS per order, so one "retry all" on a throttled platform
+	 * could authorise tens of thousands of scheduled actions — the exact
+	 * unbounded queue that ceiling exists to prevent.
+	 *
+	 * Clearing the hash is the one thing needed: without it push_order() would
+	 * decide the payload is unchanged and skip.
+	 *
+	 * @param int $order_id
+	 * @return array{ok:bool,message:string,queued:bool}
+	 */
+	public function retry( $order_id ) {
+		$order = function_exists( 'wc_get_order' ) ? wc_get_order( $order_id ) : false;
+		if ( ! $order || ! is_a( $order, 'WC_Order' ) ) {
+			return array( 'ok' => false, 'message' => __( 'Order not found.', 'aisooq-connector' ), 'queued' => false );
+		}
+		$blocked = $this->retry_blocker( $order );
+		if ( '' !== $blocked ) {
+			return array( 'ok' => false, 'message' => $blocked, 'queued' => false );
+		}
+
+		$order->delete_meta_data( AISOOQ_META_HASH );
+		$order->save();
+
+		// Without Action Scheduler, enqueue() pushes inline — so reporting
+		// "queued" would tell the operator a retry is pending when it has
+		// already happened and may already have failed again. Use the force
+		// path, which returns what actually happened.
+		if ( ! function_exists( 'as_enqueue_async_action' ) ) {
+			$res = $this->sync_one( $order_id );
+			self::flush_failed_count();
+			return array(
+				'ok'      => ! empty( $res['ok'] ),
+				'message' => isset( $res['message'] ) ? $res['message'] : '',
+				'queued'  => false,
+			);
+		}
+
+		$this->enqueue( $order_id );
+		self::flush_failed_count();
+		return array( 'ok' => true, 'message' => __( 'Queued for another attempt.', 'aisooq-connector' ), 'queued' => true );
+	}
+
+	/**
+	 * Retry a page of given-up orders.
+	 *
+	 * Cursored rather than self-consuming: a retried order keeps its attempt
+	 * count (see retry()), and an order the operator cannot retry — wrong
+	 * status, sync switched off — never leaves the result set at all. Pinning
+	 * the query to page 1 would re-read the same rows forever and never reach
+	 * anything behind them.
+	 *
+	 * @param int $offset Where to resume.
+	 * @param int $limit
+	 * @return array{queued:int,skipped:int,next_offset:int,total:int}
+	 */
+	public function retry_failed( $offset = 0, $limit = 50 ) {
+		$offset = max( 0, (int) $offset );
+		$limit  = max( 1, min( 50, (int) $limit ) );
+
+		if ( ! function_exists( 'wc_get_orders' ) ) {
+			return array( 'queued' => 0, 'skipped' => 0, 'next_offset' => $offset, 'total' => 0 );
+		}
+		$q = wc_get_orders( self::failed_query_args( array(
+			'limit'    => $limit,
+			'offset'   => $offset,
+			'paginate' => true,
+			'return'   => 'ids',
+		) ) );
+
+		$ids   = ( is_object( $q ) && isset( $q->orders ) ) ? (array) $q->orders : array();
+		$total = ( is_object( $q ) && isset( $q->total ) ) ? (int) $q->total : 0;
+
+		// Without Action Scheduler each retry is a blocking HTTP call at the
+		// client's timeout, so a page of them would exceed max_execution_time
+		// and leave the operator with a dead spinner. Time-box it.
+		$inline = ! function_exists( 'as_enqueue_async_action' );
+		$start  = microtime( true );
+
+		$queued = 0;
+		$skipped = 0;
+		foreach ( $ids as $id ) {
+			$res = $this->retry( (int) $id );
+			if ( ! empty( $res['ok'] ) ) {
+				$queued++;
+			} else {
+				$skipped++;
+			}
+			if ( $inline && ( microtime( true ) - $start ) > 10 ) {
+				break;
+			}
+		}
+
+		self::flush_failed_count();
+		return array(
+			'queued'      => $queued,
+			'skipped'     => $skipped,
+			'next_offset' => $offset + $queued + $skipped,
+			'total'       => $total,
+		);
 	}
 }

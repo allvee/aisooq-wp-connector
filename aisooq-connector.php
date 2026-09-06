@@ -2,8 +2,9 @@
 /**
  * Plugin Name:       AI Sooq Connector
  * Plugin URI:        https://github.com/allvee/aisooq-wp-connector
+ * Update URI:        https://github.com/allvee/aisooq-wp-connector
  * Description:        Mirrors WooCommerce orders, incomplete/abandoned carts and analytics into the AI Sooq platform so a store can be managed from there. Connects any WooCommerce site to one AI Sooq store via OAuth.
- * Version:           2.10.0
+ * Version:           2.11.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            AI Sooq
@@ -20,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'AISOOQ_VERSION', '2.10.0' );
+define( 'AISOOQ_VERSION', '2.11.0' );
 define( 'AISOOQ_FILE', __FILE__ );
 define( 'AISOOQ_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AISOOQ_URL', plugin_dir_url( __FILE__ ) );
@@ -52,6 +53,12 @@ define( 'AISOOQ_META_PIXEL_SENT', '_aisooq_purchase_pixel_sent' );
 // because a 429 is not a fault of the order — but it still needs a ceiling, or
 // a permanently throttled platform re-queues every order forever.
 define( 'AISOOQ_META_RATE_DEFERRALS', '_aisooq_rate_deferrals' );
+// Why the last push failed, and when. Without these an order that exhausted its
+// retries showed up as a number on a dashboard with no way to learn anything
+// about it — see AI_Sooq_Failed_Admin.
+define( 'AISOOQ_META_ERROR', '_aisooq_sync_error' );
+define( 'AISOOQ_META_ERROR_CODE', '_aisooq_sync_error_code' );
+define( 'AISOOQ_META_LAST_TRY', '_aisooq_last_attempt_at' );
 
 require_once AISOOQ_DIR . 'includes/class-aisooq-logger.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-settings.php';
@@ -75,6 +82,8 @@ require_once AISOOQ_DIR . 'includes/class-aisooq-orders-column.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-products-column.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-blocklist.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-blocklist-admin.php';
+require_once AISOOQ_DIR . 'includes/class-aisooq-updater.php';
+require_once AISOOQ_DIR . 'includes/class-aisooq-failed-admin.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-privacy.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-install.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-plugin.php';
@@ -89,6 +98,12 @@ add_action(
 		load_plugin_textdomain( 'aisooq-connector', false, dirname( AISOOQ_BASENAME ) . '/languages' );
 	}
 );
+
+// Updates are wired up unconditionally, NOT inside the WooCommerce gate below.
+// A store that deactivated WooCommerce to debug something, or paused the
+// connection, must still receive security fixes — those are exactly the states
+// where you least want the update channel to go quiet.
+add_action( 'plugins_loaded', array( 'AI_Sooq_Updater', 'boot' ), 5 );
 
 register_activation_hook( __FILE__, array( 'AI_Sooq_Install', 'activate' ) );
 register_deactivation_hook( __FILE__, array( 'AI_Sooq_Install', 'deactivate' ) );

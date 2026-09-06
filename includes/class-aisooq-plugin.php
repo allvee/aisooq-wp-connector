@@ -55,6 +55,8 @@ class AI_Sooq_Plugin {
 	private $blocklist;
 	/** @var AI_Sooq_Blocklist_Admin */
 	private $blocklist_admin;
+	/** @var AI_Sooq_Failed_Admin */
+	private $failed_admin;
 
 	private $orders_column;
 
@@ -92,6 +94,7 @@ class AI_Sooq_Plugin {
 		$this->privacy        = new AI_Sooq_Privacy();
 		$this->blocklist       = new AI_Sooq_Blocklist();
 		$this->blocklist_admin = new AI_Sooq_Blocklist_Admin( $this->logger );
+		$this->failed_admin    = new AI_Sooq_Failed_Admin( $this->settings, $this->order_sync, $this->logger );
 		$this->orders_column  = new AI_Sooq_Orders_Column( $this->settings, $this->logger );
 		$this->products_column = new AI_Sooq_Products_Column( $this->settings, $this->logger );
 
@@ -109,6 +112,10 @@ class AI_Sooq_Plugin {
 		// manageable — a list you cannot see is worse than no list.
 		$this->blocklist->register();
 		$this->blocklist_admin->register();
+		// Always registered. An order that gave up is still stranded while the
+		// connection is paused, and that is exactly when an operator comes
+		// looking — the screen itself refuses to retry until it is active.
+		$this->failed_admin->register();
 		// The abandoned-carts worklist + Resync screen is ALWAYS registered so the
 		// operator can review captured carts even while the connection is paused
 		// (Resync itself is gated on an active connection inside the handler).
