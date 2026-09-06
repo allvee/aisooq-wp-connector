@@ -94,6 +94,7 @@ class AI_Sooq_Settings {
 			'abandoned_idle_min'    => 30,
 			'allow_status_writeback' => 0,
 			'debug_log'             => 0,
+			'enable_updates'        => 1,
 			// WooCommerce-method → platform-shipping-rate map, keyed by the
 			// shipping line code "<method_id>:<instance_id>" → platform rate id.
 			'shipping_map'          => array(),
@@ -235,23 +236,10 @@ class AI_Sooq_Settings {
 			$stats['queue_errors'] = count( (array) as_get_scheduled_actions( array_merge( $base, array( 'status' => 'failed' ) ), 'ids' ) );
 		}
 
-		// The real number: orders that exhausted their retry budget and will
-		// never be pushed again unless someone intervenes.
-		$stats['failed'] = 0;
-		if ( function_exists( 'wc_get_orders' ) && class_exists( 'AI_Sooq_Order_Sync' ) ) {
-			$q = wc_get_orders( array(
-				'limit'        => 1,
-				'paginate'     => true,
-				'return'       => 'ids',
-				'meta_key'     => AISOOQ_META_ATTEMPTS, // phpcs:ignore WordPress.DB.SlowDBQuery
-				'meta_value'   => AI_Sooq_Order_Sync::MAX_ATTEMPTS, // phpcs:ignore WordPress.DB.SlowDBQuery
-				'meta_compare' => '>=',
-				'meta_type'    => 'NUMERIC',
-			) );
-			if ( is_object( $q ) && isset( $q->total ) ) {
-				$stats['failed'] = (int) $q->total;
-			}
-		}
+		// Orders that exhausted their retry budget. One query shape, shared with
+		// the Failed syncs screen, so the tile and the list can never describe
+		// different sets of orders.
+		$stats['failed'] = class_exists( 'AI_Sooq_Order_Sync' ) ? AI_Sooq_Order_Sync::failed_count( true ) : 0;
 
 		if ( class_exists( 'AI_Sooq_Abandoned_Sync' ) ) {
 			$ab = AI_Sooq_Abandoned_Sync::table_name();
@@ -464,6 +452,14 @@ class AI_Sooq_Settings {
 			$clean['sid']             = $existing['sid'];
 			$clean['client_id']       = $existing['client_id'];
 			$clean['client_secret']   = $existing['client_secret'];
+		}
+		// Held to `update_plugins`, not this screen's `manage_woocommerce`: a
+		// shop manager should not be able to switch off the channel that
+		// delivers security fixes to the whole site.
+		if ( current_user_can( 'update_plugins' ) ) {
+			$clean['enable_updates'] = empty( $raw['enable_updates'] ) ? 0 : 1;
+		} else {
+			$clean['enable_updates'] = empty( $existing['enable_updates'] ) ? 0 : 1;
 		}
 		$clean['enable_orders']         = empty( $raw['enable_orders'] ) ? 0 : 1;
 		$clean['enable_abandoned']      = empty( $raw['enable_abandoned'] ) ? 0 : 1;
@@ -757,7 +753,9 @@ class AI_Sooq_Settings {
 			</div>
 			<?php if ( $groups ) : ?>
 				<div class="aisooq-perms">
-					<p class="aisooq-perms__h"><?php echo esc_html( sprintf( _n( '%d permission granted to this plugin', '%d permissions granted to this plugin', count( $scopes ), 'aisooq-connector' ), count( $scopes ) ) ); ?></p>
+					<p class="aisooq-perms__h"><?php
+					/* translators: %d: number of OAuth scopes the platform granted. */
+					echo esc_html( sprintf( _n( '%d permission granted to this plugin', '%d permissions granted to this plugin', count( $scopes ), 'aisooq-connector' ), count( $scopes ) ) ); ?></p>
 					<div class="aisooq-perms__grid">
 						<?php foreach ( $groups as $resource => $actions ) : ?>
 							<div class="aisooq-perm">
@@ -836,6 +834,7 @@ class AI_Sooq_Settings {
 					wp_send_json_error( array( 'message' => __( 'Product sync is turned off.', 'aisooq-connector' ) ) );
 				}
 				$count = $plugin->product_sync()->backfill( 200 );
+				/* translators: %d: number of products queued. */
 				$msg   = sprintf( _n( 'Queued %d product for sync.', 'Queued %d products for sync.', $count, 'aisooq-connector' ), $count );
 				break;
 			case 'customers':
@@ -843,6 +842,7 @@ class AI_Sooq_Settings {
 					wp_send_json_error( array( 'message' => __( 'Customer sync is turned off.', 'aisooq-connector' ) ) );
 				}
 				$count = $plugin->customer_sync()->backfill( 500 );
+				/* translators: %d: number of customers queued. */
 				$msg   = sprintf( _n( 'Queued %d customer for sync.', 'Queued %d customers for sync.', $count, 'aisooq-connector' ), $count );
 				break;
 			case 'categories':
@@ -850,6 +850,7 @@ class AI_Sooq_Settings {
 					wp_send_json_error( array( 'message' => __( 'Category sync is turned off.', 'aisooq-connector' ) ) );
 				}
 				$count = $plugin->catalog_sync()->backfill_categories( 500 );
+				/* translators: %d: number of categories queued. */
 				$msg   = sprintf( _n( 'Queued %d category for sync.', 'Queued %d categories for sync.', $count, 'aisooq-connector' ), $count );
 				break;
 			case 'orders':
@@ -858,6 +859,7 @@ class AI_Sooq_Settings {
 					wp_send_json_error( array( 'message' => __( 'Order sync is turned off.', 'aisooq-connector' ) ) );
 				}
 				$count = $plugin->order_sync()->backfill( 100 );
+				/* translators: %d: number of orders queued. */
 				$msg   = sprintf( _n( 'Queued %d order for sync.', 'Queued %d orders for sync.', $count, 'aisooq-connector' ), $count );
 				break;
 		}
@@ -1005,7 +1007,9 @@ class AI_Sooq_Settings {
 					<h1 class="aisooq-hero__title" style="margin:0;line-height:0;">
 						<img src="<?php echo esc_url( AISOOQ_URL . 'assets/img/logo-horizontal.svg' ); ?>" alt="<?php esc_attr_e( 'AI Sooq', 'aisooq-connector' ); ?>" height="40" style="height:40px;width:auto;display:block;" />
 					</h1>
-					<p class="aisooq-hero__sub"><?php echo esc_html( isset( $status['time'] ) && ! empty( $status['ok'] ) ? sprintf( __( 'Last verified %s', 'aisooq-connector' ), $status['time'] ) : __( 'Two-way sync between WooCommerce and your AI Sooq store.', 'aisooq-connector' ) ); ?></p>
+					<p class="aisooq-hero__sub"><?php
+					/* translators: %s: when the connection was last verified. */
+					echo esc_html( isset( $status['time'] ) && ! empty( $status['ok'] ) ? sprintf( __( 'Last verified %s', 'aisooq-connector' ), $status['time'] ) : __( 'Two-way sync between WooCommerce and your AI Sooq store.', 'aisooq-connector' ) ); ?></p>
 				</div>
 				<div class="aisooq-actions">
 					<span class="aisooq-badge <?php echo esc_attr( $badge_class ); ?>"><?php echo esc_html( $badge_text ); ?></span>
@@ -1455,9 +1459,42 @@ class AI_Sooq_Settings {
 	}
 
 	/** "Something is wrong and I need to see why." */
+	/** Human wording for the update channel's state, with no I/O. */
+	private static function update_state_badge() {
+		$st = class_exists( 'AI_Sooq_Updater' ) ? AI_Sooq_Updater::instance()->state() : array( 'state' => 'unknown', 'latest' => '' );
+		switch ( $st['state'] ) {
+			case 'available':
+				/* translators: %s: the version available on GitHub. */
+				return array( 'warn', sprintf( __( 'Version %s is available', 'aisooq-connector' ), $st['latest'] ) );
+			case 'current':
+				return array( 'ok', __( 'Up to date', 'aisooq-connector' ) );
+			case 'unreachable':
+				return array( 'err', __( 'Could not reach GitHub last time it looked', 'aisooq-connector' ) );
+			case 'off':
+				return array( 'muted', __( 'Turned off', 'aisooq-connector' ) );
+			case 'disabled':
+				return array( 'muted', __( 'Disabled on this server', 'aisooq-connector' ) );
+		}
+		return array( 'muted', __( 'Not checked yet', 'aisooq-connector' ) );
+	}
+
 	private function render_advanced_section( $s ) {
 		$this->panel_open( 'advanced', 'admin-generic', __( 'Advanced', 'aisooq-connector' ) );
 		?>
+		<div class="aisooq-field">
+			<?php list( $upd_tone, $upd_text ) = self::update_state_badge(); ?>
+			<label class="aisooq-check">
+				<input type="checkbox" name="aisooq[enable_updates]" value="1" <?php checked( $s['enable_updates'] ); ?> <?php disabled( ! current_user_can( 'update_plugins' ) ); ?> />
+				<strong><?php esc_html_e( 'Offer plugin updates from GitHub', 'aisooq-connector' ); ?></strong>
+				<span class="aisooq-badge <?php echo esc_attr( $upd_tone ); ?>"><?php echo esc_html( $upd_text ); ?></span>
+			</label>
+			<p class="description">
+				<?php esc_html_e( 'This plugin is not on WordPress.org, so without this it can only be updated by uploading a zip by hand — which is how security fixes stop reaching stores. Updates appear on Dashboard › Updates like any other plugin.', 'aisooq-connector' ); ?>
+				<?php if ( ! current_user_can( 'update_plugins' ) ) : ?>
+					<br /><em><?php esc_html_e( 'Only a user who can install plugin updates may change this.', 'aisooq-connector' ); ?></em>
+				<?php endif; ?>
+			</p>
+		</div>
 		<div class="aisooq-field">
 			<label class="aisooq-check"><input type="checkbox" name="aisooq[debug_log]" value="1" <?php checked( $s['debug_log'] ); ?> /> <strong><?php esc_html_e( 'Verbose debug logging', 'aisooq-connector' ); ?></strong></label>
 			<p class="description">

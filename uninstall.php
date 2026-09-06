@@ -33,6 +33,7 @@ function aisooq_uninstall_site() {
 		'aisooq_status',
 		'aisooq_version',
 		'aisooq_table_missing',
+		'aisooq_failed_count',
 		'aisooq_blocklist_notice',
 		// Sync cursors and caches.
 		'aisooq_poll_cursor',
@@ -60,6 +61,8 @@ function aisooq_uninstall_site() {
 		delete_transient( $transient );
 	}
 	delete_transient( 'aisooq_dashboard_stats' );
+	delete_site_transient( 'aisooq_update_manifest' );
+	delete_site_transient( 'aisooq_update_etag' );
 
 	$crons = array(
 		'aisooq_abandoned_sweep',
@@ -94,6 +97,18 @@ function aisooq_uninstall_site() {
 	// but user meta maps this store's users onto a platform we're disconnecting.
 	foreach ( array( '_aisooq_cust_hash', '_aisooq_cust_platform_updated', '_aisooq_cust_synced_at', '_aisooq_platform_customer_id' ) as $meta_key ) {
 		delete_metadata( 'user', 0, $meta_key, '', true );
+	}
+
+	// Failure bookkeeping on orders. String literals, not AISOOQ_META_* — this
+	// file runs with the plugin deactivated and its constants undefined.
+	foreach ( array( '_aisooq_sync_error', '_aisooq_sync_error_code', '_aisooq_last_attempt_at' ) as $meta_key ) {
+		delete_metadata( 'post', 0, $meta_key, '', true );
+	}
+	$hpos = $wpdb->prefix . 'wc_orders_meta';
+	if ( $hpos === $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $hpos ) ) ) { // phpcs:ignore WordPress.DB
+		$keys = array( '_aisooq_sync_error', '_aisooq_sync_error_code', '_aisooq_last_attempt_at' );
+		$in   = implode( ', ', array_fill( 0, count( $keys ), '%s' ) );
+		$wpdb->query( $wpdb->prepare( "DELETE FROM `{$hpos}` WHERE meta_key IN ({$in})", $keys ) ); // phpcs:ignore WordPress.DB
 	}
 
 	foreach ( array( 'aisooq_abandoned_carts', 'aisooq_blocklist', 'aisooq_block_log', 'sp_abandoned_carts', 'wafi_abandoned_carts' ) as $suffix ) {
