@@ -264,14 +264,19 @@ class AI_Sooq_Install {
 			return;
 		}
 		echo '<div class="notice notice-error"><p>';
-		echo esc_html__(
-			'AI Sooq Connector could not create its abandoned-carts database table. Cart capture and recovery are disabled until this is fixed — check the database user\'s CREATE TABLE permission, then deactivate and reactivate the plugin.',
-			'aisooq-connector'
+		printf(
+			/* translators: %s: comma-separated list of database table names. */
+			esc_html__(
+				'AI Sooq Connector could not create these database tables: %s. The features that depend on them are disabled until this is fixed — check the database user\'s CREATE TABLE permission, then deactivate and reactivate the plugin.',
+				'aisooq-connector'
+			),
+			esc_html( (string) get_option( 'aisooq_table_missing' ) )
 		);
 		echo '</p></div>';
 	}
 
 	public static function deactivate() {
+		wp_clear_scheduled_hook( AISOOQ_BLOCK_GC_CRON );
 		wp_clear_scheduled_hook( AISOOQ_ABANDONED_CRON );
 		wp_clear_scheduled_hook( AISOOQ_POLL_CRON );
 		wp_clear_scheduled_hook( AISOOQ_CUSTOMER_PULL_CRON );
@@ -290,6 +295,10 @@ class AI_Sooq_Install {
 		}
 		if ( ! wp_next_scheduled( AISOOQ_CATALOG_PULL_CRON ) ) {
 			wp_schedule_event( time() + 300, 'aisooq_15min', AISOOQ_CATALOG_PULL_CRON );
+		}
+		// Daily is plenty: the block log is pruned on retention, not volume.
+		if ( ! wp_next_scheduled( AISOOQ_BLOCK_GC_CRON ) ) {
+			wp_schedule_event( time() + 600, 'daily', AISOOQ_BLOCK_GC_CRON );
 		}
 	}
 
@@ -333,14 +342,61 @@ class AI_Sooq_Install {
   KEY converted_synced_updated (converted, synced, updated_at)
 ) {$charset_collate};";
 
+		// The operator's own block/allow list, and the record of every checkout
+		// this plugin refused. Both are local by design — see AI_Sooq_Blocklist.
+		$block_table = AI_Sooq_Blocklist::table_name();
+		$sql        .= "\nCREATE TABLE {$block_table} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  type varchar(16) NOT NULL,
+  value varchar(191) NOT NULL,
+  mode varchar(8) NOT NULL DEFAULT 'block',
+  reason varchar(255) DEFAULT NULL,
+  expires_at datetime DEFAULT NULL,
+  hits int(11) unsigned NOT NULL DEFAULT 0,
+  last_hit_at datetime DEFAULT NULL,
+  created_by bigint(20) unsigned DEFAULT NULL,
+  created_at datetime DEFAULT NULL,
+  PRIMARY KEY  (id),
+  UNIQUE KEY type_value (type, value),
+  KEY mode_type (mode, type),
+  KEY expires_at (expires_at)
+) {$charset_collate};";
+
+		$log_table = AI_Sooq_Blocklist::log_table_name();
+		$sql      .= "\nCREATE TABLE {$log_table} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  gate varchar(32) NOT NULL,
+  action varchar(16) NOT NULL DEFAULT 'block',
+  reason varchar(255) DEFAULT NULL,
+  phone varchar(64) DEFAULT NULL,
+  email varchar(191) DEFAULT NULL,
+  ip varchar(45) DEFAULT NULL,
+  name varchar(191) DEFAULT NULL,
+  order_id bigint(20) unsigned DEFAULT NULL,
+  created_at datetime DEFAULT NULL,
+  PRIMARY KEY  (id),
+  KEY created_at (created_at),
+  KEY gate_created (gate, created_at),
+  KEY phone (phone),
+  KEY ip (ip)
+) {$charset_collate};";
+
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql );
 
-		// dbDelta() swallows failures, so verify the table is really there.
+		// dbDelta() swallows failures, so verify the tables are really there.
 		// Without this a refused CREATE TABLE left every cart capture writing
-		// into nothing, indefinitely and invisibly.
-		if ( $table !== $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) ) { // phpcs:ignore WordPress.DB
-			update_option( 'aisooq_table_missing', '1', false );
+		// into nothing, indefinitely and invisibly — and a missing blocklist
+		// table would silently mean "nobody is blocked", which is worse than
+		// an error because it looks like everything is working.
+		$missing = array();
+		foreach ( array( $table, $block_table, $log_table ) as $t ) {
+			if ( $t !== $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $t ) ) ) { // phpcs:ignore WordPress.DB
+				$missing[] = $t;
+			}
+		}
+		if ( $missing ) {
+			update_option( 'aisooq_table_missing', implode( ', ', $missing ), false );
 			return;
 		}
 		delete_option( 'aisooq_table_missing' );

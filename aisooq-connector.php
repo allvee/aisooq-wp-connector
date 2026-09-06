@@ -3,7 +3,7 @@
  * Plugin Name:       AI Sooq Connector
  * Plugin URI:        https://github.com/allvee/aisooq-wp-connector
  * Description:        Mirrors WooCommerce orders, incomplete/abandoned carts and analytics into the AI Sooq platform so a store can be managed from there. Connects any WooCommerce site to one AI Sooq store via OAuth.
- * Version:           2.9.1
+ * Version:           2.10.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            AI Sooq
@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'AISOOQ_VERSION', '2.9.1' );
+define( 'AISOOQ_VERSION', '2.10.0' );
 define( 'AISOOQ_FILE', __FILE__ );
 define( 'AISOOQ_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AISOOQ_URL', plugin_dir_url( __FILE__ ) );
@@ -40,6 +40,7 @@ define( 'AISOOQ_TERM_SYNC_ACTION', 'aisooq_sync_term' );
 define( 'AISOOQ_PRODUCT_SYNC_ACTION', 'aisooq_sync_product' );
 define( 'AISOOQ_CATALOG_PULL_CRON', 'aisooq_catalog_pull' );
 define( 'AISOOQ_PRODUCT_DELETE_ACTION', 'aisooq_delete_product' );
+define( 'AISOOQ_BLOCK_GC_CRON', 'aisooq_block_gc' );
 
 // Order meta keys.
 define( 'AISOOQ_META_ID', '_aisooq_order_id' );
@@ -72,6 +73,8 @@ require_once AISOOQ_DIR . 'includes/class-aisooq-seo-sync.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-status-poller.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-orders-column.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-products-column.php';
+require_once AISOOQ_DIR . 'includes/class-aisooq-blocklist.php';
+require_once AISOOQ_DIR . 'includes/class-aisooq-blocklist-admin.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-privacy.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-install.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-plugin.php';

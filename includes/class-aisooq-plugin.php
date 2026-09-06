@@ -51,6 +51,10 @@ class AI_Sooq_Plugin {
 	private $poller;
 	/** @var AI_Sooq_Privacy */
 	private $privacy;
+	/** @var AI_Sooq_Blocklist */
+	private $blocklist;
+	/** @var AI_Sooq_Blocklist_Admin */
+	private $blocklist_admin;
 
 	private $orders_column;
 
@@ -86,6 +90,8 @@ class AI_Sooq_Plugin {
 		$this->seo_sync       = new AI_Sooq_Seo_Sync( $this->settings, $this->api, $this->logger );
 		$this->poller         = new AI_Sooq_Status_Poller( $this->settings, $this->api, $this->logger );
 		$this->privacy        = new AI_Sooq_Privacy();
+		$this->blocklist       = new AI_Sooq_Blocklist();
+		$this->blocklist_admin = new AI_Sooq_Blocklist_Admin( $this->logger );
 		$this->orders_column  = new AI_Sooq_Orders_Column( $this->settings, $this->logger );
 		$this->products_column = new AI_Sooq_Products_Column( $this->settings, $this->logger );
 
@@ -98,6 +104,11 @@ class AI_Sooq_Plugin {
 		// Registered unconditionally: a data-subject request must be honourable
 		// even while the connection is paused — the captured PII is still here.
 		$this->privacy->register();
+		// Always registered. The block list is LOCAL and still refuses
+		// checkouts while the connection is paused, so it must stay visible and
+		// manageable — a list you cannot see is worse than no list.
+		$this->blocklist->register();
+		$this->blocklist_admin->register();
 		// The abandoned-carts worklist + Resync screen is ALWAYS registered so the
 		// operator can review captured carts even while the connection is paused
 		// (Resync itself is gated on an active connection inside the handler).
