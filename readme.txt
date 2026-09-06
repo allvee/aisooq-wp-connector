@@ -6,7 +6,7 @@ Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 2.9.0
+Stable tag: 2.9.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,63 @@ No — one WooCommerce site connects to one AI Sooq store (one OAuth app = one
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 2.9.1 =
+An audit of the whole plugin raised 133 issues; 39 held up under scrutiny and
+all of them are fixed here. Nothing needs re-syncing after upgrading. The ones
+that were costing money or data:
+
+* **Discounted products are no longer marked down permanently.** When product
+  sync pulled from the platform it read the current selling price as the
+  regular price and threw away the original, so a product on sale at 800 with
+  a regular price of 1000 came back priced 800 — and, with two-way sync on,
+  dropped again on the next run. Existing prices are not corrected
+  automatically; check anything that was on sale while two-way product sync
+  was running.
+* **Products, categories and customers stopped being re-uploaded needlessly.**
+  The "nothing has changed, skip it" check could never match, so every item
+  was pushed again on every run and burned through the platform's rate limit.
+* **Unticking every order status now means "push nothing".** It used to mean
+  the opposite — push everything, including the draft carts the block checkout
+  creates.
+* **Block-checkout carts are marked recovered when the shopper buys.** They
+  never were, so the platform kept chasing customers who had already paid.
+* **The fraud "put the order on hold" action now actually holds a cash-on-
+  delivery order.** The payment method was overwriting the hold a moment later.
+* **Checkout can no longer be blocked by an error inside the fraud screen.**
+  On the block checkout an unexpected error returned a server error instead of
+  letting the sale through, which is the opposite of the intended behaviour.
+* **The "Failed" figure on the dashboard is now real.** It was always zero, so
+  orders that had given up trying were invisible. It now counts orders that
+  exhausted their retries, and says so.
+* **The visitor-attribution feature works.** It had never been switched on
+  internally, so every order was recorded with no campaign or referrer.
+* **Refunds and order edits now reach the platform.** A partial refund or a
+  corrected address never left this store.
+* **Deleting a product removes it from the platform** instead of leaving it
+  live there.
+* **Repeat customers are recognised however they type their number.** The
+  duplicate-order guard compared the exact characters, so a dash was enough to
+  slip past it — and a shopper who abandoned a payment redirect was wrongly
+  locked out of trying again.
+* **Courier lookups are bought once per shopper**, not once per place that
+  asks, and the number is no longer sent in the web address (where it ended up
+  in server logs along the way).
+* **The settings screen stays usable when the platform is down.** It made
+  three slow calls before drawing anything; those are now cached, including
+  the failures.
+* Checkout waits at most 5 seconds on the platform instead of 20, per call.
+* Security: only administrators can change the connection details, a platform
+  record can no longer overwrite a WordPress administrator's e-mail address,
+  the public cart beacon is rate limited and tied to the shopper's own
+  session, and prices captured from a browser are no longer trusted when
+  turning a cart into an order.
+* Privacy: the plugin now answers WordPress's own personal-data export and
+  erase requests for the carts it stores, and adds suggested privacy-policy
+  text describing what leaves the store.
+* Uninstalling now removes everything it should, including across a multisite
+  network.
+* The plugin's own text is translatable for the first time.
 
 = 2.9.0 =
 * **A re-keyed site no longer imports every order twice.** The platform matches
