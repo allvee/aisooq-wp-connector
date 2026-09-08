@@ -179,6 +179,61 @@ class Test_Order_Courier extends WP_Ajax_UnitTestCase {
 		$this->assertNull( $this->courier->snapshot( $this->reload( $order ) ), 'A failed lookup must not look like a checked order.' );
 	}
 
+	/**
+	 * The lookup POSTs so the customer's number stays out of every access log
+	 * between here and the platform, and falls back to GET when the platform
+	 * answers 404/405. That fallback is not a legacy nicety — the platform
+	 * exposes this route as GET ONLY, so the POST always 404s and the retry is
+	 * the only path that ever returns data.
+	 *
+	 * It was dead. The condition asked `get_error_data( 'status' )`, but that
+	 * method takes an error CODE, not a data key; the code here is
+	 * `aisooq_http_404`, so it returned null, `(int) null` is 0, and 0 is not
+	 * 404. Every courier check in the field surfaced "HTTP 404" while the code
+	 * read correctly in review. Pinned here because nothing else would catch it:
+	 * the bug is invisible unless a test actually makes the POST fail.
+	 */
+	public function test_a_404_on_the_post_falls_back_to_the_get_form() {
+		$payload = $this->api_payload();
+		$seen    = array();
+
+		add_filter( 'pre_http_request', function ( $pre, $args, $url ) use ( $payload, &$seen ) {
+			if ( false === strpos( $url, '/connect/courier' ) ) {
+				return $pre;
+			}
+			$method = isset( $args['method'] ) ? strtoupper( $args['method'] ) : 'GET';
+			$seen[] = $method;
+
+			if ( 'POST' === $method ) {
+				return array(
+					'headers'  => array(),
+					'body'     => wp_json_encode( array( 'message' => 'Cannot POST /api/v1/connect/courier' ) ),
+					'response' => array( 'code' => 404, 'message' => 'Not Found' ),
+					'cookies'  => array(),
+					'filename' => null,
+				);
+			}
+			return array(
+				'headers'  => array(),
+				'body'     => wp_json_encode( $payload ),
+				'response' => array( 'code' => 200, 'message' => 'OK' ),
+				'cookies'  => array(),
+				'filename' => null,
+			);
+		}, 10, 3 );
+
+		$order = $this->make_order();
+		$this->assertTrue(
+			$this->courier->run_check( $order->get_id() ),
+			'A 404 from the POST must retry as GET, not surface as a failed check.'
+		);
+		$this->assertSame( array( 'POST', 'GET' ), $seen, 'It must try POST first, then fall back to GET.' );
+
+		$snap = $this->courier->snapshot( $this->reload( $order ) );
+		$this->assertNotNull( $snap, 'The GET answer must be stored like any other.' );
+		$this->assertNotNull( $snap['ratio'] );
+	}
+
 	public function test_an_order_without_a_phone_is_skipped() {
 		$this->stub_api( $this->api_payload() );
 		$order = $this->make_order( '' );

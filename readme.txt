@@ -6,7 +6,7 @@ Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 2.12.0
+Stable tag: 2.12.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,17 @@ No — one WooCommerce site connects to one AI Sooq store (one OAuth app = one
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 2.12.1 =
+* **Fixed: "Check courier ratio" always failed with HTTP 404.**
+  The lookup sends the customer's number in a POST body rather than a query
+  string, so it never lands in an access log along the way, and falls back to the
+  older GET form if the platform answers 404. The platform serves this route as
+  GET only — so the fallback was not a legacy nicety, it was the only path that
+  ever worked, and it was dead. The condition asked WordPress for the error data
+  under the key `status`, but that argument is an error *code*, so it always came
+  back empty and the retry never ran. Courier checks now work. There is a test
+  that fails without the fix, because this one read as correct in review.
 
 = 2.12.0 =
 * **Fixed: the courier ratio figure could be unreadable, and sometimes invisible.**

@@ -1317,8 +1317,26 @@ class AI_Sooq_Order_Courier {
 		// back to it rather than silently disabling the courier gate on a store
 		// that has not been updated yet.
 		$res = $api->post( '/connect/courier', array( 'phone' => $phone ) );
-		if ( is_wp_error( $res ) && in_array( (int) $res->get_error_data( 'status' ), array( 404, 405 ), true ) ) {
-			$res = $api->get( '/connect/courier?phone=' . rawurlencode( $phone ) );
+		if ( is_wp_error( $res ) ) {
+			/*
+			 * `get_error_data()` takes an error CODE, not a data key. Asking it
+			 * for 'status' looked up an error code that never exists — the code
+			 * here is `aisooq_http_404` — so it returned null, `(int) null` is 0,
+			 * 0 is not in the list, and the fallback never ran.
+			 *
+			 * The platform exposes this route as GET only, so the POST always
+			 * 404s and the retry is not a legacy path at all: it is the only path
+			 * that works. Every courier check surfaced the 404 and the gate was
+			 * dead in the field while looking correct in review.
+			 *
+			 * Read the whole array and index it, the way every other caller in
+			 * this plugin already does.
+			 */
+			$data   = $res->get_error_data();
+			$status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 0;
+			if ( in_array( $status, array( 404, 405 ), true ) ) {
+				$res = $api->get( '/connect/courier?phone=' . rawurlencode( $phone ) );
+			}
 		}
 		if ( is_wp_error( $res ) || ! is_array( $res ) ) {
 			return $res;
