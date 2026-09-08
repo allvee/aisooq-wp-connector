@@ -4,7 +4,7 @@
  * Plugin URI:        https://github.com/allvee/aisooq-wp-connector
  * Update URI:        https://github.com/allvee/aisooq-wp-connector
  * Description:        Mirrors WooCommerce orders, incomplete/abandoned carts and analytics into the AI Sooq platform so a store can be managed from there. Connects any WooCommerce site to one AI Sooq store via OAuth.
- * Version:           2.12.1
+ * Version:           2.13.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            AI Sooq
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'AISOOQ_VERSION', '2.12.1' );
+define( 'AISOOQ_VERSION', '2.13.0' );
 define( 'AISOOQ_FILE', __FILE__ );
 define( 'AISOOQ_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AISOOQ_URL', plugin_dir_url( __FILE__ ) );

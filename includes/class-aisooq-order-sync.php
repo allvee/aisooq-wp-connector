@@ -370,11 +370,18 @@ class AI_Sooq_Order_Sync {
 	 * HPOS-safe: wc_get_orders() maps meta_query onto whichever store is
 	 * active, and `offset` is supported by both.
 	 *
-	 * @param array $extra limit / offset / return / paginate.
+	 * $filters narrows that same set without reshaping it — `code` (one
+	 * AISOOQ_META_ERROR_CODE, or CAUSE_NONE for the orders that stopped before
+	 * codes were recorded) and `search` (order number / customer name / phone /
+	 * e-mail). The meta_key/meta_value pair below is what MAKES this the
+	 * given-up set, so it is always here: a filter can only ever narrow.
+	 *
+	 * @param array $extra   limit / offset / return / paginate.
+	 * @param array $filters code / search.
 	 * @return array
 	 */
-	public static function failed_query_args( array $extra = array() ) {
-		return array_merge(
+	public static function failed_query_args( array $extra = array(), array $filters = array() ) {
+		$args = array_merge(
 			array(
 				'limit'        => 25,
 				'orderby'      => 'date',
@@ -386,6 +393,21 @@ class AI_Sooq_Order_Sync {
 			),
 			$extra
 		);
+
+		$ids = self::failed_filter_ids( $filters );
+		if ( null === $ids ) {
+			return $args;
+		}
+
+		// `post__in`, not `include`. The legacy store hands arguments it does
+		// not recognise straight to WP_Query, which has no `include` — the
+		// filter would have vanished and the screen would have shown the whole
+		// pile under a heading saying otherwise — while HPOS remaps `post__in`
+		// onto its id column. And "nothing matched" has to be spelled as an id
+		// that cannot exist, because both stores read an empty array as "no
+		// constraint" and would again list everything.
+		$args['post__in'] = $ids ? $ids : array( 0 );
+		return $args;
 	}
 
 	/**
@@ -417,9 +439,417 @@ class AI_Sooq_Order_Sync {
 		return $n;
 	}
 
-	/** Drop the cached count — anything that changes the set calls this. */
+	/**
+	 * Drop the cached count — anything that changes the set calls this.
+	 *
+	 * The cause rollup describes the SAME set, so it is dropped here rather
+	 * than behind a second call the retry paths, the poller and the admin
+	 * screens would each have had to remember: missing one leaves the screen
+	 * offering "5 × HTTP 500" to retry after those five have gone.
+	 */
 	public static function flush_failed_count() {
 		delete_transient( 'aisooq_failed_count' );
+		delete_transient( self::CAUSES_TRANSIENT );
+	}
+
+	// ── Reading the pile: causes, filters, selections ────────────────────────
+
+	/**
+	 * The cause rollup lives beside the count and dies with it — see
+	 * flush_failed_count().
+	 */
+	const CAUSES_TRANSIENT = 'aisooq_failed_causes';
+
+	/**
+	 * The cause of an order that stopped before this plugin recorded codes.
+	 *
+	 * Those orders are real and will never fail again (nothing reschedules them
+	 * past the ceiling), so leaving them out of the rollup would make the
+	 * causes add up to less than the header and look like a bug. They get their
+	 * own bucket instead, under a value no WP_Error code can collide with.
+	 */
+	const CAUSE_NONE = '_aisooq_no_code';
+
+	/** Distinct causes worth rendering; a rollup is a shortlist, not a report. */
+	const MAX_CAUSES = 50;
+
+	/**
+	 * Ceiling on the ids one filtered view resolves.
+	 *
+	 * A filter is answered as an explicit id set (see failed_filter_ids), which
+	 * is what keeps the list and its count describing one set on both order
+	 * stores — but an unbounded set would put every given-up order id into an
+	 * IN() clause. The newest MAX_FILTER_MATCHES are kept, which is the end of
+	 * the list the operator is looking at anyway.
+	 */
+	const MAX_FILTER_MATCHES = 2000;
+
+	/** Orders one bulk retry call may touch before it hands the rest back. */
+	const MAX_BULK_RETRY = 50;
+
+	/**
+	 * Seconds a bulk retry may spend when there is no Action Scheduler and each
+	 * retry is therefore a blocking HTTP call. Past this the operator gets a
+	 * dead spinner and a PHP timeout instead of a result.
+	 */
+	const INLINE_BUDGET_SECONDS = 10;
+
+	/**
+	 * Longest search term honoured. Past this it is not a search, it is a
+	 * pasted paragraph, and every extra character is another LIKE comparison.
+	 */
+	const SEARCH_MAX_CHARS = 100;
+
+	/** Width of a 'Y-m-d H:i:s' stamp — see query_causes() for why it matters. */
+	const STAMP_WIDTH = 19;
+
+	/** Sorts before every real stamp, and is exactly STAMP_WIDTH wide. */
+	const STAMP_NEVER = '0000-00-00 00:00:00';
+
+	/**
+	 * Why the given-up orders gave up: one row per distinct error code, biggest
+	 * first.
+	 *
+	 * This is what turns forty failures into three decisions — "30 Missing
+	 * Store SID, 5 HTTP 500, 3 rate limited" are three different emergencies,
+	 * and one of them is not an emergency at all.
+	 *
+	 * Cached and cold-cache-shy for the same reason as failed_count(): it runs
+	 * on every view of a screen an operator may leave open, and it is a
+	 * grouped read over the order-meta table. One query, no orders hydrated —
+	 * counting in PHP would mean loading every failed order on every page view.
+	 *
+	 * @param bool $fresh Recompute rather than answer empty on a cold cache.
+	 * @return array<int,array{code:string,label:string,count:int}> `label` is
+	 *         the last error message stored for that code and may be '' — the
+	 *         wording for that case belongs to the screen, not here.
+	 */
+	public static function failed_by_cause( $fresh = false ) {
+		$cached = get_transient( self::CAUSES_TRANSIENT );
+		if ( is_array( $cached ) && ! $fresh ) {
+			return $cached;
+		}
+		if ( ! $fresh ) {
+			return array();
+		}
+		$rollup = self::query_causes();
+		set_transient( self::CAUSES_TRANSIENT, $rollup, HOUR_IN_SECONDS );
+		return $rollup;
+	}
+
+	/**
+	 * The rollup query itself.
+	 *
+	 * The label is the trick. "Newest message for this code" normally means
+	 * either a window function (not available on the MySQL floor WordPress
+	 * supports) or a second query per code, so instead the last-attempt stamp
+	 * is glued in front of the message and MAX() picks the winner: 'Y-m-d
+	 * H:i:s' is fixed width and sorts lexicographically the same way it sorts
+	 * chronologically, so the prefix decides and PHP slices it back off. Orders
+	 * with no message at all CONCAT to NULL and MAX() skips them, which is
+	 * wanted — a code with one recorded message and nine blanks should show
+	 * that message.
+	 *
+	 * @return array<int,array{code:string,label:string,count:int}>
+	 */
+	private static function query_causes() {
+		global $wpdb;
+
+		$scope = self::order_scope();
+		if ( null === $scope ) {
+			return array();
+		}
+		$t = self::order_tables();
+
+		// SIGNED, not UNSIGNED, because that is what meta_type NUMERIC becomes
+		// in the query behind failed_count(): MySQL casts '-1' to a colossal
+		// unsigned number, so the two would have disagreed about a junk value
+		// and the causes would have added up to more than the header.
+		$sql = "SELECT COALESCE( code.meta_value, '' ) AS cause_code,
+				COUNT( DISTINCT o.{$t['id']} ) AS orders,
+				MAX( CONCAT( COALESCE( lt.meta_value, %s ), msg.meta_value ) ) AS newest
+			FROM {$t['orders']} o
+			JOIN {$t['meta']} att ON att.{$t['meta_id']} = o.{$t['id']} AND att.meta_key = %s
+			LEFT JOIN {$t['meta']} code ON code.{$t['meta_id']} = o.{$t['id']} AND code.meta_key = %s
+			LEFT JOIN {$t['meta']} msg ON msg.{$t['meta_id']} = o.{$t['id']} AND msg.meta_key = %s
+			LEFT JOIN {$t['meta']} lt ON lt.{$t['meta_id']} = o.{$t['id']} AND lt.meta_key = %s
+			WHERE CAST( att.meta_value AS SIGNED ) >= %d
+				AND o.{$t['type']} IN ( " . self::placeholders( $scope['types'] ) . " )
+				AND o.{$t['status']} IN ( " . self::placeholders( $scope['statuses'] ) . " )
+			GROUP BY COALESCE( code.meta_value, '' )
+			ORDER BY orders DESC, cause_code ASC
+			LIMIT %d";
+
+		$args = array_merge(
+			array(
+				self::STAMP_NEVER,
+				AISOOQ_META_ATTEMPTS,
+				AISOOQ_META_ERROR_CODE,
+				AISOOQ_META_ERROR,
+				AISOOQ_META_LAST_TRY,
+				(int) self::MAX_ATTEMPTS,
+			),
+			$scope['types'],
+			$scope['statuses'],
+			array( (int) self::MAX_CAUSES )
+		);
+
+		$rows   = $wpdb->get_results( $wpdb->prepare( $sql, $args ), ARRAY_A ); // phpcs:ignore WordPress.DB
+		$rollup = array();
+		foreach ( (array) $rows as $row ) {
+			$code = (string) $row['cause_code'];
+			// Byte offset, deliberately: the prefix is ASCII of known width and
+			// everything after it is the message untouched, so a Bangla error
+			// comes back whole where mb_substr on a character count would not
+			// line up with the stamp at all.
+			$newest = (string) $row['newest'];
+			$rollup[] = array(
+				'code'  => '' === $code ? self::CAUSE_NONE : $code,
+				'label' => strlen( $newest ) > self::STAMP_WIDTH ? substr( $newest, self::STAMP_WIDTH ) : '',
+				'count' => (int) $row['orders'],
+			);
+		}
+		return $rollup;
+	}
+
+	/**
+	 * Order ids in the given-up set that match the filters, newest first.
+	 *
+	 * Answering a filter with ids rather than with more query args is not a
+	 * detour, it is the only thing that works on both stores: the legacy store
+	 * drops `meta_query` on the floor (with a _doing_it_wrong notice) so a
+	 * second meta condition cannot be expressed there at all, and HPOS keeps
+	 * customer names in its own address table where postmeta joins mean
+	 * nothing. One prepared query per store, driven off the attempts meta so it
+	 * only ever walks orders that already failed, and both the list and its
+	 * count are then handed the same ids.
+	 *
+	 * Memoised per request because the screen asks twice — once for the count,
+	 * once for the rows — and that would otherwise be the same query run twice
+	 * per page view.
+	 *
+	 * @param array $filters code / search.
+	 * @return int[]|null null means "no filters" — do not constrain at all,
+	 *                    which is NOT the same as an empty match.
+	 */
+	public static function failed_filter_ids( array $filters ) {
+		static $memo = array();
+
+		$code   = isset( $filters['code'] ) ? trim( (string) $filters['code'] ) : '';
+		$search = isset( $filters['search'] ) ? trim( (string) $filters['search'] ) : '';
+		if ( '' !== $search ) {
+			$search = function_exists( 'mb_substr' )
+				? mb_substr( $search, 0, self::SEARCH_MAX_CHARS, 'UTF-8' )
+				: substr( $search, 0, self::SEARCH_MAX_CHARS );
+		}
+		if ( '' === $code && '' === $search ) {
+			return null;
+		}
+
+		$key = md5( $code . "\n" . $search );
+		if ( ! array_key_exists( $key, $memo ) ) {
+			$memo[ $key ] = self::query_filter_ids( $code, $search );
+		}
+		return $memo[ $key ];
+	}
+
+	/**
+	 * How many given-up orders match the filters.
+	 *
+	 * No query: resolving the filter already produced the exact id set the list
+	 * pages through, so the header and the rows cannot disagree — the failure
+	 * this whole module is built around. With no filters it defers to
+	 * failed_count(), which is the same set counted by the same query shape.
+	 *
+	 * @param array $filters code / search.
+	 * @return int
+	 */
+	public static function failed_count_matching( array $filters = array() ) {
+		$ids = self::failed_filter_ids( $filters );
+		return ( null === $ids ) ? self::failed_count( true ) : count( $ids );
+	}
+
+	/**
+	 * The filter query, per order store.
+	 *
+	 * @param string $code   Error code, CAUSE_NONE, or '' for any.
+	 * @param string $search Free text over order number / name / phone / e-mail.
+	 * @return int[]
+	 */
+	private static function query_filter_ids( $code, $search ) {
+		global $wpdb;
+
+		$scope = self::order_scope();
+		if ( null === $scope ) {
+			return array();
+		}
+		$t = self::order_tables();
+
+		$joins      = array( "JOIN {$t['meta']} att ON att.{$t['meta_id']} = o.{$t['id']} AND att.meta_key = %s" );
+		$join_args  = array( AISOOQ_META_ATTEMPTS );
+		$where      = array( 'CAST( att.meta_value AS SIGNED ) >= %d' );
+		$where_args = array( (int) self::MAX_ATTEMPTS );
+
+		$where[]    = "o.{$t['type']} IN ( " . self::placeholders( $scope['types'] ) . ' )';
+		$where_args = array_merge( $where_args, $scope['types'] );
+		$where[]    = "o.{$t['status']} IN ( " . self::placeholders( $scope['statuses'] ) . ' )';
+		$where_args = array_merge( $where_args, $scope['statuses'] );
+
+		if ( self::CAUSE_NONE === $code ) {
+			$joins[]     = "LEFT JOIN {$t['meta']} code ON code.{$t['meta_id']} = o.{$t['id']} AND code.meta_key = %s";
+			$join_args[] = AISOOQ_META_ERROR_CODE;
+			$where[]     = "( code.meta_value IS NULL OR code.meta_value = '' )";
+		} elseif ( '' !== $code ) {
+			$joins[]     = "JOIN {$t['meta']} code ON code.{$t['meta_id']} = o.{$t['id']} AND code.meta_key = %s AND code.meta_value = %s";
+			$join_args[] = AISOOQ_META_ERROR_CODE;
+			$join_args[] = $code;
+		}
+
+		if ( '' !== $search ) {
+			// esc_like first, then the wildcards, or a customer whose name
+			// contains a % would match every order on the shop.
+			$like  = '%' . $wpdb->esc_like( $search ) . '%';
+			$or    = array();
+			$likes = array();
+
+			if ( '' !== $t['addresses'] ) {
+				$joins[]     = "LEFT JOIN {$t['addresses']} addr ON addr.order_id = o.{$t['id']} AND addr.address_type = %s";
+				$join_args[] = 'billing';
+				$or[]        = 'addr.first_name LIKE %s';
+				$or[]        = 'addr.last_name LIKE %s';
+				// A shopper searched for by full name matches neither column on
+				// its own, which is how most people type a name.
+				$or[]        = "CONCAT_WS( ' ', addr.first_name, addr.last_name ) LIKE %s";
+				$or[]        = 'addr.phone LIKE %s';
+				$or[]        = 'addr.email LIKE %s';
+				// HPOS also keeps the billing e-mail on the order row, and an
+				// order can exist with no address row at all.
+				$or[]        = 'o.billing_email LIKE %s';
+				$likes       = array( $like, $like, $like, $like, $like, $like );
+			} else {
+				foreach ( array( 'fn' => '_billing_first_name', 'ln' => '_billing_last_name', 'ph' => '_billing_phone', 'em' => '_billing_email' ) as $alias => $meta_key ) {
+					$joins[]     = "LEFT JOIN {$t['meta']} {$alias} ON {$alias}.{$t['meta_id']} = o.{$t['id']} AND {$alias}.meta_key = %s";
+					$join_args[] = $meta_key;
+				}
+				$or[]  = 'fn.meta_value LIKE %s';
+				$or[]  = 'ln.meta_value LIKE %s';
+				$or[]  = "CONCAT_WS( ' ', fn.meta_value, ln.meta_value ) LIKE %s";
+				$or[]  = 'ph.meta_value LIKE %s';
+				$or[]  = 'em.meta_value LIKE %s';
+				$likes = array( $like, $like, $like, $like, $like );
+			}
+
+			$where_args = array_merge( $where_args, $likes );
+
+			// Order numbers are what an operator actually copies out of a
+			// support message, and on a default store that number IS the id.
+			if ( ctype_digit( $search ) ) {
+				$or[]         = "o.{$t['id']} = %d";
+				$where_args[] = (int) $search;
+			}
+			$where[] = '( ' . implode( ' OR ', $or ) . ' )';
+		}
+
+		// The date is selected, not just sorted on: under DISTINCT a column that
+		// is only in the ORDER BY is an error on MySQL, and sorting on the alias
+		// keeps the two spellings from drifting apart.
+		$sql = "SELECT DISTINCT o.{$t['id']} AS order_id, o.{$t['date']} AS ordered_at
+			FROM {$t['orders']} o
+			" . implode( "\n\t\t\t", $joins ) . '
+			WHERE ' . implode( ' AND ', $where ) . "
+			ORDER BY ordered_at DESC
+			LIMIT %d";
+
+		$args = array_merge( $join_args, $where_args, array( (int) self::MAX_FILTER_MATCHES ) );
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, $args ) ); // phpcs:ignore WordPress.DB
+
+		$ids = array();
+		foreach ( (array) $rows as $row ) {
+			$ids[] = (int) $row->order_id;
+		}
+		return $ids;
+	}
+
+	/**
+	 * Which statuses and order types wc_get_orders() would have matched.
+	 *
+	 * The raw queries above have to spell this out or they describe a different
+	 * set from the list: a trashed order still carries the attempt meta, and
+	 * counting it would leave the causes adding up to more than the header
+	 * while the row it refers to is nowhere on the screen. These are the same
+	 * two defaults WC_Order_Query applies.
+	 *
+	 * @return array{statuses:string[],types:string[]}|null null when
+	 *         WooCommerce is not loaded and there is nothing to ask.
+	 */
+	private static function order_scope() {
+		if ( ! function_exists( 'wc_get_order_statuses' ) || ! function_exists( 'wc_get_order_types' ) ) {
+			return null;
+		}
+		$statuses = array_values( array_keys( (array) wc_get_order_statuses() ) );
+		$types    = array_values( (array) wc_get_order_types( 'view-orders' ) );
+		if ( ! $statuses || ! $types ) {
+			return null;
+		}
+		return array( 'statuses' => $statuses, 'types' => $types );
+	}
+
+	/**
+	 * Table and column names for wherever this store keeps its orders.
+	 *
+	 * `addresses` is empty on the legacy store, and doubles as the answer to
+	 * "which shape is this?" — the customer's name is a row in a table on HPOS
+	 * and four postmeta rows without it.
+	 *
+	 * @return array<string,string>
+	 */
+	private static function order_tables() {
+		global $wpdb;
+
+		if ( self::hpos_enabled() ) {
+			return array(
+				'orders'    => $wpdb->prefix . 'wc_orders',
+				'meta'      => $wpdb->prefix . 'wc_orders_meta',
+				'addresses' => $wpdb->prefix . 'wc_order_addresses',
+				'id'        => 'id',
+				'meta_id'   => 'order_id',
+				'status'    => 'status',
+				'type'      => 'type',
+				'date'      => 'date_created_gmt',
+			);
+		}
+		return array(
+			'orders'    => $wpdb->posts,
+			'meta'      => $wpdb->postmeta,
+			'addresses' => '',
+			'id'        => 'ID',
+			'meta_id'   => 'post_id',
+			'status'    => 'post_status',
+			'type'      => 'post_type',
+			'date'      => 'post_date_gmt',
+		);
+	}
+
+	/**
+	 * Are orders in WooCommerce's own tables?
+	 *
+	 * AI_Sooq_Order_Courier owns this question so the plugin cannot hold two
+	 * answers. The fallback is not decoration: guessing "legacy" on an HPOS
+	 * store would query wp_postmeta, find nothing, and quietly report "no
+	 * causes" beside a screen listing forty failures — a wrong answer that
+	 * looks like a working feature.
+	 */
+	private static function hpos_enabled() {
+		if ( class_exists( 'AI_Sooq_Order_Courier' ) ) {
+			return AI_Sooq_Order_Courier::hpos_enabled();
+		}
+		return class_exists( '\Automattic\WooCommerce\Utilities\OrderUtil' )
+			&& \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled();
+	}
+
+	/** Placeholder list for an IN() clause — the values are always prepared. */
+	private static function placeholders( array $values, $format = '%s' ) {
+		return implode( ', ', array_fill( 0, count( $values ), $format ) );
 	}
 
 	/**
@@ -503,23 +933,32 @@ class AI_Sooq_Order_Sync {
 	 * the query to page 1 would re-read the same rows forever and never reach
 	 * anything behind them.
 	 *
-	 * @param int $offset Where to resume.
-	 * @param int $limit
+	 * $filters restricts the walk to one cause or one search — the "retry
+	 * everything that failed for THIS reason" the screen is built around. It
+	 * changes which orders are walked and nothing about how each one is
+	 * retried.
+	 *
+	 * @param int   $offset  Where to resume.
+	 * @param int   $limit
+	 * @param array $filters code / search, as failed_query_args() takes them.
 	 * @return array{queued:int,skipped:int,next_offset:int,total:int}
 	 */
-	public function retry_failed( $offset = 0, $limit = 50 ) {
+	public function retry_failed( $offset = 0, $limit = 50, array $filters = array() ) {
 		$offset = max( 0, (int) $offset );
-		$limit  = max( 1, min( 50, (int) $limit ) );
+		$limit  = max( 1, min( self::MAX_BULK_RETRY, (int) $limit ) );
 
 		if ( ! function_exists( 'wc_get_orders' ) ) {
 			return array( 'queued' => 0, 'skipped' => 0, 'next_offset' => $offset, 'total' => 0 );
 		}
-		$q = wc_get_orders( self::failed_query_args( array(
-			'limit'    => $limit,
-			'offset'   => $offset,
-			'paginate' => true,
-			'return'   => 'ids',
-		) ) );
+		$q = wc_get_orders( self::failed_query_args(
+			array(
+				'limit'    => $limit,
+				'offset'   => $offset,
+				'paginate' => true,
+				'return'   => 'ids',
+			),
+			$filters
+		) );
 
 		$ids   = ( is_object( $q ) && isset( $q->orders ) ) ? (array) $q->orders : array();
 		$total = ( is_object( $q ) && isset( $q->total ) ) ? (int) $q->total : 0;
@@ -539,7 +978,7 @@ class AI_Sooq_Order_Sync {
 			} else {
 				$skipped++;
 			}
-			if ( $inline && ( microtime( true ) - $start ) > 10 ) {
+			if ( $inline && ( microtime( true ) - $start ) > self::INLINE_BUDGET_SECONDS ) {
 				break;
 			}
 		}
@@ -550,6 +989,75 @@ class AI_Sooq_Order_Sync {
 			'skipped'     => $skipped,
 			'next_offset' => $offset + $queued + $skipped,
 			'total'       => $total,
+		);
+	}
+
+	/**
+	 * Retry every order that failed for one cause, a page at a time.
+	 *
+	 * Cursored for the same reason as retry_failed(), and it is the same walk:
+	 * fixing a cause and sending back exactly the orders that hit it is the
+	 * whole reason the rollup exists.
+	 *
+	 * @param string $code   An AISOOQ_META_ERROR_CODE, or CAUSE_NONE.
+	 * @param int    $offset Where to resume.
+	 * @param int    $limit
+	 * @return array{queued:int,skipped:int,next_offset:int,total:int}
+	 */
+	public function retry_by_cause( $code, $offset = 0, $limit = 50 ) {
+		return $this->retry_failed( $offset, $limit, array( 'code' => (string) $code ) );
+	}
+
+	/**
+	 * Retry exactly the orders an operator ticked.
+	 *
+	 * Goes through retry() per order, so the two rules that make a retry safe —
+	 * the attempt count is not reset, the rate-limit ceiling is not re-armed —
+	 * hold here by construction instead of by remembering to copy them.
+	 *
+	 * Bounded, and it hands back what it did not reach rather than pretending
+	 * it finished: without Action Scheduler every retry is a blocking HTTP call
+	 * at the client's timeout, so a long selection would hit
+	 * max_execution_time and the operator would be left with a dead spinner and
+	 * no idea which orders were sent. The caller sends `remaining` back in.
+	 *
+	 * @param int[] $order_ids
+	 * @return array{queued:int,skipped:int,results:array<int,array{ok:bool,message:string}>,remaining:int[]}
+	 */
+	public function retry_orders( array $order_ids ) {
+		$all       = array_values( array_unique( array_filter( array_map( 'absint', $order_ids ) ) ) );
+		$batch     = array_slice( $all, 0, self::MAX_BULK_RETRY );
+		$remaining = array_slice( $all, count( $batch ) );
+
+		$inline  = ! function_exists( 'as_enqueue_async_action' );
+		$start   = microtime( true );
+		$queued  = 0;
+		$skipped = 0;
+		$results = array();
+
+		foreach ( $batch as $i => $id ) {
+			$res            = $this->retry( $id );
+			$results[ $id ] = array(
+				'ok'      => ! empty( $res['ok'] ),
+				'message' => isset( $res['message'] ) ? (string) $res['message'] : '',
+			);
+			if ( ! empty( $res['ok'] ) ) {
+				$queued++;
+			} else {
+				$skipped++;
+			}
+			if ( $inline && ( microtime( true ) - $start ) > self::INLINE_BUDGET_SECONDS ) {
+				$remaining = array_merge( array_slice( $batch, $i + 1 ), $remaining );
+				break;
+			}
+		}
+
+		self::flush_failed_count();
+		return array(
+			'queued'    => $queued,
+			'skipped'   => $skipped,
+			'results'   => $results,
+			'remaining' => array_values( $remaining ),
 		);
 	}
 }

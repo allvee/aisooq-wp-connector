@@ -2,7 +2,7 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: AI Sooq Connector 2.11.1\n"
+"Project-Id-Version: AI Sooq Connector 2.12.1\n"
 "Report-Msgid-Bugs-To: https://github.com/allvee/aisooq-wp-connector/issues\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: AI Sooq <https://github.com/allvee/aisooq-wp-connector>\n"
@@ -618,12 +618,13 @@ msgstr ""
 msgid "Missing order."
 msgstr ""
 
+msgid "Nothing selected."
+msgstr ""
+
 msgid "Not recorded — this order gave up before the update that started keeping reasons."
 msgstr ""
 
-#. translators: %d: the number of attempts an order makes before giving up.
-#, php-format
-msgid "Orders that tried %d times and stopped. Nothing will push them again on its own — they are here so you can see why, fix the cause, and send them."
+msgid "No reason recorded"
 msgstr ""
 
 msgid "The connection is paused, so retrying is disabled. Activate it in Settings first."
@@ -635,13 +636,60 @@ msgstr ""
 msgid "Every order either synced or is still retrying."
 msgstr ""
 
-msgid "Given up"
+msgid "Retrying does not reset an order's attempt count, so an order that fails again stays on this list with a fresh reason rather than disappearing."
+msgstr ""
+
+#. translators: %d: the number of attempts an order makes before giving up.
+#, php-format
+msgid "Orders that tried %d times and stopped. Nothing will push them again on its own — they are here so you can see why, fix the cause, and send them."
+msgstr ""
+
+msgid "Why they stopped"
+msgstr ""
+
+msgid "All failures"
+msgstr ""
+
+#. translators: 1: how many orders match the current filter, 2: how many have given up in total.
+#, php-format
+msgid "Showing %1$s of %2$s failures"
+msgstr ""
+
+#. translators: %s: the error code the list is filtered to.
+#, php-format
+msgid "Cause: %s"
+msgstr ""
+
+#. translators: %s: the term the operator searched for.
+#, php-format
+msgid "Search: %s"
+msgstr ""
+
+msgid "Clear filters"
+msgstr ""
+
+msgid "Remove this filter"
+msgstr ""
+
+msgid "order number, name, phone or email…"
+msgstr ""
+
+#. translators: %s: how many orders failed for the selected cause.
+#, php-format
+msgid "Retry all %s with this cause"
+msgstr ""
+
+#. translators: %s: how many orders match the current filter.
+#, php-format
+msgid "Retry all %s matching"
 msgstr ""
 
 msgid "Try all again"
 msgstr ""
 
-msgid "Retrying does not reset an order's attempt count, so an order that fails again stays on this list with a fresh reason rather than disappearing."
+#. translators: %d: how many rows are ticked.
+#, php-format
+msgid "Retry selected (%d)"
 msgstr ""
 
 msgid "Why it stopped"
@@ -653,10 +701,21 @@ msgstr ""
 msgid "Last tried"
 msgstr ""
 
+#. translators: %s: the order number.
+#, php-format
+msgid "Select order %s"
+msgstr ""
+
+msgid "The error code this failure was recorded under."
+msgstr ""
+
 msgid "Cannot retry"
 msgstr ""
 
 msgid "Try again"
+msgstr ""
+
+msgid "Nothing here matches that filter."
 msgstr ""
 
 #. translators: 1: number queued, 2: number skipped.
