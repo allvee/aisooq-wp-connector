@@ -6,7 +6,7 @@ Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 2.12.1
+Stable tag: 2.13.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,24 @@ No — one WooCommerce site connects to one AI Sooq store (one OAuth app = one
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 2.13.0 =
+* **Failed syncs is now a screen you can work from.**
+  It records why each order gave up and never showed it, so forty failures looked
+  like one undifferentiated pile with a single all-or-nothing button. Failures are
+  now grouped by cause with a count — "Missing Store SID 9", "Server error 4" —
+  and you can retry one order, the ones you tick, or everything sharing a cause.
+  That is the actual job: fix the credential, retry the nine that failed on it,
+  leave the rest alone.
+* Search failures by order number, customer name, phone or email; filter by cause.
+  Both survive paging and clear in one click.
+* The error code is shown beside each message, because that is what you search a
+  log or a support ticket for.
+* "Last tried" reads "6 hours ago" instead of a raw machine timestamp, matching
+  every other screen. The exact time is still there on hover.
+* Retrying still does not reset an order's attempt count or re-arm its rate-limit
+  ceiling — including from the new bulk and per-cause paths, which is exactly
+  where that could have drifted.
 
 = 2.12.1 =
 * **Fixed: "Check courier ratio" always failed with HTTP 404.**
