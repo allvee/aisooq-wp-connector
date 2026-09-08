@@ -1,0 +1,81 @@
+{
+  "$schema": "https://design-tokens.org/draft",
+  "name": "AI Sooq — WordPress admin",
+  "description": "X/Twitter visual language, AI Sooq palette. Source of truth: assets/css/aisooq-admin.css",
+  "color": {
+    "brand": {
+      "--pri": "#08294C",
+      "--pri-d": "#04162B",
+      "--pri-fg": "#ffffff",
+      "--pri-wash": "rgba(8, 41, 76, .1)",
+      "--hl": "#FDC137",
+      "--hl-d": "#E0A81F",
+      "--hl-fg": "#3d2c00",
+      "--pri-tint": "#e9f0f8"
+    },
+    "status": {
+      "--ok": "#00754b",
+      "--warn": "#8a5a00",
+      "--err": "#c0392b",
+      "--info": "#1f6f9c"
+    },
+    "statusSurface": {
+      "--ok-wash": "#e8f3ec",
+      "--warn-wash": "#fdf3e0",
+      "--err-wash": "#fcebea",
+      "--info-wash": "#f0f6fc",
+      "--pri-tint": "#e9f0f8",
+      "--ok-edge": "#00844a33",
+      "--warn-edge": "#99680033",
+      "--err-edge": "#b32d2e33",
+      "--edge": "#cfd9de"
+    },
+    "surface": {
+      "--pri-wash": "rgba(8, 41, 76, .1)",
+      "--line": "#eff3f4",
+      "--edge": "#cfd9de",
+      "--bg": "#ffffff",
+      "--card": "#ffffff",
+      "--wash": "rgba(15, 20, 25, .03)",
+      "--sunk": "#fbfbfc",
+      "--sunk-2": "#f6f7f7",
+      "--track": "#f0f0f1"
+    },
+    "text": {
+      "--muted": "#536471",
+      "--fg": "#0f1419"
+    }
+  },
+  "typography": {
+    "--text-xs": "11px",
+    "--text-sm": "13px",
+    "--text": "15px",
+    "--text-lg": "17px",
+    "--text-xl": "20px",
+    "--text-2xl": "26px",
+    "--lh-tight": "1.15",
+    "--lh": "1.35"
+  },
+  "space": {
+    "--sp-1": "4px",
+    "--sp-2": "8px",
+    "--sp-3": "12px",
+    "--sp-4": "16px",
+    "--sp-5": "20px",
+    "--sp-6": "24px"
+  },
+  "radius": {
+    "--radius": "16px",
+    "--radius-sm": "4px",
+    "--radius-md": "8px",
+    "--pill": "9999px"
+  },
+  "elevation": {
+    "--sh-elev": "0 0 15px rgba(101, 119, 134, .2), 0 0 3px 1px rgba(101, 119, 134, .15)"
+  },
+  "breakpoints": {
+    "admin": "782px",
+    "single": "600px",
+    "phone": "400px"
+  }
+}

@@ -67,6 +67,17 @@ mkdir -p "$STAGE"
 
 # Ship only what runs. Everything dev/build/VCS is excluded.
 #
+# Note for anyone adding an --exclude: put the reason HERE, not between the
+# flags. A `#` line inside the backslash-continued list is spliced into the same
+# logical line, so it comments out every remaining flag AND the source and
+# destination — rsync then runs with no paths and the rest execute as commands.
+# `bash -n` does not catch it, because it parses fine.
+#
+# design-preview.html and design-tokens.json are design-system build artifacts,
+# generated from the stylesheet for authoring. DESIGN.md ships (it is
+# documentation, like README.md); those two should not sit web-accessible in
+# every merchant's plugin folder.
+#
 # The `--filter` line applies .gitignore to the copy. rsync reads the working
 # tree, not git, so without it ANY ignored file a developer happens to have
 # lying around ships inside the plugin zip — `.phpunit.result.cache` did
@@ -91,6 +102,8 @@ rsync -a \
 	--exclude='.idea' \
 	--exclude='.vscode' \
 	--exclude='*.log' \
+	--exclude='design-preview.html' \
+	--exclude='design-tokens.json' \
 	./ "$STAGE/"
 
 # Gate the PACKAGE, not the repo.
