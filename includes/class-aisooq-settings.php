@@ -295,20 +295,38 @@ class AI_Sooq_Settings {
 	 * base64 icon as a dimmed background/img and can't tint it, so we hide that
 	 * and paint the same glyph as a CSS mask whose colour we control. Printed in
 	 * admin_head (all screens) because the menu shows everywhere.
+	 *
+	 * WHY THIS BLOCK DECLARES ITS OWN --hl INSTEAD OF JUST USING THE ONE IN
+	 * assets/css/aisooq-admin.css: that sheet declares its tokens on
+	 * `.wrap.aisooq, .wrap.aisooq-ab, .wrap.aisooq-bl`, and it is enqueued only
+	 * on hooks containing "aisooq" (see enqueue_admin_assets() above). This rule
+	 * targets #adminmenu, which is neither inside `.wrap.aisooq*` nor on a
+	 * plugin screen most of the time. Custom properties only inherit down the
+	 * tree, so a bare `var(--hl)` here would be invalid at computed-value time
+	 * and background-color would compute to transparent — the sidebar glyph
+	 * would simply vanish on every screen. Seeding the token on $sel keeps the
+	 * value named and greppable while resolving locally, whatever is enqueued.
 	 */
 	public function menu_icon_css() {
 		$icon = self::menu_icon();
 		$sel  = '#toplevel_page_' . self::PAGE_SLUG;
 		echo '<style id="aisooq-menu-icon">'
+			// Local copy of --hl from assets/css/aisooq-admin.css. If the gold
+			// ever changes there, it must change here too; nothing links them.
+			. $sel . '{--hl:#FDC137;}'
 			. $sel . ' .wp-menu-image,' . $sel . ' .wp-menu-image.svg{background-image:none !important;}'
 			. $sel . ' .wp-menu-image img{opacity:0 !important;}'
 			. $sel . ' .wp-menu-image{position:relative;}'
+			// Resting white stays a literal: it is wp-admin's own ink on its
+			// dark sidebar, not one of ours. --pri-fg means "ink on navy" and
+			// --bg means "page surface"; neither describes this, and borrowing
+			// one would tie the sidebar to a token that may move without us.
 			. $sel . ' .wp-menu-image:after{content:"";position:absolute;top:7px;left:0;right:0;margin:0 auto;width:20px;height:20px;background-color:#fff;'
 			. '-webkit-mask:url(\'' . $icon . '\') center/20px no-repeat;mask:url(\'' . $icon . '\') center/20px no-repeat;transition:background-color .15s ease;}'
 			. $sel . ':hover .wp-menu-image:after,'
 			. $sel . '.current .wp-menu-image:after,'
 			. $sel . '.wp-has-current-submenu .wp-menu-image:after,'
-			. $sel . '.opensub .wp-menu-image:after{background-color:#FDC137;}'
+			. $sel . '.opensub .wp-menu-image:after{background-color:var(--hl);}'
 			. '</style>';
 	}
 
