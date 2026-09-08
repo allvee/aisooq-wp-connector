@@ -6,7 +6,7 @@ Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 2.11.1
+Stable tag: 2.12.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,26 @@ No — one WooCommerce site connects to one AI Sooq store (one OAuth app = one
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 2.12.0 =
+* **Fixed: the courier ratio figure could be unreadable, and sometimes invisible.**
+  The percentage printed on the delivery-ratio bar is white, and it sat on a
+  colour generated per-ratio — which failed the WCAG AA contrast minimum at every
+  ratio above about 33%, worst at 2.9:1. Separately, the figure centres on the
+  full bar while the fill only reaches its own percentage, so between roughly 32%
+  and 71% the white text was landing on the empty track at 1.1:1 and effectively
+  disappearing. The fill is now darker, and the figure only moves inside once the
+  fill actually reaches it. Both thresholds are named constants with the
+  measurements recorded beside them, so neither can drift back silently.
+* The admin styling is now a documented design system: 51 tokens, and no raw
+  colour values left in the stylesheet. The abandoned-carts and blocked screens
+  had drifted onto a second, WordPress-coloured palette — the same badge wore
+  three different greens on three screens — and they now share one. The most
+  visible change is the recovery funnel, which loses a blue gradient it should
+  never have had.
+* Courier ratio bars are now 44px targets on touch devices rather than 40px.
+* New DESIGN.md records the palette, the type and spacing scales, the measured
+  contrast of every token, and — deliberately — what is still inconsistent.
 
 = 2.11.1 =
 * **Fixed: "Blocked" and "Failed syncs" were missing from the AI Sooq menu.**

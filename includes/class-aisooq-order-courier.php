@@ -336,6 +336,42 @@ class AI_Sooq_Order_Courier {
 	}
 
 	/**
+	 * The ramp's saturation and lightness, held out here because the contrast
+	 * of the white figure printed on the fill rests entirely on the lightness.
+	 *
+	 * At the lightness this shipped with (38%) that figure measured 3.49:1 at
+	 * 93%, 3.08:1 at 61% and 2.88:1 at its worst point (hue 60) against WCAG
+	 * 2.2 AA's 4.5:1 for a 10-12px label — the text-shadow below reads better
+	 * than that but earns no credit. Only hues 0-30 passed, and by the `$pos`
+	 * rule below those are exactly the ratios under ~25% whose figure sits
+	 * OUTSIDE the fill, so every case that actually painted white on colour
+	 * failed. 29% is the highest whole lightness at this saturation where white
+	 * clears 4.5:1 at every hue the ramp can reach (worst 4.67:1 at hue 60, and
+	 * still 4.60:1 if a browser rounds each channel up); 30% drops to 4.41:1.
+	 * Raise either number and the label goes back under AA.
+	 *
+	 * One lightness for the whole ramp, rather than clawing brightness back hue
+	 * by hue: a per-hue lightness makes the middle of the range darker than both
+	 * ends, and a bar whose job is "order these two rows at a glance" must not
+	 * encode the value in two directions at once. Choosing the label colour from
+	 * the fill's luminance instead does not rescue 38% either — hue 40 there is
+	 * 4.20:1 against white and 3.79:1 against the #1d2327 used outside the bar,
+	 * so no label colour passes and the fill has to come down regardless.
+	 */
+	const RATIO_FILL_SAT   = 62;
+	const RATIO_FILL_LIGHT = 29;
+
+	/**
+	 * Lowest ratio whose fill is long enough to sit under the centred figure.
+	 *
+	 * Pairs with RATIO_FILL_LIGHT: that one makes white legible ON the fill, this
+	 * one makes sure the white is actually on the fill and not on bare track. Both
+	 * are needed — darkening the fill does nothing for a label floating past its
+	 * right edge. See the comment at the `$pos` assignment for the measurements.
+	 */
+	const RATIO_LABEL_INSIDE_MIN = 72;
+
+	/**
 	 * The delivery-success ratio as a filled bar with the figure on it.
 	 *
 	 * A bar rather than a bare number because this value is read in a hurry,
@@ -355,8 +391,24 @@ class AI_Sooq_Order_Courier {
 	public static function ratio_bar( $ratio, $parcels = null, $success = null, $cancelled = null ) {
 		$pct  = max( 0, min( 100, (float) $ratio ) );
 		$hue  = (int) round( $pct * 1.2 );
-		$fill = sprintf( 'hsl(%d 62%% 38%%)', $hue );
-		$pos  = $pct >= 32 ? 'inside' : 'outside';
+		$fill = sprintf( 'hsl(%d %d%% %d%%)', $hue, self::RATIO_FILL_SAT, self::RATIO_FILL_LIGHT );
+		/*
+		 * 72, not 32. The label is a SIBLING of the fill, not a child of it, and
+		 * `.inside` gives it `left:0;width:100%;text-align:center` — so it centres
+		 * on the TRACK while the fill only reaches `$pct` of it. Until the fill
+		 * passes the centred glyph box, the white figure sits on bare `#f0f0f1`
+		 * track at 1.14:1, which is not low contrast so much as invisible.
+		 *
+		 * Measured in a browser rather than reasoned about, at both widths this
+		 * bar renders at: the glyphs clear the fill from 58% on a 168px track, and
+		 * only from 72% on the 56px minimum the orders column uses. 72 is the
+		 * threshold that holds at every width.
+		 *
+		 * The cost is that 32-71 now reads outside instead of inside. That is the
+		 * right trade: outside is `#1d2327` on the track at 13.95:1, so the figure
+		 * is legible in exactly the mid-range where it used to disappear.
+		 */
+		$pos  = $pct >= self::RATIO_LABEL_INSIDE_MIN ? 'inside' : 'outside';
 		$tone = self::tone( $ratio );
 
 		/*
@@ -810,7 +862,10 @@ class AI_Sooq_Order_Courier {
 			}
 			.aisooq-ratio-val{position:absolute;top:0;line-height:16px;font-size:10px;font-weight:700;font-variant-numeric:tabular-nums}
 			/* Wide enough to sit on the fill: white on the colour. Too narrow:
-			   outside it, dark on the track, so a low ratio stays legible. */
+			   outside it, dark on the track, so a low ratio stays legible.
+			   The white only clears 4.5:1 because the fill is pinned to
+			   RATIO_FILL_LIGHT in PHP — this rule cannot be read for contrast
+			   on its own, and lightening that constant breaks this line. */
 			.aisooq-ratio.inside .aisooq-ratio-val{right:auto;left:0;width:100%;text-align:center;color:#fff;
 				text-shadow:0 1px 1px rgba(0,0,0,.28)}
 			.aisooq-ratio.outside .aisooq-ratio-val{right:6px;color:#1d2327}

@@ -132,6 +132,28 @@ class AI_Sooq_Orders_Column {
 		$failed  = esc_js( __( 'Sync failed', 'aisooq-connector' ) );
 		?>
 		<style>
+			/* NO var() ANYWHERE IN THIS BLOCK, DELIBERATELY.
+			   assets/css/aisooq-admin.css is enqueued only on hooks containing
+			   "aisooq" (Aisooq_Settings::enqueue_admin_assets), and this style
+			   prints on edit-shop_order / woocommerce_page_wc-orders — so the
+			   sheet is not on the page at all; and even if it were, its tokens
+			   are declared on `.wrap.aisooq*`, which this markup does not sit
+			   inside. A bare `var(--pri)` here would be invalid at
+			   computed-value time, `color` would fall back to inherit and the
+			   sync icons would go the table's near-black on a live merchant's
+			   orders screen — a silent regression nobody would attribute to a
+			   colour refactor.
+			   The palette is also WordPress core's on purpose, not AI Sooq's:
+			   #2271b1 / #135e96 are wp-admin's link and link-hover and #646970
+			   its muted grey, so these controls read as part of the orders
+			   table rather than as a plugin graft. #f0f6fc happens to equal
+			   --info-wash and #00844a the base of --ok-edge, but that is two
+			   palettes coinciding, not a mapping — #2271b1, #135e96 and #646970
+			   have no token equivalent (--pri is navy, --muted is #536471), so
+			   the set cannot be tokenised as a whole without a redesign.
+			   Keep these rules in lockstep with the identical icon rules in
+			   class-aisooq-order-courier.php: the two columns are meant to read
+			   as one row of controls, and drifting one recolours half a row. */
 			.aisooq-order-cell{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 			/* Same box as the courier column's icons, so the two columns read as
 			   one row of controls rather than two unrelated ones. Two classes
