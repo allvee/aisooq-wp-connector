@@ -4,7 +4,7 @@
  * Plugin URI:        https://github.com/allvee/aisooq-wp-connector
  * Update URI:        https://github.com/allvee/aisooq-wp-connector
  * Description:        Mirrors WooCommerce orders, incomplete/abandoned carts and analytics into the AI Sooq platform so a store can be managed from there. Connects any WooCommerce site to one AI Sooq store via OAuth.
- * Version:           2.13.0
+ * Version:           2.13.1
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            AI Sooq
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'AISOOQ_VERSION', '2.13.0' );
+define( 'AISOOQ_VERSION', '2.13.1' );
 define( 'AISOOQ_FILE', __FILE__ );
 define( 'AISOOQ_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AISOOQ_URL', plugin_dir_url( __FILE__ ) );
@@ -60,6 +60,12 @@ define( 'AISOOQ_META_ERROR', '_aisooq_sync_error' );
 define( 'AISOOQ_META_ERROR_CODE', '_aisooq_sync_error_code' );
 define( 'AISOOQ_META_LAST_TRY', '_aisooq_last_attempt_at' );
 
+// Before anything that paints. The three screens printing their own inline
+// <style> each require this themselves as well, because they must not depend on
+// load order — but a fourth caller that forgot would fatal, and a class
+// reachable only through its consumers is one missed `git add` from never
+// shipping at all. require_once makes the belt and the braces free.
+require_once AISOOQ_DIR . 'includes/class-aisooq-palette.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-logger.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-settings.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-api-client.php';
