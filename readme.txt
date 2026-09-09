@@ -6,7 +6,7 @@ Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 2.13.0
+Stable tag: 2.13.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,19 @@ No — one WooCommerce site connects to one AI Sooq store (one OAuth app = one
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 2.13.1 =
+* **Internal: the last hardcoded colours are gone.** Three screens print their own
+  inline styles because WooCommerce's order screens never load the plugin's
+  stylesheet, and they carried 45 hardcoded colour values it could not reach. They
+  now read from one named palette in PHP, seeded into each block so nothing depends
+  on the stylesheet being present. No colour on any screen changes — this is a
+  refactor, and the suite proves every value maps to an identical one.
+* A drift test now fails if the PHP palette and the stylesheet disagree, if a block
+  paints with a colour it did not seed, or if a block is moved somewhere its colours
+  cannot reach it. WordPress's own greys and blues are kept as a separate, labelled
+  group rather than folded into the AI Sooq palette, because they exist to make
+  those controls look like part of WordPress.
 
 = 2.13.0 =
 * **Failed syncs is now a screen you can work from.**

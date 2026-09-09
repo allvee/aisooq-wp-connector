@@ -12,10 +12,32 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// Required here rather than relying on the main file's load order: every colour
+// below comes from it, and a missing class would be a fatal on a merchant's
+// orders screen.
+require_once __DIR__ . '/class-aisooq-palette.php';
+
 class AI_Sooq_Orders_Column {
 
 	const COL   = 'aisooq_sync';
 	const NONCE = 'aisooq_order_col';
+
+	/**
+	 * The palette entries footer_js() seeds and then paints with.
+	 *
+	 * Four of the five are WordPress's own colours rather than AI Sooq's, on
+	 * purpose — see the comment inside the style block and AI_Sooq_Palette::WP.
+	 * Kept as a constant so tests/test-palette-drift.php can prove that every
+	 * `var(--aisooq-*)` in that block is actually seeded by it; one that is not
+	 * resolves to nothing and the icon loses its colour silently.
+	 */
+	const STYLE_COLOURS = array(
+		'wp-link',
+		'wp-link-wash',
+		'wp-link-hover',
+		'wp-muted',
+		'num-ok',
+	);
 
 	/** @var AI_Sooq_Settings */
 	private $settings;
@@ -132,25 +154,36 @@ class AI_Sooq_Orders_Column {
 		$failed  = esc_js( __( 'Sync failed', 'aisooq-connector' ) );
 		?>
 		<style>
-			/* NO var() ANYWHERE IN THIS BLOCK, DELIBERATELY.
+<?php
+		/*
+		 * Seed this block's colours on `body`, for the reason spelled out just
+		 * below and in AI_Sooq_Palette. The courier column prints an identical
+		 * seed; the two agree by construction because both read the same
+		 * palette, which is the whole point.
+		 */
+		echo AI_Sooq_Palette::vars( self::STYLE_COLOURS, 'body' ), "\n"; // phpcs:ignore WordPress.Security.EscapeOutput -- allow-listed hex only; see AI_Sooq_Palette::hex().
+		?>
+			/* NO BARE var(--pri) IN THIS BLOCK, EVER — read the seed above.
 			   assets/css/aisooq-admin.css is enqueued only on hooks containing
-			   "aisooq" (Aisooq_Settings::enqueue_admin_assets), and this style
+			   "aisooq" (AI_Sooq_Settings::enqueue_admin_assets), and this style
 			   prints on edit-shop_order / woocommerce_page_wc-orders — so the
 			   sheet is not on the page at all; and even if it were, its tokens
 			   are declared on `.wrap.aisooq*`, which this markup does not sit
-			   inside. A bare `var(--pri)` here would be invalid at
-			   computed-value time, `color` would fall back to inherit and the
-			   sync icons would go the table's near-black on a live merchant's
-			   orders screen — a silent regression nobody would attribute to a
-			   colour refactor.
+			   inside. A token this block has not seeded itself would be invalid
+			   at computed-value time, `color` would fall back to inherit and
+			   the sync icons would go the table's near-black on a live
+			   merchant's orders screen — a silent regression nobody would
+			   attribute to a colour refactor. Every name below is in
+			   STYLE_COLOURS, and the drift test proves it.
 			   The palette is also WordPress core's on purpose, not AI Sooq's:
-			   #2271b1 / #135e96 are wp-admin's link and link-hover and #646970
-			   its muted grey, so these controls read as part of the orders
-			   table rather than as a plugin graft. #f0f6fc happens to equal
-			   --info-wash and #00844a the base of --ok-edge, but that is two
-			   palettes coinciding, not a mapping — #2271b1, #135e96 and #646970
-			   have no token equivalent (--pri is navy, --muted is #536471), so
-			   the set cannot be tokenised as a whole without a redesign.
+			   `wp-link` / `wp-link-hover` are wp-admin's link and link-hover
+			   and `wp-muted` its grey, so these controls read as part of the
+			   orders table rather than as a plugin graft. `wp-link-wash`
+			   happens to equal --info-wash and `num-ok` the base of --ok-edge,
+			   but that is two palettes coinciding, not a mapping — wp-admin's
+			   blues have no token equivalent (--pri is navy, --muted is
+			   #536471), so the set stays under AI_Sooq_Palette::WP where its
+			   ownership is written down.
 			   Keep these rules in lockstep with the identical icon rules in
 			   class-aisooq-order-courier.php: the two columns are meant to read
 			   as one row of controls, and drifting one recolours half a row. */
@@ -161,18 +194,18 @@ class AI_Sooq_Orders_Column {
 			   link-buttons and outranks a single-class rule. */
 			.aisooq-order-cell .aisooq-order-icon{display:inline-flex;align-items:center;justify-content:center;
 				width:24px;min-width:24px;height:24px;padding:0;border-radius:4px;flex:0 0 auto;
-				color:#2271b1;text-decoration:none;cursor:pointer;touch-action:manipulation;
+				color:var(--aisooq-wp-link);text-decoration:none;cursor:pointer;touch-action:manipulation;
 				transition:background-color .18s cubic-bezier(.32,.72,0,1),color .18s cubic-bezier(.32,.72,0,1)}
-			.aisooq-order-cell .aisooq-order-icon:hover:not([disabled]){background:#f0f6fc;color:#135e96}
-			.aisooq-order-cell .aisooq-order-icon:focus-visible{outline:2px solid #2271b1;outline-offset:1px}
+			.aisooq-order-cell .aisooq-order-icon:hover:not([disabled]){background:var(--aisooq-wp-link-wash);color:var(--aisooq-wp-link-hover)}
+			.aisooq-order-cell .aisooq-order-icon:focus-visible{outline:2px solid var(--aisooq-wp-link);outline-offset:1px}
 			.aisooq-order-cell .aisooq-order-icon .dashicons{width:16px;height:16px;font-size:16px;line-height:16px}
 			.aisooq-order-cell .aisooq-order-icon[disabled]{opacity:.55;cursor:default}
 			/* Resync is the quieter of the two: the order is already through, so
 			   it should not compete with the un-synced state beside it. */
-			.aisooq-order-cell .aisooq-order-icon.is-resync{color:#646970}
-			.aisooq-order-cell .aisooq-order-icon.is-resync:hover:not([disabled]){color:#2271b1}
+			.aisooq-order-cell .aisooq-order-icon.is-resync{color:var(--aisooq-wp-muted)}
+			.aisooq-order-cell .aisooq-order-icon.is-resync:hover:not([disabled]){color:var(--aisooq-wp-link)}
 			.aisooq-order-synced{display:inline-flex;align-items:center;justify-content:center;
-				width:24px;height:24px;color:#00844a;flex:0 0 auto}
+				width:24px;height:24px;color:var(--aisooq-num-ok);flex:0 0 auto}
 			.aisooq-order-synced .dashicons{width:18px;height:18px;font-size:18px;line-height:18px}
 			/* In flight: the arrows turn, so a slow push looks like work rather
 			   than a dead button. */

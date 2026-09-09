@@ -23,6 +23,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// Required here rather than relying on the main file's load order: every colour
+// below comes from it, and a missing class would be a fatal on a merchant's
+// orders screen.
+require_once __DIR__ . '/class-aisooq-palette.php';
+
 class AI_Sooq_Order_Courier {
 
 	const META_RATIO   = '_aisooq_courier_ratio';
@@ -276,6 +281,15 @@ class AI_Sooq_Order_Courier {
 	 * list), never renders as a broken image, and belongs to us.
 	 *
 	 * BDCourier returns lowercase slugs; keep the keys lowercase.
+	 *
+	 * These hexes stay here and NOT in AI_Sooq_Palette on purpose. They are the
+	 * couriers' brand colours, not this plugin's design palette: they change
+	 * when BDCourier adds a carrier, never when our design does, and each is
+	 * already a named entry beside the label and monogram it belongs with.
+	 * Moving the colours into the palette would split one carrier's record
+	 * across two files and give the drift test a set of values that have no
+	 * counterpart in the stylesheet to drift from. The unbranded fallback in
+	 * brand_of() below is the one exception — that pair IS ours.
 	 */
 	const COURIER_BRAND = array(
 		'steadfast' => array( 'label' => 'Steadfast', 'mono' => 'SF', 'bg' => '#e7f0fb', 'fg' => '#14539a' ),
@@ -301,8 +315,13 @@ class AI_Sooq_Order_Courier {
 		return array(
 			'label' => '' === $slug ? __( 'Unknown courier', 'aisooq-connector' ) : ucfirst( $slug ),
 			'mono'  => '' === $slug ? '?' : strtoupper( substr( $slug, 0, 1 ) ),
-			'bg'    => '#f0f0f1',
-			'fg'    => '#646970',
+			// The same neutral pair the "no previous order" pill uses, taken
+			// from the palette rather than re-typed: an unbranded tile is not
+			// a colour decision of its own. Real hex, not var(), because this
+			// lands in a style="" attribute on a <span> that also renders in
+			// contexts this class does not print CSS for.
+			'bg'    => AI_Sooq_Palette::value( 'track' ),
+			'fg'    => AI_Sooq_Palette::value( 'wp-muted' ),
 		);
 	}
 
@@ -355,8 +374,9 @@ class AI_Sooq_Order_Courier {
 	 * ends, and a bar whose job is "order these two rows at a glance" must not
 	 * encode the value in two directions at once. Choosing the label colour from
 	 * the fill's luminance instead does not rescue 38% either — hue 40 there is
-	 * 4.20:1 against white and 3.79:1 against the #1d2327 used outside the bar,
-	 * so no label colour passes and the fill has to come down regardless.
+	 * 4.20:1 against white and 3.79:1 against `wp-fg` (#1d2327), the ink used
+	 * outside the bar, so no label colour passes and the fill has to come down
+	 * regardless.
 	 */
 	const RATIO_FILL_SAT   = 62;
 	const RATIO_FILL_LIGHT = 29;
@@ -396,8 +416,8 @@ class AI_Sooq_Order_Courier {
 		 * 72, not 32. The label is a SIBLING of the fill, not a child of it, and
 		 * `.inside` gives it `left:0;width:100%;text-align:center` — so it centres
 		 * on the TRACK while the fill only reaches `$pct` of it. Until the fill
-		 * passes the centred glyph box, the white figure sits on bare `#f0f0f1`
-		 * track at 1.14:1, which is not low contrast so much as invisible.
+		 * passes the centred glyph box, the white figure sits on bare `track`
+		 * (#f0f0f1) at 1.14:1, which is not low contrast so much as invisible.
 		 *
 		 * Measured in a browser rather than reasoned about, at both widths this
 		 * bar renders at: the glyphs clear the fill from 58% on a 168px track, and
@@ -405,8 +425,9 @@ class AI_Sooq_Order_Courier {
 		 * threshold that holds at every width.
 		 *
 		 * The cost is that 32-71 now reads outside instead of inside. That is the
-		 * right trade: outside is `#1d2327` on the track at 13.95:1, so the figure
-		 * is legible in exactly the mid-range where it used to disappear.
+		 * right trade: outside is `wp-fg` (#1d2327) on the track at 13.95:1, so
+		 * the figure is legible in exactly the mid-range where it used to
+		 * disappear.
 		 */
 		$pos  = $pct >= self::RATIO_LABEL_INSIDE_MIN ? 'inside' : 'outside';
 		$tone = self::tone( $ratio );
@@ -789,6 +810,50 @@ class AI_Sooq_Order_Courier {
 	}
 
 	/**
+	 * The palette entries assets() seeds and then paints with.
+	 *
+	 * A constant rather than a literal at the call site so the list is one
+	 * greppable thing and tests/test-palette-drift.php can hold it against the
+	 * `var(--aisooq-*)` uses in the block below: a name that is used but not
+	 * seeded resolves to nothing and the colour disappears, which is precisely
+	 * the regression this whole arrangement exists to make impossible.
+	 *
+	 * Six of these are WordPress's own colours, not AI Sooq's — the icons
+	 * belong to wp-admin's table. See AI_Sooq_Palette::WP.
+	 */
+	const STYLE_COLOURS = array(
+		// Chips.
+		'pri-tint',
+		'chip-blue-ink',
+		'ok-wash',
+		'chip-green-ink',
+		'chip-red-bed',
+		'chip-red-ink',
+		'chip-violet-bed',
+		'chip-violet-ink',
+		'wp-grey-40',
+		// Ratio bar.
+		'track',
+		'wp-border',
+		'bar-ok',
+		'bar-err',
+		'bar-ink',
+		'wp-fg',
+		// Breakdown table + prose.
+		'sunk-2',
+		'num-ok',
+		'num-err',
+		'note-warn',
+		'wp-muted',
+		// Icon buttons — wp-admin's link colours, deliberately.
+		'wp-link',
+		'wp-link-wash',
+		'wp-link-hover',
+		// Modal.
+		'card',
+	);
+
+	/**
 	 * Styles + the one click handler, printed only on screens that show a cell.
 	 * Inline because it is small enough that a separate request would cost more
 	 * than it saves.
@@ -801,6 +866,25 @@ class AI_Sooq_Order_Courier {
 		}
 		?>
 		<style>
+<?php
+			/*
+			 * Seed the colours this block uses, HERE, on `body`.
+			 *
+			 * Not decoration: assets/css/aisooq-admin.css is not enqueued on
+			 * any of the three screens above, and its tokens are scoped to
+			 * `.wrap.aisooq*` in any case, so a bare `var(--pri)` below would
+			 * be invalid at computed-value time and the rule would simply not
+			 * paint. `body` rather than a tighter selector because the history
+			 * modal is appended to `document.body` by the script beneath this
+			 * block and shares no other ancestor with the table cells.
+			 *
+			 * AI_Sooq_Palette is the single source; see that file for why the
+			 * emitted names are prefixed and which of them are WordPress's own
+			 * rather than ours. tests/test-palette-drift.php fails if a
+			 * `var(--aisooq-*)` below is missing from STYLE_COLOURS.
+			 */
+			echo AI_Sooq_Palette::vars( self::STYLE_COLOURS, 'body' ), "\n"; // phpcs:ignore WordPress.Security.EscapeOutput -- allow-listed hex only; see AI_Sooq_Palette::hex().
+			?>
 			.aisooq-ordc-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 			/* ── The tally row ──────────────────────────────────────────────
 			   sent | delivered | returned | past orders here, then the eye.
@@ -825,14 +909,14 @@ class AI_Sooq_Order_Courier {
 			   Drawn in the gap to the pill's left — the pill is position:relative
 			   so this lands beside it, not inside it. */
 			.aisooq-pill + .aisooq-pill::before{content:":";position:absolute;left:-6px;top:50%;
-				transform:translateY(-50%);color:#8c8f94;font-weight:600;line-height:1}
-			.aisooq-pill.total{background:#e9f0f8;color:#2c5c8f}
-			.aisooq-pill.ok{background:#e8f3ec;color:#2f6b45}
-			.aisooq-pill.err{background:#f7ece9;color:#964a3f}
+				transform:translateY(-50%);color:var(--aisooq-wp-grey-40);font-weight:600;line-height:1}
+			.aisooq-pill.total{background:var(--aisooq-pri-tint);color:var(--aisooq-chip-blue-ink)}
+			.aisooq-pill.ok{background:var(--aisooq-ok-wash);color:var(--aisooq-chip-green-ink)}
+			.aisooq-pill.err{background:var(--aisooq-chip-red-bed);color:var(--aisooq-chip-red-ink)}
 			/* Past orders HERE is a different kind of fact from the three courier
 			   figures beside it, so it gets its own hue rather than reusing one. */
-			.aisooq-pill.mine{background:#efeafa;color:#55389c}
-			.aisooq-pill.first{background:#f0f0f1;color:#646970;font-weight:500}
+			.aisooq-pill.mine{background:var(--aisooq-chip-violet-bed);color:var(--aisooq-chip-violet-ink)}
+			.aisooq-pill.first{background:var(--aisooq-track);color:var(--aisooq-wp-muted);font-weight:500}
 			/* ── Courier brand mark ────────────────────────────────────────── */
 			.aisooq-cmark{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
 				width:34px;height:20px;border-radius:4px;font-size:10px;font-weight:700;overflow:hidden}
@@ -842,16 +926,16 @@ class AI_Sooq_Order_Courier {
 			/* The ratio bar. min-width keeps it readable in the orders-list
 			   column; flex:1 lets it use the width of a metabox. */
 			.aisooq-ratio{display:flex;align-items:center;gap:6px;width:100%;min-width:56px;max-width:168px}
-			.aisooq-ratio-track{position:relative;flex:1 1 auto;height:16px;border-radius:999px;background:#f0f0f1;
-				border:1px solid #dcdcde;overflow:hidden;min-width:56px}
+			.aisooq-ratio-track{position:relative;flex:1 1 auto;height:16px;border-radius:999px;background:var(--aisooq-track);
+				border:1px solid var(--aisooq-wp-border);overflow:hidden;min-width:56px}
 			/* Custom easing rather than a stock `ease`: the fill settles instead
 			   of arriving, which reads as a value being measured. */
 			.aisooq-ratio-fill{position:absolute;top:0;bottom:0;left:0;
 				transition:width .35s cubic-bezier(.32,.72,0,1)}
 			/* Delivered from the left, returned continuing straight on from it,
 			   the track showing through for anything still in transit. */
-			.aisooq-ratio-fill.is-ok{background:#45805a;border-radius:999px 0 0 999px}
-			.aisooq-ratio-fill.is-err{background:#a85a4e}
+			.aisooq-ratio-fill.is-ok{background:var(--aisooq-bar-ok);border-radius:999px 0 0 999px}
+			.aisooq-ratio-fill.is-err{background:var(--aisooq-bar-err)}
 			/* Nothing still moving: the segments reach the end, so round it off.
 			   Set from PHP rather than :last-of-type, which would round the red
 			   even when parcels are still in transit and the bar is unfinished. */
@@ -866,29 +950,29 @@ class AI_Sooq_Order_Courier {
 			   The white only clears 4.5:1 because the fill is pinned to
 			   RATIO_FILL_LIGHT in PHP — this rule cannot be read for contrast
 			   on its own, and lightening that constant breaks this line. */
-			.aisooq-ratio.inside .aisooq-ratio-val{right:auto;left:0;width:100%;text-align:center;color:#fff;
+			.aisooq-ratio.inside .aisooq-ratio-val{right:auto;left:0;width:100%;text-align:center;color:var(--aisooq-bar-ink);
 				text-shadow:0 1px 1px rgba(0,0,0,.28)}
-			.aisooq-ratio.outside .aisooq-ratio-val{right:6px;color:#1d2327}
-			.aisooq-ratio-meta{font-size:11px;color:#646970;white-space:nowrap}
-			.aisooq-ordc-why{font-size:11px;color:#996800;font-style:italic}
+			.aisooq-ratio.outside .aisooq-ratio-val{right:6px;color:var(--aisooq-wp-fg)}
+			.aisooq-ratio-meta{font-size:11px;color:var(--aisooq-wp-muted);white-space:nowrap}
+			.aisooq-ordc-why{font-size:11px;color:var(--aisooq-note-warn);font-style:italic}
 			/* Amber, not red: the number is real and usable, it is just drawn
 			   from a narrower source than usual. */
 			.aisooq-ordc-src{display:flex;align-items:center;gap:4px;margin-top:3px;
-				font-size:11px;color:#996800;line-height:1.35}
+				font-size:11px;color:var(--aisooq-note-warn);line-height:1.35}
 			.aisooq-ordc-src .dashicons{width:14px;height:14px;font-size:14px;line-height:14px;flex:0 0 auto}
-			.aisooq-ordc-when{font-size:11px;margin-top:3px;color:#646970}
+			.aisooq-ordc-when{font-size:11px;margin-top:3px;color:var(--aisooq-wp-muted)}
 			/* The per-courier breakdown can exceed a narrow metabox, so it
 			   scrolls on its own rather than stretching the whole panel. */
 			.aisooq-ordc-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:8px}
 			.aisooq-ordc-tbl{width:100%;border-collapse:collapse;font-size:12px;min-width:260px}
-			.aisooq-ordc-tbl th,.aisooq-ordc-tbl td{padding:4px 6px;border-bottom:1px solid #f0f0f1;text-align:left;white-space:nowrap}
-			.aisooq-ordc-tbl th{font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:#646970;background:#f6f7f7}
+			.aisooq-ordc-tbl th,.aisooq-ordc-tbl td{padding:4px 6px;border-bottom:1px solid var(--aisooq-track);text-align:left;white-space:nowrap}
+			.aisooq-ordc-tbl th{font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--aisooq-wp-muted);background:var(--aisooq-sunk-2)}
 			.aisooq-ordc-tbl td:not(:first-child),.aisooq-ordc-tbl th:not(:first-child){text-align:right}
 			/* Delivered vs returned, told by colour as well as position — the
 			   two columns are adjacent integers and the eye needs a cue about
 			   which way is good. */
-			.aisooq-ordc-tbl td.aisooq-num-ok{color:#00844a;font-weight:600}
-			.aisooq-ordc-tbl td.aisooq-num-err{color:#b32d2e;font-weight:600}
+			.aisooq-ordc-tbl td.aisooq-num-ok{color:var(--aisooq-num-ok);font-weight:600}
+			.aisooq-ordc-tbl td.aisooq-num-err{color:var(--aisooq-num-err);font-weight:600}
 			/* Recheck + eye share one icon-button shape so the pair reads as a
 			   set. touch-action kills the 300ms double-tap delay on the phones
 			   this list is mostly read on. */
@@ -897,12 +981,12 @@ class AI_Sooq_Order_Courier {
 			   which drew a stray underline under the icon. */
 			.aisooq-ordc .aisooq-ordc-icon{display:inline-flex;align-items:center;justify-content:center;
 				width:24px;min-width:24px;height:24px;padding:0;border-radius:4px;flex:0 0 auto;
-				color:#2271b1;text-decoration:none;cursor:pointer;touch-action:manipulation;
+				color:var(--aisooq-wp-link);text-decoration:none;cursor:pointer;touch-action:manipulation;
 				transition:background-color .18s cubic-bezier(.32,.72,0,1),color .18s cubic-bezier(.32,.72,0,1)}
-			.aisooq-ordc .aisooq-ordc-icon:hover:not([disabled]){background:#f0f6fc;color:#135e96}
-			.aisooq-ordc .aisooq-ordc-icon:focus-visible{outline:2px solid #2271b1;outline-offset:1px}
+			.aisooq-ordc .aisooq-ordc-icon:hover:not([disabled]){background:var(--aisooq-wp-link-wash);color:var(--aisooq-wp-link-hover)}
+			.aisooq-ordc .aisooq-ordc-icon:focus-visible{outline:2px solid var(--aisooq-wp-link);outline-offset:1px}
 			.aisooq-ordc .aisooq-ordc-icon .dashicons{width:16px;height:16px;font-size:16px;line-height:16px}
-			.aisooq-ordc-check[disabled]{opacity:.45;cursor:not-allowed;color:#646970}
+			.aisooq-ordc-check[disabled]{opacity:.45;cursor:not-allowed;color:var(--aisooq-wp-muted)}
 			@media (prefers-reduced-motion:reduce){
 				.aisooq-ordc .aisooq-ordc-icon{transition:none}
 			}
@@ -912,18 +996,18 @@ class AI_Sooq_Order_Courier {
 			   as a second grey button competing with Recheck — hence button-link
 			   rather than .button. */
 			.aisooq-ordc-hist{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;margin-top:8px;
-				padding-top:8px;border-top:1px solid #f0f0f1;font-size:12px}
+				padding-top:8px;border-top:1px solid var(--aisooq-track);font-size:12px}
 			/* Popup. A plain overlay rather than <dialog>, which Safari only got
 			   in 15.4 — a merchant on an older iPad would get no popup at all. */
 			.aisooq-modal{position:fixed;inset:0;z-index:100050;display:flex;align-items:center;
 				justify-content:center;padding:16px;background:rgba(0,0,0,.5)}
-			.aisooq-modal-box{background:#fff;border-radius:8px;max-width:520px;width:100%;
+			.aisooq-modal-box{background:var(--aisooq-card);border-radius:8px;max-width:520px;width:100%;
 				max-height:85vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.25)}
 			.aisooq-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;
-				padding:12px 16px;border-bottom:1px solid #dcdcde;position:sticky;top:0;background:#fff}
+				padding:12px 16px;border-bottom:1px solid var(--aisooq-wp-border);position:sticky;top:0;background:var(--aisooq-card)}
 			.aisooq-modal-head h2{margin:0;font-size:14px;line-height:1.4}
 			.aisooq-modal-x{background:none;border:0;cursor:pointer;font-size:20px;line-height:1;
-				padding:4px 8px;color:#646970;min-height:32px;min-width:32px}
+				padding:4px 8px;color:var(--aisooq-wp-muted);min-height:32px;min-width:32px}
 			.aisooq-modal-body{padding:16px}
 			/* On a phone it becomes a bottom sheet — a centred dialog with a
 			   scrolling table is unusable one-handed. */
@@ -932,7 +1016,7 @@ class AI_Sooq_Order_Courier {
 				.aisooq-modal-box{max-width:none;border-radius:12px 12px 0 0;max-height:92vh}
 				.aisooq-modal-x{min-height:40px;min-width:40px;font-size:24px}
 			}
-			.aisooq-dim{color:#646970}
+			.aisooq-dim{color:var(--aisooq-wp-muted)}
 			/* Touch + narrow screens. WP admin drops to a single column at 782px
 			   and the orders table becomes stacked cards, so the bar has to own
 			   the row width and the button needs a real tap target (WCAG 2.5.5
