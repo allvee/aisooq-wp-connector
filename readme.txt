@@ -6,7 +6,7 @@ Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 2.13.1
+Stable tag: 2.14.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,24 @@ No — one WooCommerce site connects to one AI Sooq store (one OAuth app = one
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 2.14.0 =
+* **Fixed: deleting an order in WooCommerce left it live on AI Sooq.** A test, spam
+  or duplicate order you trashed or deleted stayed on the platform — in revenue, in
+  the customer's history, and in the courier ratio. Trashing now cancels it there,
+  restoring from the trash sends its real status again, and a permanent delete
+  cancels it immediately. Orders the platform never received are left alone, and
+  the platform refusing never stops you deleting an order.
+* **Fixed: deactivating the plugin left its background jobs to fail.** WooCommerce
+  kept running them with nothing to handle them, so pausing the plugin filled
+  WooCommerce → Status → Scheduled Actions with failed jobs. Uninstalling had the
+  same gap: it was meant to remove queued jobs and, because of how the call matched
+  them, never removed any.
+* **Privacy: data export and erasure now cover refused checkouts.** The record of a
+  checkout the fraud screen turned away — name, email, phone, IP — was missing from
+  WordPress's personal-data tools. It is now exported and erased, matched on email
+  and on the customer's phone. Entries on your own block list are exported but kept,
+  with a note explaining why, since erasing them would lift the block.
 
 = 2.13.1 =
 * **Internal: the last hardcoded colours are gone.** Three screens print their own
