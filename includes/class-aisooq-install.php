@@ -275,12 +275,53 @@ class AI_Sooq_Install {
 		echo '</p></div>';
 	}
 
+	/**
+	 * Every Action Scheduler hook this plugin queues work on.
+	 *
+	 * uninstall.php keeps its own literal copy because it runs without the plugin
+	 * loaded and cannot read this constant; tests/test-upgrade-path.php holds the
+	 * two lists together so neither can gain a hook the other misses.
+	 */
+	const QUEUED_ACTIONS = array(
+		AISOOQ_SYNC_ACTION,
+		AISOOQ_CUSTOMER_SYNC_ACTION,
+		AISOOQ_TERM_SYNC_ACTION,
+		AISOOQ_PRODUCT_SYNC_ACTION,
+		AISOOQ_PRODUCT_DELETE_ACTION,
+		AISOOQ_ABANDONED_PUSH_ACTION,
+	);
+
 	public static function deactivate() {
 		wp_clear_scheduled_hook( AISOOQ_BLOCK_GC_CRON );
 		wp_clear_scheduled_hook( AISOOQ_ABANDONED_CRON );
 		wp_clear_scheduled_hook( AISOOQ_POLL_CRON );
 		wp_clear_scheduled_hook( AISOOQ_CUSTOMER_PULL_CRON );
 		wp_clear_scheduled_hook( AISOOQ_CATALOG_PULL_CRON );
+
+		// Deactivating cleared WP-Cron and left the queue alone. But the queue is
+		// WooCommerce's, not ours: it kept running while this plugin was off, found
+		// no callback registered for any of these hooks, and marked every job
+		// FAILED. A store that paused the plugin for a day came back to hundreds of
+		// failed actions under WooCommerce → Status → Scheduled Actions, reading
+		// like a crash that never happened.
+		//
+		// Dropping them loses nothing the failure did not already lose — a failed
+		// job is not retried either. What survives is the order itself: its sync
+		// hash still describes the last payload the platform accepted, so the next
+		// change pushes it normally, and "Sync now" in Settings re-sends the rest.
+		//
+		// By HOOK alone, with no group. `as_unschedule_all_actions( $hook, array(),
+		// $group )` looks like "everything for this hook in this group", but with
+		// both set it falls through to an EXACT match on the empty args array — and
+		// every job here carries args (an order push is [ order_id, backfill ]), so
+		// it matched nothing and removed nothing. Hook-only takes the store's
+		// cancel-by-hook path, which ignores args; these hook names are unique to
+		// this plugin, so nothing else is caught by it.
+		if ( function_exists( 'as_unschedule_all_actions' ) ) {
+			foreach ( self::QUEUED_ACTIONS as $hook ) {
+				as_unschedule_all_actions( $hook );
+			}
+		}
 	}
 
 	public static function schedule_crons() {
