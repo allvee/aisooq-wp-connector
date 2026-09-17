@@ -48,7 +48,137 @@ class AI_Sooq_Order_Sync {
 		// An admin editing an order (corrected address, changed line items) is
 		// likewise a silent change today.
 		add_action( 'woocommerce_process_shop_order_meta', array( $this, 'on_admin_save' ), 90, 1 );
+
+		// Removing an order in WooCommerce never reached the platform. A test,
+		// spam or duplicate order deleted here stayed a LIVE order there — in
+		// revenue, in the customer's history, and in the courier-ratio fallback
+		// that counts this store's own settled deliveries. The ingest contract
+		// already cancels a platform order when `wcStatus` is `cancelled`, so
+		// that is what trashing and deleting send; nothing new is needed on the
+		// platform.
+		//
+		// Both the WooCommerce hooks and the WordPress post hooks are wired
+		// because they do not fire on the same paths: the order data store fires
+		// the former, a bulk trash from the legacy posts list only the latter.
+		// Firing twice is harmless — the queue dedupes and an unchanged payload
+		// is skipped by its hash.
+		add_action( 'woocommerce_trash_order', array( $this, 'on_trashed' ), 20, 1 );
+		add_action( 'woocommerce_untrash_order', array( $this, 'on_untrashed' ), 20, 1 );
+		add_action( 'woocommerce_before_delete_order', array( $this, 'on_before_delete' ), 20, 1 );
+		add_action( 'trashed_post', array( $this, 'on_post_trashed' ), 20, 1 );
+		add_action( 'untrashed_post', array( $this, 'on_post_untrashed' ), 20, 1 );
+		add_action( 'before_delete_post', array( $this, 'on_post_before_delete' ), 20, 1 );
+
 		add_action( AISOOQ_SYNC_ACTION, array( $this, 'handle_job' ), 10, 2 );
+	}
+
+	/** Order ids already cancelled on the platform during this request. */
+	private static $cancelled_on_delete = array();
+
+	/**
+	 * Did this order ever reach the platform?
+	 *
+	 * Only those are worth telling about a removal. Pushing a never-synced order
+	 * because it was trashed would CREATE it on the platform just to cancel it —
+	 * a phantom order that never existed there until the operator deleted it.
+	 * The hash is written on every successful push, so it is the reliable mark;
+	 * the platform id is only present when the response carried one.
+	 */
+	private static function was_synced( WC_Order $order ) {
+		return '' !== (string) $order->get_meta( AISOOQ_META_HASH )
+			|| '' !== (string) $order->get_meta( AISOOQ_META_ID );
+	}
+
+	/**
+	 * Is this WordPress post a legacy (CPT-stored) order?
+	 *
+	 * ONLY for the WordPress post hooks, which fire for every post type. The
+	 * woocommerce_* hooks always pass a real order id and must not be filtered
+	 * through this: on an HPOS store WooCommerce reserves each order's id with a
+	 * `shop_order_placehold` post, which is not an order type, so this check
+	 * answers false for a genuine order and every trash and delete on an HPOS
+	 * store would be skipped.
+	 */
+	private static function is_legacy_order_post( $id ) {
+		return function_exists( 'wc_get_order_types' )
+			&& in_array( get_post_type( (int) $id ), wc_get_order_types(), true );
+	}
+
+	public function on_post_trashed( $post_id ) {
+		if ( self::is_legacy_order_post( $post_id ) ) {
+			$this->on_trashed( $post_id );
+		}
+	}
+
+	public function on_post_untrashed( $post_id ) {
+		if ( self::is_legacy_order_post( $post_id ) ) {
+			$this->on_untrashed( $post_id );
+		}
+	}
+
+	public function on_post_before_delete( $post_id ) {
+		if ( self::is_legacy_order_post( $post_id ) ) {
+			$this->on_before_delete( $post_id );
+		}
+	}
+
+	/** Trashed: tell the platform to cancel it. The push runs in the background. */
+	public function on_trashed( $order_id ) {
+		$this->enqueue( (int) $order_id );
+	}
+
+	/**
+	 * Restored from the trash: push its real status again.
+	 *
+	 * Whether the platform reopens an order it already cancelled is its decision,
+	 * not ours — but the store's true state is sent, so the two systems do not
+	 * silently disagree about an order the operator deliberately restored.
+	 */
+	public function on_untrashed( $order_id ) {
+		$this->enqueue( (int) $order_id );
+	}
+
+	/**
+	 * About to be permanently deleted.
+	 *
+	 * This one cannot be queued: by the time a background job ran the order would
+	 * be gone, with nothing left to build a payload from. So it is sent now,
+	 * synchronously, while the order still exists.
+	 *
+	 * An order that went through the trash first was cancelled then, and is
+	 * skipped. What is left is a force-delete that bypassed the trash — a
+	 * programmatic `$order->delete( true )`, or EMPTY_TRASH_DAYS set to 0 — which
+	 * is exactly the case that would otherwise vanish without a trace.
+	 */
+	public function on_before_delete( $order_id ) {
+		$order_id = (int) $order_id;
+		if ( isset( self::$cancelled_on_delete[ $order_id ] ) ) {
+			return;
+		}
+		if ( ! $this->settings->get( 'enable_orders' ) || ! $this->settings->is_active() ) {
+			return;
+		}
+		$order = wc_get_order( $order_id );
+		if ( ! $order || 'trash' === $order->get_status() || ! self::was_synced( $order ) ) {
+			return;
+		}
+		self::$cancelled_on_delete[ $order_id ] = true;
+
+		$payload             = AI_Sooq_Order_Mapper::map( $order, false );
+		$payload['wcStatus'] = 'cancelled';
+
+		$res = $this->api->post( '/connect/orders', $payload );
+		if ( is_wp_error( $res ) ) {
+			// No retry can be scheduled — the order is being deleted. Say so
+			// loudly: the platform now holds a live order this store no longer
+			// has, and this log line is the only place that fact survives.
+			$this->logger->error(
+				'Order ' . $order_id . ' was permanently deleted but could not be cancelled on the platform: '
+				. $res->get_error_message() . ' — cancel it there by hand.'
+			);
+			return;
+		}
+		$this->logger->debug( 'Order ' . $order_id . ' permanently deleted — cancelled on the platform.' );
 	}
 
 	/**
@@ -94,7 +224,15 @@ class AI_Sooq_Order_Sync {
 			// custom status a third-party plugin registers. The default is the
 			// full seven-status list, so empty is only ever reached deliberately.
 			$allowed = (array) $this->settings->get( 'order_statuses' );
-			if ( ! in_array( $order->get_status(), $allowed, true ) ) {
+			if ( 'trash' === $order->get_status() ) {
+				// Not an operator-selectable status, so the list above can never
+				// contain it — without this branch a trashed order was filtered out
+				// here and its cancellation never left the store. Only an order the
+				// platform already holds is worth cancelling.
+				if ( ! self::was_synced( $order ) ) {
+					return;
+				}
+			} elseif ( ! in_array( $order->get_status(), $allowed, true ) ) {
 				return;
 			}
 

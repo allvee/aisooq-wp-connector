@@ -88,7 +88,11 @@ class AI_Sooq_Order_Mapper {
 			'phone'            => $order->get_billing_phone() ?: null,
 			'financialStatus'  => $financial,
 			'fulfillmentStatus' => ( 'completed' === $status ) ? 'fulfilled' : 'unfulfilled',
-			'wcStatus'         => $status,
+			// `trash` is not a status the platform knows; `cancelled` is, and it is
+			// the lifecycle value the ingest contract uses to cancel the platform
+			// order. A trashed order is one the store no longer stands behind, so
+			// that is what it has to say.
+			'wcStatus'         => 'trash' === $status ? 'cancelled' : $status,
 			// The gateway SLUG, lower-cased — `cod`, `bacs`, `bkash` — not the
 			// display title. The platform groups payments by this string and its
 			// own picker speaks slugs, so a title ("Cash on delivery") would sit

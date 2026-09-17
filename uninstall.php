@@ -89,7 +89,10 @@ function aisooq_uninstall_site() {
 	// callback that no longer exists.
 	if ( function_exists( 'as_unschedule_all_actions' ) ) {
 		foreach ( array( 'aisooq_sync_order', 'aisooq_sync_customer', 'aisooq_sync_term', 'aisooq_sync_product', 'aisooq_delete_product', 'aisooq_abandoned_push' ) as $action ) {
-			as_unschedule_all_actions( $action, array(), 'aisooq-connector' );
+			// Hook only, no group: with both set this fell through to an exact
+			// match on EMPTY args, and every job here carries args, so it removed
+			// nothing. See AI_Sooq_Install::deactivate() for the full story.
+			as_unschedule_all_actions( $action );
 		}
 	}
 

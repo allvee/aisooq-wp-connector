@@ -50,4 +50,51 @@ class Test_Upgrade_Path extends WP_UnitTestCase {
 		$wpdb->query( "DROP TABLE IF EXISTS `$block`" );
 		$wpdb->query( "DROP TABLE IF EXISTS `$log`" );
 	}
+
+	/**
+	 * Deactivation must take this plugin's jobs off WooCommerce's queue.
+	 *
+	 * The queue belongs to WooCommerce and keeps running while this plugin is
+	 * off. It found no callback for these hooks and marked every job FAILED, so
+	 * pausing the plugin for a day left hundreds of failed actions in
+	 * WooCommerce → Status → Scheduled Actions, reading like a crash.
+	 */
+	public function test_deactivating_takes_the_plugins_jobs_off_the_queue() {
+		if ( ! function_exists( 'as_schedule_single_action' ) ) {
+			$this->markTestSkipped( 'Action Scheduler not available.' );
+		}
+		foreach ( AI_Sooq_Install::QUEUED_ACTIONS as $hook ) {
+			as_schedule_single_action( time() + HOUR_IN_SECONDS, $hook, array( 4242 ), AISOOQ_AS_GROUP );
+			$this->assertNotFalse( as_next_scheduled_action( $hook, null, AISOOQ_AS_GROUP ), "precondition: {$hook} is queued" );
+		}
+
+		AI_Sooq_Install::deactivate();
+
+		foreach ( AI_Sooq_Install::QUEUED_ACTIONS as $hook ) {
+			$this->assertFalse( as_next_scheduled_action( $hook, null, AISOOQ_AS_GROUP ), "{$hook} must not survive deactivation" );
+		}
+	}
+
+	/**
+	 * uninstall.php runs without the plugin loaded, so it cannot read
+	 * QUEUED_ACTIONS and keeps a literal copy. Hold the two together: a queued
+	 * hook added to one list and not the other would be silently left running
+	 * on uninstall, or on deactivation.
+	 */
+	public function test_uninstall_and_deactivate_clear_the_same_queued_hooks() {
+		$src = (string) file_get_contents( AISOOQ_DIR . 'uninstall.php' );
+		$this->assertSame(
+			1,
+			preg_match( '/foreach\s*\(\s*array\(([^)]*)\)\s+as\s+\$action/s', $src, $m ),
+			'could not find the queued-hook list in uninstall.php'
+		);
+		preg_match_all( "/'([a-z_]+)'/", $m[1], $names );
+
+		$uninstall  = $names[1];
+		$deactivate = array_values( AI_Sooq_Install::QUEUED_ACTIONS );
+		sort( $uninstall );
+		sort( $deactivate );
+
+		$this->assertSame( $deactivate, $uninstall );
+	}
 }

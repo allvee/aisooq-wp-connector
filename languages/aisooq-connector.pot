@@ -2,7 +2,7 @@
 # This file is distributed under the GPL-2.0-or-later.
 msgid ""
 msgstr ""
-"Project-Id-Version: AI Sooq Connector 2.12.1\n"
+"Project-Id-Version: AI Sooq Connector 2.13.1\n"
 "Report-Msgid-Bugs-To: https://github.com/allvee/aisooq-wp-connector/issues\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: AI Sooq <https://github.com/allvee/aisooq-wp-connector>\n"
@@ -950,13 +950,39 @@ msgstr ""
 msgid "AI Sooq Connector — abandoned carts"
 msgstr ""
 
-msgid "Captured at"
+msgid "AI Sooq Connector — refused checkouts"
+msgstr ""
+
+msgid "Refused at"
 msgstr ""
 
 msgid "Name"
 msgstr ""
 
 msgid "Phone"
+msgstr ""
+
+msgid "IP address"
+msgstr ""
+
+msgid "Store block list"
+msgstr ""
+
+msgid "Matched on"
+msgstr ""
+
+msgid "Added at"
+msgstr ""
+
+#. translators: %d: number of refused-checkout records removed.
+#, php-format
+msgid "Removed %d refused-checkout record(s) held by AI Sooq Connector."
+msgstr ""
+
+msgid "Kept this person's entry on the store block list. It is a fraud-prevention control, and removing it at their request would lift the block. Remove it under AI Sooq → Blocked if that is intended."
+msgstr ""
+
+msgid "Captured at"
 msgstr ""
 
 msgid "Cart contents"
