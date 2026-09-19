@@ -551,7 +551,25 @@ class AI_Sooq_Abandoned_Admin {
 			$is_active   = ( 'active' === $row->status );
 			$reachable   = ( ! empty( $row->email ) || ! empty( $row->phone ) );
 			$key_attr    = esc_attr( $row->session_key );
-			?>
+			
+			$updated_ts = $row->updated_at ? strtotime( $row->updated_at . ' UTC' ) : 0;
+			if ( ! $updated_ts ) {
+				$updated_display = '<span class="aisooq-td-val">—</span>';
+			} else {
+				$now = time();
+				$diff = $now - $updated_ts;
+				$t_time = date_i18n( __( 'Y/m/d g:i:s A', 'aisooq-connector' ), $updated_ts );
+				
+				if ( $diff < DAY_IN_SECONDS ) {
+					$h_time = sprintf( __( '%s ago', 'aisooq-connector' ), human_time_diff( $updated_ts, $now ) );
+				} elseif ( gmdate( 'Y-m-d', $updated_ts ) === gmdate( 'Y-m-d', strtotime( '-1 day', $now ) ) ) {
+					$h_time = __( 'yesterday', 'aisooq-connector' );
+				} else {
+					$h_time = date_i18n( __( 'jS F Y', 'aisooq-connector' ), $updated_ts );
+				}
+				$updated_display = '<abbr title="' . esc_attr( $t_time ) . '">' . esc_html( ucfirst( $h_time ) ) . '</abbr>';
+			}
+?>
 			<tr data-key="<?php echo $key_attr; ?>" data-status="<?php echo esc_attr( $row->status ); ?>">
 				<td class="aisooq-cb-cell"><input type="checkbox" class="aisooq-cb" value="<?php echo $key_attr; ?>" aria-label="<?php esc_attr_e( 'Select cart', 'aisooq-connector' ); ?>" /></td>
 				<td class="aisooq-cust-cell" data-label="<?php esc_attr_e( 'Customer', 'aisooq-connector' ); ?>">
@@ -564,6 +582,7 @@ class AI_Sooq_Abandoned_Admin {
 						<?php echo $this->courier_cell( $row, $active ); // phpcs:ignore WordPress.Security.EscapeOutput ?>
 					</div>
 				</td>
+				<td class="aisooq-dim aisooq-updated-cell" data-label="<?php esc_attr_e( 'Last seen', 'aisooq-connector' ); ?>"><span class="aisooq-td-val"><?php echo $updated_display; // phpcs:ignore WordPress.Security.EscapeOutput ?></span></td>
 				<td class="aisooq-addr" data-label="<?php esc_attr_e( 'Address', 'aisooq-connector' ); ?>">
 					<span class="aisooq-td-val"><?php echo $addr_bits ? esc_html( implode( ', ', $addr_bits ) ) : '<span class="aisooq-dim">—</span>'; ?></span>
 				</td>
@@ -583,7 +602,6 @@ class AI_Sooq_Abandoned_Admin {
 						<?php endif; ?>
 					</span>
 				</td>
-				<td class="aisooq-dim aisooq-updated-cell" data-label="<?php esc_attr_e( 'Updated', 'aisooq-connector' ); ?>"><span class="aisooq-td-val"><?php echo esc_html( $row->updated_at ? human_time_diff( strtotime( $row->updated_at . ' UTC' ) ) . ' ' . __( 'ago', 'aisooq-connector' ) : '—' ); ?></span></td>
 				<td class="aisooq-actions-cell" data-label="<?php esc_attr_e( 'Actions', 'aisooq-connector' ); ?>">
 					<div class="aisooq-menu-wrap">
 						<button type="button" class="button button-small aisooq-menu-btn" aria-haspopup="true" aria-expanded="false"><?php esc_html_e( 'Actions', 'aisooq-connector' ); ?> <span class="aisooq-caret">▾</span></button>
@@ -1123,12 +1141,12 @@ class AI_Sooq_Abandoned_Admin {
 							<tr>
 								<th class="aisooq-cb-cell"><input type="checkbox" id="aisooq-cb-all" aria-label="<?php esc_attr_e( 'Select all', 'aisooq-connector' ); ?>" /></th>
 								<th><?php esc_html_e( 'Customer', 'aisooq-connector' ); ?></th>
+								<th><?php esc_html_e( 'Last seen', 'aisooq-connector' ); ?></th>
 								<th><?php esc_html_e( 'Address', 'aisooq-connector' ); ?></th>
 								<th><?php esc_html_e( 'Cart', 'aisooq-connector' ); ?></th>
 								<th><?php esc_html_e( 'Value', 'aisooq-connector' ); ?></th>
 								<th><?php esc_html_e( 'Step', 'aisooq-connector' ); ?></th>
 								<th><?php esc_html_e( 'Status', 'aisooq-connector' ); ?></th>
-								<th><?php esc_html_e( 'Updated', 'aisooq-connector' ); ?></th>
 								<th style="text-align:right;"><?php esc_html_e( 'Actions', 'aisooq-connector' ); ?></th>
 							</tr>
 						</thead>

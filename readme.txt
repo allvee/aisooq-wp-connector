@@ -6,7 +6,7 @@ Tested up to: 6.7
 Requires PHP: 7.4
 WC requires at least: 6.0
 WC tested up to: 9.9
-Stable tag: 2.14.0
+Stable tag: 2.15.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -56,6 +56,14 @@ No — one WooCommerce site connects to one AI Sooq store (one OAuth app = one
 store). Run separate sites for separate stores.
 
 == Changelog ==
+
+= 2.15.1 =
+
+* Fix: "Last seen" column position and format dates in Abandoned Carts.
+
+= 2.15.0 =
+
+* Update: Move "Last seen" column position and format dates in Abandoned Carts.
 
 = 2.14.0 =
 * **Fixed: deleting an order in WooCommerce left it live on AI Sooq.** A test, spam
