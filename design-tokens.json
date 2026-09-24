@@ -1,81 +1,107 @@
 {
-  "$schema": "https://design-tokens.org/draft",
-  "name": "AI Sooq — WordPress admin",
-  "description": "X/Twitter visual language, AI Sooq palette. Source of truth: assets/css/aisooq-admin.css",
-  "color": {
-    "brand": {
-      "--pri": "#08294C",
-      "--pri-d": "#04162B",
-      "--pri-fg": "#ffffff",
-      "--pri-wash": "rgba(8, 41, 76, .1)",
-      "--hl": "#FDC137",
-      "--hl-d": "#E0A81F",
-      "--hl-fg": "#3d2c00",
-      "--pri-tint": "#e9f0f8"
+    "$schema": "https://design-tokens.org/draft",
+    "name": "AI Sooq — WordPress admin",
+    "description": "Source of truth: assets/css/aisooq-admin.css. Regenerate with bin/make-design-tokens.php — do not hand-edit.",
+    "color": {
+        "accentRamp": {
+            "--pri-100": "#0b2a4a",
+            "--pri-200": "#103d6b",
+            "--pri-300": "#1766b3",
+            "--pri-400": "#1f74c7",
+            "--pri-500": "#2b8ae6",
+            "--pri-600": "#62a9ee",
+            "--pri-700": "#a3cdf6",
+            "--pri-800": "#d6e9fc",
+            "--pri-900": "#eef6fe"
+        },
+        "neutralRamp": {
+            "--n-100": "#14171c",
+            "--n-200": "#2f3439",
+            "--n-300": "#56626e",
+            "--n-400": "#6c7884",
+            "--n-500": "#8b98a5",
+            "--n-600": "#aab5c0",
+            "--n-700": "#d3dbe1",
+            "--n-800": "#e6ebef",
+            "--n-900": "#f6f8fa"
+        },
+        "brand": {
+            "--pri": "#2b8ae6",
+            "--pri-d": "#1f74c7",
+            "--pri-dd": "#1766b3",
+            "--pri-solid": "#1f74c7",
+            "--pri-fg": "#ffffff",
+            "--pri-wash": "rgba(43, 138, 230, .1)",
+            "--pri-tint": "#eef6fe",
+            "--hl": "#FDC137",
+            "--hl-d": "#E0A81F",
+            "--hl-fg": "#3d2c00"
+        },
+        "status": {
+            "--ok": "#00754b",
+            "--warn": "#8a5a00",
+            "--err": "#c0392b",
+            "--info": "#1766b3"
+        },
+        "statusSurface": {
+            "--ok-wash": "#e8f3ec",
+            "--warn-wash": "#fdf3e0",
+            "--err-wash": "#fcebea",
+            "--info-wash": "#eef6fe",
+            "--ok-edge": "#00844a33",
+            "--warn-edge": "#99680033",
+            "--err-edge": "#b32d2e33"
+        },
+        "surface": {
+            "--bg": "#ffffff",
+            "--card": "#ffffff",
+            "--wash": "rgba(20, 23, 28, .03)",
+            "--sunk": "#fbfcfd",
+            "--sunk-2": "#f6f8fa",
+            "--track": "#e6ebef",
+            "--line": "#e6ebef",
+            "--edge": "#d3dbe1"
+        },
+        "text": {
+            "--muted": "#56626e",
+            "--fg": "#14171c"
+        }
     },
-    "status": {
-      "--ok": "#00754b",
-      "--warn": "#8a5a00",
-      "--err": "#c0392b",
-      "--info": "#1f6f9c"
+    "typography": {
+        "--text-xs": "11px",
+        "--text-sm": "13px",
+        "--text": "14px",
+        "--text-lg": "16px",
+        "--text-xl": "22px",
+        "--text-2xl": "24px",
+        "--lh-tight": "1.15",
+        "--lh": "1.45"
     },
-    "statusSurface": {
-      "--ok-wash": "#e8f3ec",
-      "--warn-wash": "#fdf3e0",
-      "--err-wash": "#fcebea",
-      "--info-wash": "#f0f6fc",
-      "--pri-tint": "#e9f0f8",
-      "--ok-edge": "#00844a33",
-      "--warn-edge": "#99680033",
-      "--err-edge": "#b32d2e33",
-      "--edge": "#cfd9de"
+    "space": {
+        "--sp-1": "4px",
+        "--sp-2": "8px",
+        "--sp-3": "12px",
+        "--sp-4": "16px",
+        "--sp-5": "20px",
+        "--sp-6": "24px",
+        "--sp-8": "32px"
     },
-    "surface": {
-      "--pri-wash": "rgba(8, 41, 76, .1)",
-      "--line": "#eff3f4",
-      "--edge": "#cfd9de",
-      "--bg": "#ffffff",
-      "--card": "#ffffff",
-      "--wash": "rgba(15, 20, 25, .03)",
-      "--sunk": "#fbfbfc",
-      "--sunk-2": "#f6f7f7",
-      "--track": "#f0f0f1"
+    "radius": {
+        "--radius": "16px",
+        "--radius-sm": "6px",
+        "--radius-md": "10px",
+        "--pill": "9999px"
     },
-    "text": {
-      "--muted": "#536471",
-      "--fg": "#0f1419"
+    "elevation": {
+        "--sh-sm": "0 0 0 1px #e6ebef",
+        "--sh-md": "0 0 0 1px #e6ebef, 0 8px 24px rgba(20, 23, 28, .10)",
+        "--sh-lg": "0 0 0 1px #e6ebef, 0 12px 32px rgba(20, 23, 28, .16)",
+        "--sh-elev": "0 0 0 1px #e6ebef, 0 12px 32px rgba(20, 23, 28, .16)"
+    },
+    "breakpoints": {
+        "admin": "782px",
+        "shell": "720px",
+        "single": "600px",
+        "phone": "400px"
     }
-  },
-  "typography": {
-    "--text-xs": "11px",
-    "--text-sm": "13px",
-    "--text": "15px",
-    "--text-lg": "17px",
-    "--text-xl": "20px",
-    "--text-2xl": "26px",
-    "--lh-tight": "1.15",
-    "--lh": "1.35"
-  },
-  "space": {
-    "--sp-1": "4px",
-    "--sp-2": "8px",
-    "--sp-3": "12px",
-    "--sp-4": "16px",
-    "--sp-5": "20px",
-    "--sp-6": "24px"
-  },
-  "radius": {
-    "--radius": "16px",
-    "--radius-sm": "4px",
-    "--radius-md": "8px",
-    "--pill": "9999px"
-  },
-  "elevation": {
-    "--sh-elev": "0 0 15px rgba(101, 119, 134, .2), 0 0 3px 1px rgba(101, 119, 134, .15)"
-  },
-  "breakpoints": {
-    "admin": "782px",
-    "single": "600px",
-    "phone": "400px"
-  }
 }

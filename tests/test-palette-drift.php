@@ -410,6 +410,42 @@ class Test_Palette_Drift extends WP_UnitTestCase {
 		}
 	}
 
+	/**
+	 * design-preview.html carries the token block too, so it is a FOURTH copy.
+	 *
+	 * It used to be hand-typed, including its contrast ratios, while its own
+	 * lede claimed nothing in it was — so it was both wrong and claiming not to
+	 * be. It is now written by bin/make-design-tokens.php, and this is what
+	 * makes "regenerate it" a rule rather than a suggestion.
+	 *
+	 * Generated INTO the file rather than fetched at runtime because that page
+	 * opens straight off disk with no server, and `file://` blocks the fetch.
+	 */
+	public function test_the_preview_page_still_matches_the_stylesheet() {
+		$css  = self::stylesheet_tokens();
+		$html = (string) file_get_contents( AISOOQ_DIR . 'design-preview.html' );
+
+		$start = strpos( $html, '/* @generated:tokens' );
+		$this->assertNotFalse( $start, 'design-preview.html has lost its generated token marker.' );
+		$end = strpos( $html, '/* @end:tokens */', $start );
+		$this->assertNotFalse( $end, 'design-preview.html has lost its generated token end marker.' );
+
+		$block = substr( $html, $start, $end - $start );
+		$found = array();
+		if ( preg_match_all( '/(--[a-z0-9-]+)\s*:\s*([^;]+);/i', $block, $m, PREG_SET_ORDER ) ) {
+			foreach ( $m as $hit ) {
+				$found[ $hit[1] ] = trim( $hit[2] );
+			}
+		}
+
+		$this->assertNotEmpty( $found, 'The preview page declares no tokens — regenerate it.' );
+		$this->assertSame(
+			$css,
+			$found,
+			'design-preview.html has drifted from assets/css/aisooq-admin.css. Run: php bin/make-design-tokens.php'
+		);
+	}
+
 	/** Every `--name => value` pair anywhere in the exported token tree. */
 	private static function flatten_tokens( array $tree ) {
 		$out = array();

@@ -303,6 +303,36 @@ class AI_Sooq_Settings {
 			return;
 		}
 		wp_enqueue_style( 'aisooq-admin', AISOOQ_URL . 'assets/css/aisooq-admin.css', array(), AISOOQ_VERSION );
+
+		/*
+		 * The application shell — app bar, sidebar, cards, tables. Every AI
+		 * Sooq screen wears it, so it rides along with the base sheet on the
+		 * same hook test rather than naming the four screens individually: a
+		 * fifth screen would otherwise render unstyled until someone
+		 * remembered to add it here.
+		 */
+		wp_enqueue_style(
+			'aisooq-app',
+			AISOOQ_URL . 'assets/css/aisooq-app.css',
+			array( 'aisooq-admin' ),
+			AISOOQ_VERSION
+		);
+
+		/*
+		 * The date-range picker. Enqueued on every AI Sooq screen rather than
+		 * only the one that uses it today: it costs 5KB, it initialises itself
+		 * from whatever markup is on the page, and a screen that adds a range
+		 * filter should not also have to remember to add a script.
+		 *
+		 * In the footer, because it reads the trigger out of the DOM on load.
+		 */
+		wp_enqueue_script(
+			'aisooq-daterange',
+			AISOOQ_URL . 'assets/js/aisooq-daterange.js',
+			array(),
+			AISOOQ_VERSION,
+			true
+		);
 	}
 
 	/**
@@ -761,61 +791,6 @@ class AI_Sooq_Settings {
 		);
 	}
 
-	/**
-	 * "Connected to" panel: the tenant/store profile + the OAuth permissions this
-	 * plugin was granted, grouped by resource with read/write badges, so the
-	 * operator can see at a glance what the connection can do.
-	 */
-	private function render_connection_panel( $status ) {
-		if ( empty( $status['ok'] ) ) {
-			return;
-		}
-		$store   = isset( $status['store'] ) && is_array( $status['store'] ) ? $status['store'] : array();
-		$scopes  = isset( $status['scopes'] ) && is_array( $status['scopes'] ) ? $status['scopes'] : array();
-		$sid     = isset( $status['sid'] ) ? $status['sid'] : '';
-		$name    = ! empty( $store['name'] ) ? $store['name'] : $sid;
-		$initial = $name ? mb_strtoupper( mb_substr( (string) $name, 0, 1 ) ) : 'S';
-		$groups  = $this->group_scopes( $scopes );
-		?>
-		<div class="aisooq-conn">
-			<div class="aisooq-conn__top">
-				<span class="aisooq-conn__avatar" aria-hidden="true"><?php echo esc_html( $initial ); ?></span>
-				<div style="min-width:0;">
-					<div class="aisooq-conn__name"><?php echo esc_html( $name ); ?></div>
-					<div class="aisooq-dim" style="font-size:12px;font-family:monospace;"><?php echo esc_html( $sid ); ?></div>
-				</div>
-			</div>
-			<div class="aisooq-conn__meta">
-				<?php if ( ! empty( $store['contactPhone'] ) ) : ?><span><?php esc_html_e( 'Contact', 'aisooq-connector' ); ?>: <b><?php echo esc_html( $store['contactPhone'] ); ?></b></span><?php endif; ?>
-				<?php if ( ! empty( $store['email'] ) ) : ?><span><?php esc_html_e( 'Email', 'aisooq-connector' ); ?>: <b><?php echo esc_html( $store['email'] ); ?></b></span><?php endif; ?>
-				<?php if ( ! empty( $store['currency'] ) ) : ?><span><?php esc_html_e( 'Currency', 'aisooq-connector' ); ?>: <b><?php echo esc_html( $store['currency'] ); ?></b></span><?php endif; ?>
-				<?php if ( ! empty( $store['country'] ) ) : ?><span><?php esc_html_e( 'Country', 'aisooq-connector' ); ?>: <b><?php echo esc_html( $store['country'] ); ?></b></span><?php endif; ?>
-				<?php if ( ! empty( $store['domain'] ) ) : ?><span><?php esc_html_e( 'Domain', 'aisooq-connector' ); ?>: <b><?php echo esc_html( $store['domain'] ); ?></b></span><?php endif; ?>
-				<?php if ( ! empty( $status['time'] ) ) : ?><span><?php esc_html_e( 'Verified', 'aisooq-connector' ); ?>: <b><?php echo esc_html( $status['time'] ); ?></b></span><?php endif; ?>
-			</div>
-			<?php if ( $groups ) : ?>
-				<div class="aisooq-perms">
-					<p class="aisooq-perms__h"><?php
-					/* translators: %d: number of OAuth scopes the platform granted. */
-					echo esc_html( sprintf( _n( '%d permission granted to this plugin', '%d permissions granted to this plugin', count( $scopes ), 'aisooq-connector' ), count( $scopes ) ) ); ?></p>
-					<div class="aisooq-perms__grid">
-						<?php foreach ( $groups as $resource => $actions ) : ?>
-							<div class="aisooq-perm">
-								<div class="aisooq-perm__name"><span class="dashicons <?php echo esc_attr( $this->perm_icon( $resource ) ); ?>" aria-hidden="true"></span> <?php echo esc_html( ucwords( str_replace( array( '_', '-' ), ' ', $resource ) ) ); ?></div>
-								<div class="aisooq-perm__acts">
-									<?php foreach ( $actions as $a ) : $cls = ( 'read' === $a ? 'read' : ( 'write' === $a ? 'write' : 'other' ) ); ?>
-										<span class="aisooq-act-badge <?php echo esc_attr( $cls ); ?>"><?php echo esc_html( $a ); ?></span>
-									<?php endforeach; ?>
-								</div>
-							</div>
-						<?php endforeach; ?>
-					</div>
-				</div>
-			<?php endif; ?>
-		</div>
-		<?php
-	}
-
 	/** Group `resource.action` scopes into resource → [actions]. */
 	private function group_scopes( $scopes ) {
 		$groups = array();
@@ -833,24 +808,6 @@ class AI_Sooq_Settings {
 		}
 		ksort( $groups );
 		return $groups;
-	}
-
-	/** Dashicon for a permission resource group. */
-	private function perm_icon( $resource ) {
-		$map = array(
-			'orders'      => 'dashicons-cart',
-			'products'    => 'dashicons-products',
-			'customers'   => 'dashicons-groups',
-			'categories'  => 'dashicons-category',
-			'brands'      => 'dashicons-tag',
-			'collections' => 'dashicons-portfolio',
-			'inventory'   => 'dashicons-archive',
-			'analytics'   => 'dashicons-chart-bar',
-			'fraud'       => 'dashicons-shield',
-			'courier'     => 'dashicons-airplane',
-			'shipping'    => 'dashicons-airplane',
-		);
-		return isset( $map[ $resource ] ) ? $map[ $resource ] : 'dashicons-admin-network';
 	}
 
 	/**
@@ -968,50 +925,25 @@ class AI_Sooq_Settings {
 	 */
 	private function sections() {
 		return array(
-			'connection' => array( 'icon' => 'admin-links',   'label' => __( 'Connection', 'aisooq-connector' ) ),
-			'sync'       => array( 'icon' => 'update',        'label' => __( 'Sync', 'aisooq-connector' ) ),
-			'fraud'      => array( 'icon' => 'shield',        'label' => __( 'Fraud & courier', 'aisooq-connector' ) ),
-			'messages'   => array( 'icon' => 'format-chat',   'label' => __( 'Checkout messages', 'aisooq-connector' ) ),
-			'shipping'   => array( 'icon' => 'location',      'label' => __( 'Shipping', 'aisooq-connector' ) ),
-			'advanced'   => array( 'icon' => 'admin-generic', 'label' => __( 'Advanced', 'aisooq-connector' ) ),
+			'connection' => array( 'icon' => 'link',              'label' => __( 'Connection', 'aisooq-connector' ) ),
+			'sync'       => array( 'icon' => 'arrows-clockwise',  'label' => __( 'Sync', 'aisooq-connector' ) ),
+			'fraud'      => array( 'icon' => 'shield-check',      'label' => __( 'Fraud & courier', 'aisooq-connector' ) ),
+			'messages'   => array( 'icon' => 'chats',             'label' => __( 'Checkout messages', 'aisooq-connector' ) ),
+			'shipping'   => array( 'icon' => 'map-pin',           'label' => __( 'Shipping', 'aisooq-connector' ) ),
+			'advanced'   => array( 'icon' => 'gear',              'label' => __( 'Advanced', 'aisooq-connector' ) ),
 		);
 	}
 
-	/** Open a panel. Also the card, so a no-JS page still reads as sections. */
-	private function panel_open( $key, $icon, $label ) {
-		printf(
-			'<section class="aisooq-panel aisooq-card" id="aisooq-panel-%1$s" data-panel="%1$s" role="tabpanel" aria-labelledby="aisooq-tab-%1$s" tabindex="0">'
-				. '<div class="aisooq-card__head"><span class="dashicons dashicons-%2$s"></span>%3$s</div>'
-				. '<div class="aisooq-card__body">',
-			esc_attr( $key ),
-			esc_attr( $icon ),
-			esc_html( $label )
-		);
-	}
 
-	private function panel_close() {
-		echo '</div></section>';
-	}
-
-	/**
-	 * A field that only bites while another switch is on. Dimmed, never hidden
-	 * and never disabled — an operator who came here to change this setting must
-	 * still be able to find and change it, and a control that vanishes reads as
-	 * a missing feature rather than an inactive one.
-	 */
-	private function depends_on( $field, $note ) {
-		return ' data-requires="' . esc_attr( $field ) . '" data-requires-note="' . esc_attr( $note ) . '"';
-	}
-
-	public function render_page() {		if ( ! current_user_can( self::CAPABILITY ) ) {
+	public function render_page() {
+		if ( ! current_user_can( self::CAPABILITY ) ) {
 			return;
 		}
-		$s          = $this->all();
+
+		$s           = $this->all();
 		$wc_statuses = function_exists( 'wc_get_order_statuses' ) ? wc_get_order_statuses() : array();
 		list( $ship_methods, $ship_rates ) = $this->shipping_map_data();
-		settings_errors( 'aisooq_connector' );
-		?>
-		<?php
+
 		$status = $this->status();
 		// Back-fill the store profile for a connection that was verified before
 		// the profile existed (its saved status has no `store`) — one ping, then
@@ -1026,555 +958,231 @@ class AI_Sooq_Settings {
 				update_option( self::STATUS_OPTION, $status );
 			}
 		}
+
 		// Live platform fraud config (name/address/phone/IP layers) so the form
 		// renders the real per-tenant values; null when disconnected.
-		$fraud = $this->load_platform_fraud( $status );
+		$fraud  = $this->load_platform_fraud( $status );
 		$active = $this->is_active();
 		$k      = $this->stats();
-		if ( ! $active ) {
-			$badge_class = 'warn';
-			$badge_text  = __( 'Paused', 'aisooq-connector' );
-		} elseif ( ! empty( $status['ok'] ) ) {
-			$badge_class = 'ok';
-			$badge_text  = sprintf( /* translators: %s: store sid */ __( 'Connected · %s', 'aisooq-connector' ), isset( $status['sid'] ) ? $status['sid'] : '?' );
-		} else {
-			$badge_class = 'err';
-			$badge_text  = __( 'Not verified', 'aisooq-connector' );
-		}
+		$sections = $this->sections();
 		?>
-		<div class="wrap aisooq">
+		<div class="wrap aisooq aisooq-app">
+			<?php
+			/*
+			 * wp-admin needs an <h1> in `.wrap` — it is where it splices admin
+			 * notices in, and a screen with no level-one heading is a real
+			 * navigation failure for a screen-reader user. The app bar carries
+			 * the visible identity, so this one is for those two jobs only.
+			 */
+			?>
+			<h1 class="screen-reader-text"><?php esc_html_e( 'AI Sooq settings', 'aisooq-connector' ); ?></h1>
+			<?php settings_errors( 'aisooq_connector' ); ?>
 
-			<div class="aisooq-hero">
-				<div>
-					<h1 class="aisooq-hero__title" style="margin:0;line-height:0;">
-						<img src="<?php echo esc_url( AISOOQ_URL . 'assets/img/logo-horizontal.svg' ); ?>" alt="<?php esc_attr_e( 'AI Sooq', 'aisooq-connector' ); ?>" height="40" style="height:40px;width:auto;display:block;" />
-					</h1>
-					<p class="aisooq-hero__sub"><?php
-					/* translators: %s: when the connection was last verified. */
-					echo esc_html( isset( $status['time'] ) && ! empty( $status['ok'] ) ? sprintf( __( 'Last verified %s', 'aisooq-connector' ), $status['time'] ) : __( 'Two-way sync between WooCommerce and your AI Sooq store.', 'aisooq-connector' ) ); ?></p>
-				</div>
-				<div class="aisooq-actions">
-					<span class="aisooq-badge <?php echo esc_attr( $badge_class ); ?>"><?php echo esc_html( $badge_text ); ?></span>
-					<button type="button" id="aisooq-test-connection" class="button"><?php esc_html_e( 'Verify connection', 'aisooq-connector' ); ?></button>
-					<span class="aisooq-sync-group">
-						<span class="aisooq-sync-label"><?php esc_html_e( 'Sync:', 'aisooq-connector' ); ?></span>
-						<button type="button" class="button aisooq-sync" data-entity="orders"><?php esc_html_e( 'Orders', 'aisooq-connector' ); ?></button>
-						<button type="button" class="button aisooq-sync" data-entity="products"><?php esc_html_e( 'Products', 'aisooq-connector' ); ?></button>
-						<button type="button" class="button aisooq-sync" data-entity="customers"><?php esc_html_e( 'Customers', 'aisooq-connector' ); ?></button>
-						<button type="button" class="button aisooq-sync" data-entity="categories"><?php esc_html_e( 'Categories', 'aisooq-connector' ); ?></button>
-					</span>
+			<?php AI_Sooq_Admin_Shell::unsaved_bar(); ?>
+			<?php
+			AI_Sooq_Admin_Shell::app_bar( array(
+				'name'   => __( 'AI Sooq', 'aisooq-connector' ),
+				'verify' => true,
+				'sync'   => array(
+					'orders'     => __( 'Orders', 'aisooq-connector' ),
+					'products'   => __( 'Products', 'aisooq-connector' ),
+					'customers'  => __( 'Customers', 'aisooq-connector' ),
+					'categories' => __( 'Categories', 'aisooq-connector' ),
+				),
+			) + AI_Sooq_Admin_Shell::state( $this ) );
+			?>
+
+			<div class="aisooq-body">
+				<aside class="aisooq-side">
 					<?php
-					// role=status + aria-live: the result of Verify/Sync is
-					// written here by script, and without this a screen-reader
-					// user gets no announcement at all — the button appears to
-					// do nothing. `polite` so it waits for a pause rather than
-					// interrupting.
+					AI_Sooq_Admin_Shell::settings_nav( $sections );
+					AI_Sooq_Admin_Shell::screen_links( AI_Sooq_Admin_Shell::other_screens( self::PAGE_SLUG ) );
 					?>
-					<span id="aisooq-test-result" role="status" aria-live="polite" aria-atomic="true" style="margin-left:4px;"></span>
-				</div>
-			</div>
+				</aside>
 
-			<?php $this->render_connection_panel( $status ); ?>
-
-			<div class="aisooq-kpis">
-				<div class="aisooq-kpi">
-					<div class="aisooq-kpi__label"><span class="dashicons dashicons-cart"></span><?php esc_html_e( 'Orders synced', 'aisooq-connector' ); ?></div>
-					<div class="aisooq-kpi__num"><?php echo esc_html( number_format_i18n( $k['orders_synced'] ) ); ?></div>
-				</div>
-				<div class="aisooq-kpi <?php echo $k['queue'] > 0 ? 'warn' : ''; ?>">
-					<div class="aisooq-kpi__label"><span class="dashicons dashicons-update"></span><?php esc_html_e( 'In queue', 'aisooq-connector' ); ?></div>
-					<div class="aisooq-kpi__num"><?php echo esc_html( $this->kpi_num( $k['queue'] ) ); ?></div>
-					<div class="aisooq-kpi__sub"><?php esc_html_e( 'awaiting push', 'aisooq-connector' ); ?></div>
-				</div>
-				<div class="aisooq-kpi <?php echo $k['failed'] > 0 ? 'err' : ''; ?>">
-					<div class="aisooq-kpi__label"><span class="dashicons dashicons-warning"></span><?php esc_html_e( 'Failed', 'aisooq-connector' ); ?></div>
-					<div class="aisooq-kpi__num"><?php echo esc_html( $this->kpi_num( $k['failed'] ) ); ?></div>
-					<div class="aisooq-kpi__sub">
+				<main class="aisooq-main">
+					<section class="aisooq-overview">
 						<?php
-						// This counts orders that exhausted their retries — they
-						// are NOT still retrying, and saying so was the reason a
-						// merchant could watch this tile read zero-and-fine while
-						// orders quietly stopped syncing.
-						printf(
-							/* translators: %d: the retry limit. */
-							esc_html__( 'gave up after %d attempts', 'aisooq-connector' ),
-							(int) AI_Sooq_Order_Sync::MAX_ATTEMPTS
+						if ( ! empty( $status['ok'] ) ) {
+							$store = isset( $status['store'] ) && is_array( $status['store'] ) ? $status['store'] : array();
+							$sid   = isset( $status['sid'] ) ? $status['sid'] : '';
+							AI_Sooq_Admin_Shell::store_bar(
+								! empty( $store['name'] ) ? $store['name'] : $sid,
+								$this->store_meta( $store )
+							);
+						}
+
+						AI_Sooq_Admin_Shell::stats( $this->stat_cards( $k ) );
+
+						$scopes = isset( $status['scopes'] ) && is_array( $status['scopes'] ) ? $status['scopes'] : array();
+						AI_Sooq_Admin_Shell::disclosures(
+							$this->setup_steps( $s, $status, $ship_methods ),
+							count( $scopes ),
+							$this->group_scopes( $scopes )
 						);
 						?>
-					</div>
-				</div>
-				<div class="aisooq-kpi">
-					<div class="aisooq-kpi__label"><span class="dashicons dashicons-archive"></span><?php esc_html_e( 'Abandoned pushed', 'aisooq-connector' ); ?></div>
-					<div class="aisooq-kpi__num"><?php echo esc_html( number_format_i18n( $k['abandoned'] ) ); ?></div>
-				</div>
-				<div class="aisooq-kpi">
-					<div class="aisooq-kpi__label"><span class="dashicons dashicons-products"></span><?php esc_html_e( 'Products synced', 'aisooq-connector' ); ?></div>
-					<div class="aisooq-kpi__num"><?php echo esc_html( number_format_i18n( $k['products'] ) ); ?></div>
-				</div>
-				<div class="aisooq-kpi">
-					<div class="aisooq-kpi__label"><span class="dashicons dashicons-groups"></span><?php esc_html_e( 'Customers synced', 'aisooq-connector' ); ?></div>
-					<div class="aisooq-kpi__num"><?php echo esc_html( number_format_i18n( $k['customers'] ) ); ?></div>
-				</div>
+					</section>
+
+					<form method="post" action="" id="aisooq-settings-form">
+						<?php wp_nonce_field( self::NONCE ); ?>
+
+						<div class="aisooq-panels">
+							<?php
+							AI_Sooq_Settings_Fields::render_all( array(
+								'settings'     => $s,
+								'wc_statuses'  => $wc_statuses,
+								'fraud'        => $fraud,
+								'ship_methods' => $ship_methods,
+								'ship_rates'   => $ship_rates,
+							) );
+							?>
+						</div>
+
+						<div class="aisooq-savebar">
+							<button type="submit" id="aisooq-save" name="aisooq_save" value="1" class="aisooq-btn aisooq-btn--primary"><?php esc_html_e( 'Save', 'aisooq-connector' ); ?></button>
+							<?php echo AI_Sooq_Settings_Fields::hint( __( 'Save first, then use Verify / Sync now above.', 'aisooq-connector' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in hint(). ?>
+						</div>
+					</form>
+
+					<?php AI_Sooq_Admin_Shell::main_links( AI_Sooq_Admin_Shell::other_screens( self::PAGE_SLUG ) ); ?>
+					<?php AI_Sooq_Admin_Shell::footer( AISOOQ_VERSION ); ?>
+				</main>
 			</div>
-
-			<details class="aisooq-help">
-				<summary><?php esc_html_e( 'Quick setup guide', 'aisooq-connector' ); ?></summary>
-				<ol style="margin:4px 0 12px 18px;line-height:1.7;">
-					<li><?php esc_html_e( 'Register an OAuth app for this store on the AI Sooq platform (scopes below). Copy the Client ID, Client Secret (shown once) and Store SID.', 'aisooq-connector' ); ?></li>
-					<li><?php esc_html_e( 'Admin API base URL = your admin host (host only — /api/v1 is added). Storefront base = your storefront host, or blank if same.', 'aisooq-connector' ); ?></li>
-					<li><?php esc_html_e( 'Paste credentials, tick Active, choose what to sync, Save, then Verify connection. Use the Sync buttons to backfill orders, products, customers or categories.', 'aisooq-connector' ); ?></li>
-				</ol>
-			</details>
-
-
-			<div class="aisooq-tabbar">
-				<div class="aisooq-tabs" role="tablist" aria-label="<?php esc_attr_e( 'Settings sections', 'aisooq-connector' ); ?>">
-				<?php foreach ( $this->sections() as $key => $sec ) : ?>
-					<button type="button" class="aisooq-tab" id="aisooq-tab-<?php echo esc_attr( $key ); ?>" data-tab="<?php echo esc_attr( $key ); ?>"
-						role="tab" aria-controls="aisooq-panel-<?php echo esc_attr( $key ); ?>" aria-selected="false" tabindex="-1">
-						<span class="dashicons dashicons-<?php echo esc_attr( $sec['icon'] ); ?>" aria-hidden="true"></span>
-						<span><?php echo esc_html( $sec['label'] ); ?></span>
-						<span class="aisooq-tab__count" hidden></span>
-					</button>
-				<?php endforeach; ?>
-				</div>
-				<label class="aisooq-find">
-					<span class="screen-reader-text"><?php esc_html_e( 'Find a setting', 'aisooq-connector' ); ?></span>
-					<span class="dashicons dashicons-search" aria-hidden="true"></span>
-					<input type="search" id="aisooq-find" placeholder="<?php esc_attr_e( 'Find a setting…', 'aisooq-connector' ); ?>" autocomplete="off" />
-				</label>
-			</div>
-
-			<form method="post" action="" id="aisooq-settings-form">
-				<?php wp_nonce_field( self::NONCE ); ?>
-
-				<p class="aisooq-nores" hidden role="status"><?php esc_html_e( 'No setting matches that search.', 'aisooq-connector' ); ?></p>
-
-				<div class="aisooq-panels">
-					<?php
-					$this->render_connection_section( $s );
-					$this->render_sync_section( $s, $wc_statuses );
-					$this->render_fraud_section( $s, $fraud );
-					$this->render_messages_section( $s );
-					$this->render_shipping_section( $s, $ship_methods, $ship_rates );
-					$this->render_advanced_section( $s );
-					?>
-				</div>
-
-				<div class="aisooq-savebar">
-					<button type="submit" name="aisooq_save" value="1" class="button button-primary"><?php esc_html_e( 'Save changes', 'aisooq-connector' ); ?></button>
-					<span class="aisooq-dirty" hidden role="status"><?php esc_html_e( 'Unsaved changes', 'aisooq-connector' ); ?></span>
-					<span class="description"><?php esc_html_e( 'Save first, then use Verify / Sync now above.', 'aisooq-connector' ); ?></span>
-				</div>
-			</form>
 		</div>
 		<?php
 		$this->render_page_script();
 	}
 
-	/* ── Sections ───────────────────────────────────────────────────────────
-	 * Each one is the answer to a single question an operator arrived with.
-	 * Splitting render_page() up this way is not cosmetic: the previous single
-	 * 450-line method meant any change to one card risked the other five.
+	/**
+	 * The store strip's rows, minus the ones this platform did not send.
+	 *
+	 * Deliberately does NOT include the last-verified time. It is already the
+	 * second half of the app bar's connection tooltip, and a fifth row wrapped
+	 * this strip onto a second line at every width it was drawn for.
 	 */
-
-	/** "Where does this site send its data?" */
-	private function render_connection_section( $s ) {
-		$this->panel_open( 'connection', 'admin-links', __( 'Connection', 'aisooq-connector' ) );
-		?>
-		<div class="aisooq-field aisooq-field--switch">
-			<label class="aisooq-check"><input type="checkbox" name="aisooq[active]" value="1" <?php checked( $s['active'] ); ?> /> <strong><?php esc_html_e( 'Active', 'aisooq-connector' ); ?></strong> — <?php esc_html_e( 'sync orders, carts, analytics & fraud', 'aisooq-connector' ); ?></label>
-			<p class="description"><?php esc_html_e( 'Uncheck to pause all syncing without losing settings.', 'aisooq-connector' ); ?></p>
-		</div>
-		<div class="aisooq-field">
-			<label class="h" for="aisooq_api_base"><?php esc_html_e( 'Admin API base URL', 'aisooq-connector' ); ?></label>
-			<input name="aisooq[api_base]" id="aisooq_api_base" type="url" class="code" value="<?php echo esc_attr( $s['api_base'] ); ?>" placeholder="https://api.admin.yourdomain.com" />
-			<p class="description"><?php esc_html_e( 'Host only — /api/v1 is appended. Handles OAuth + /connect/*.', 'aisooq-connector' ); ?></p>
-		</div>
-		<div class="aisooq-field">
-			<label class="h" for="aisooq_storefront_base"><?php esc_html_e( 'Storefront API base URL', 'aisooq-connector' ); ?></label>
-			<input name="aisooq[storefront_base]" id="aisooq_storefront_base" type="url" class="code" value="<?php echo esc_attr( $s['storefront_base'] ); ?>" placeholder="https://api.yourdomain.com" />
-			<p class="description"><?php esc_html_e( 'Handles analytics + fraud. Blank = same host as admin.', 'aisooq-connector' ); ?></p>
-		</div>
-		<div class="aisooq-field">
-			<label class="h" for="aisooq_sid"><?php esc_html_e( 'Store SID', 'aisooq-connector' ); ?></label>
-			<input name="aisooq[sid]" id="aisooq_sid" type="text" class="code" value="<?php echo esc_attr( $s['sid'] ); ?>" />
-		</div>
-		<div class="aisooq-field">
-			<label class="h" for="aisooq_client_id"><?php esc_html_e( 'OAuth Client ID', 'aisooq-connector' ); ?></label>
-			<input name="aisooq[client_id]" id="aisooq_client_id" type="text" class="code" value="<?php echo esc_attr( $s['client_id'] ); ?>" placeholder="wapp_..." />
-		</div>
-		<div class="aisooq-field">
-			<label class="h" for="aisooq_client_secret"><?php esc_html_e( 'OAuth Client Secret', 'aisooq-connector' ); ?></label>
-			<input name="aisooq[client_secret]" id="aisooq_client_secret" type="password" class="code" value="" placeholder="<?php echo '' !== $s['client_secret'] ? esc_attr__( '•••••••• (stored — leave blank to keep)', 'aisooq-connector' ) : 'wsk_...'; ?>" autocomplete="new-password" />
-			<p class="description"><?php esc_html_e( 'Shown once when you register the app. Leave blank to keep the stored one.', 'aisooq-connector' ); ?></p>
-		</div>
-		<?php
-		$this->panel_close();
-	}
-
-	/** "What crosses between WooCommerce and the platform, and which way?" */
-	private function render_sync_section( $s, $wc_statuses ) {
-		$this->panel_open( 'sync', 'update', __( 'Sync', 'aisooq-connector' ) );
-		?>
-		<div class="aisooq-field">
-			<span class="h"><?php esc_html_e( 'Push to the platform', 'aisooq-connector' ); ?></span>
-			<label class="aisooq-check"><input type="checkbox" name="aisooq[enable_orders]" value="1" <?php checked( $s['enable_orders'] ); ?> /> <?php esc_html_e( 'Orders (incl. incomplete/unpaid)', 'aisooq-connector' ); ?></label>
-			<label class="aisooq-check"><input type="checkbox" name="aisooq[enable_abandoned]" value="1" <?php checked( $s['enable_abandoned'] ); ?> /> <?php esc_html_e( 'Abandoned carts (pushed instantly)', 'aisooq-connector' ); ?></label>
-			<label class="aisooq-check"><input type="checkbox" name="aisooq[enable_analytics]" value="1" <?php checked( $s['enable_analytics'] ); ?> /> <?php esc_html_e( 'Analytics events (pixel / CAPI)', 'aisooq-connector' ); ?></label>
-		</div>
-
-		<div class="aisooq-field"<?php echo $this->depends_on( 'enable_orders', __( 'Orders sync is off', 'aisooq-connector' ) ); // phpcs:ignore WordPress.Security.EscapeOutput ?>>
-			<span class="h"><?php esc_html_e( 'Order statuses to push', 'aisooq-connector' ); ?></span>
-			<div class="aisooq-checkgrid">
-				<?php foreach ( $wc_statuses as $key => $label ) : ?>
-					<?php $slug = preg_replace( '/^wc-/', '', $key ); ?>
-					<label class="aisooq-check">
-						<input type="checkbox" name="aisooq[order_statuses][]" value="<?php echo esc_attr( $slug ); ?>" <?php checked( in_array( $slug, (array) $s['order_statuses'], true ) ); ?> />
-						<?php echo esc_html( $label ); ?>
-					</label>
-				<?php endforeach; ?>
-			</div>
-		</div>
-
-		<div class="aisooq-field"<?php echo $this->depends_on( 'enable_abandoned', __( 'Abandoned-cart sync is off', 'aisooq-connector' ) ); // phpcs:ignore WordPress.Security.EscapeOutput ?>>
-			<label class="h" for="aisooq_idle"><?php esc_html_e( 'Treat a cart as abandoned after', 'aisooq-connector' ); ?></label>
-			<span class="aisooq-inline">
-				<input name="aisooq[abandoned_idle_min]" id="aisooq_idle" type="number" min="5" value="<?php echo esc_attr( $s['abandoned_idle_min'] ); ?>" class="small-text" />
-				<?php esc_html_e( 'minutes idle', 'aisooq-connector' ); ?>
-			</span>
-		</div>
-
-		<hr class="aisooq-rule" />
-		<p class="aisooq-subhead"><?php esc_html_e( 'Two-way sync', 'aisooq-connector' ); ?></p>
-
-		<?php
-		$entities = array(
-			'customer' => array(
-				'label' => __( 'Customers', 'aisooq-connector' ),
-				'desc'  => __( 'Matched by email/phone. Needs customers.read + customers.write.', 'aisooq-connector' ),
-			),
-			'category' => array(
-				'label' => __( 'Categories', 'aisooq-connector' ),
-				'desc'  => __( 'Product categories + hierarchy. Matched to the platform by handle/slug. Needs categories.read + categories.write.', 'aisooq-connector' ),
-			),
-			'brand'    => array(
-				'label' => __( 'Brands', 'aisooq-connector' ),
-				'desc'  => __( 'Any brand taxonomy (native WC, Perfect Brands, YITH…). Matched by handle/slug. Needs brands.read + brands.write.', 'aisooq-connector' ),
-			),
-			'product'  => array(
-				'label' => __( 'Products', 'aisooq-connector' ),
-				'desc'  => __( 'Products + variants, mapped to existing platform products by SKU/handle. On pull, a product’s categories + brand are linked too. Needs products.read + products.write.', 'aisooq-connector' ),
+	private function store_meta( array $store ) {
+		$candidates = array(
+			array( 'icon' => 'phone',           'label' => __( 'Contact', 'aisooq-connector' ),  'value' => isset( $store['contactPhone'] ) ? $store['contactPhone'] : '' ),
+			array( 'icon' => 'envelope-simple', 'label' => __( 'Email', 'aisooq-connector' ),    'value' => isset( $store['email'] ) ? $store['email'] : '' ),
+			array( 'icon' => 'globe',           'label' => __( 'Domain', 'aisooq-connector' ),   'value' => isset( $store['domain'] ) ? $store['domain'] : '' ),
+			array(
+				'icon'  => 'coins',
+				'label' => __( 'Currency · Country', 'aisooq-connector' ),
+				'value' => trim( ( isset( $store['currency'] ) ? $store['currency'] : '' ) . ' · ' . ( isset( $store['country'] ) ? $store['country'] : '' ), ' ·' ),
 			),
 		);
-		$dirs = array(
-			'both' => __( 'Two-way (last edit wins)', 'aisooq-connector' ),
-			'push' => __( 'WooCommerce → Platform', 'aisooq-connector' ),
-			'pull' => __( 'Platform → WooCommerce', 'aisooq-connector' ),
+
+		$rows = array();
+		foreach ( $candidates as $row ) {
+			if ( '' !== trim( (string) $row['value'] ) ) {
+				$rows[] = $row;
+			}
+		}
+		return $rows;
+	}
+
+	/** The six figures, in the order the design puts them. */
+	private function stat_cards( array $k ) {
+		return array(
+			array( 'icon' => 'shopping-cart',        'label' => __( 'Orders', 'aisooq-connector' ),    'value' => number_format_i18n( $k['orders_synced'] ), 'sub' => __( 'Orders synced', 'aisooq-connector' ), 'tone' => '' ),
+			array( 'icon' => 'arrows-clockwise',     'label' => __( 'Queue', 'aisooq-connector' ),     'value' => $this->kpi_num( $k['queue'] ),  'sub' => __( 'In queue — awaiting push', 'aisooq-connector' ), 'tone' => $k['queue'] > 0 ? 'is-warn' : '' ),
+			array(
+				'icon'  => 'warning-circle',
+				'label' => __( 'Failed', 'aisooq-connector' ),
+				'value' => $this->kpi_num( $k['failed'] ),
+				// Counts orders that exhausted their retries — they are NOT
+				// still retrying, and saying so was the reason a merchant could
+				// watch this tile read zero-and-fine while orders quietly
+				// stopped syncing.
+				'sub'   => sprintf(
+					/* translators: %d: the retry limit. */
+					__( 'Gave up after %d attempts', 'aisooq-connector' ),
+					(int) AI_Sooq_Order_Sync::MAX_ATTEMPTS
+				),
+				'tone'  => $k['failed'] > 0 ? 'is-err' : '',
+			),
+			array( 'icon' => 'shopping-cart-simple', 'label' => __( 'Carts', 'aisooq-connector' ),     'value' => number_format_i18n( $k['abandoned'] ), 'sub' => __( 'Abandoned carts pushed', 'aisooq-connector' ), 'tone' => '' ),
+			array( 'icon' => 'bag',                  'label' => __( 'Products', 'aisooq-connector' ),  'value' => number_format_i18n( $k['products'] ),  'sub' => __( 'Products synced', 'aisooq-connector' ), 'tone' => '' ),
+			array( 'icon' => 'users',                'label' => __( 'Customers', 'aisooq-connector' ), 'value' => number_format_i18n( $k['customers'] ), 'sub' => __( 'Customers synced', 'aisooq-connector' ), 'tone' => '' ),
 		);
-		foreach ( $entities as $ent => $meta ) :
-			$on  = "enable_{$ent}_sync";
-			$dir = "{$ent}_sync_dir";
-			?>
-			<div class="aisooq-field aisooq-entity">
-				<label class="aisooq-check"><input type="checkbox" name="aisooq[<?php echo esc_attr( $on ); ?>]" value="1" <?php checked( $s[ $on ] ); ?> /> <strong><?php echo esc_html( $meta['label'] ); ?></strong></label>
-				<select name="aisooq[<?php echo esc_attr( $dir ); ?>]" id="aisooq_<?php echo esc_attr( $dir ); ?>" aria-label="<?php echo esc_attr( sprintf( /* translators: %s: entity name */ __( '%s sync direction', 'aisooq-connector' ), $meta['label'] ) ); ?>">
-					<?php foreach ( $dirs as $val => $text ) : ?>
-						<option value="<?php echo esc_attr( $val ); ?>" <?php selected( $s[ $dir ], $val ); ?>><?php echo esc_html( $text ); ?></option>
-					<?php endforeach; ?>
-				</select>
-				<p class="description"><?php echo esc_html( $meta['desc'] ); ?></p>
-			</div>
-		<?php endforeach; ?>
-
-		<div class="aisooq-field">
-			<label class="aisooq-check"><input type="checkbox" name="aisooq[auto_sku]" value="1" <?php checked( $s['auto_sku'] ); ?> /> <strong><?php esc_html_e( 'Auto-generate missing SKUs', 'aisooq-connector' ); ?></strong></label>
-			<p class="description"><?php esc_html_e( 'A product/variant with no SKU gets a unique one (SP-<id>) written to WooCommerce at sync time, so the platform can map it. Turn off if you manage SKUs yourself.', 'aisooq-connector' ); ?></p>
-		</div>
-		<div class="aisooq-field">
-			<label class="aisooq-check"><input type="checkbox" name="aisooq[allow_status_writeback]" value="1" <?php checked( $s['allow_status_writeback'] ); ?> /> <strong><?php esc_html_e( 'Let the platform update WooCommerce order status', 'aisooq-connector' ); ?></strong></label>
-			<p class="description"><?php esc_html_e( 'When an order is progressed on the platform, mirror that status back onto the WooCommerce order.', 'aisooq-connector' ); ?></p>
-		</div>
-		<?php
-		$this->panel_close();
-	}
-
-	/** "Which orders do I refuse, and which do I look at twice?" */
-	private function render_fraud_section( $s, $fraud ) {
-		$this->panel_open( 'fraud', 'shield', __( 'Fraud & courier', 'aisooq-connector' ) );
-		?>
-		<div class="aisooq-field aisooq-field--switch">
-			<label class="aisooq-check"><input type="checkbox" name="aisooq[enable_fraud]" value="1" <?php checked( $s['enable_fraud'] ); ?> /> <strong><?php esc_html_e( 'Screen checkouts for fraud', 'aisooq-connector' ); ?></strong></label>
-			<p class="description"><?php esc_html_e( 'Phone/name/address, IP velocity, courier history. Fails open if the API is unreachable.', 'aisooq-connector' ); ?></p>
-		</div>
-		<div class="aisooq-field"<?php echo $this->depends_on( 'enable_fraud', __( 'Fraud screening is off', 'aisooq-connector' ) ); // phpcs:ignore WordPress.Security.EscapeOutput ?>>
-			<label class="h" for="aisooq_fraud_action"><?php esc_html_e( 'When fraud is detected', 'aisooq-connector' ); ?></label>
-			<select name="aisooq[fraud_action]" id="aisooq_fraud_action">
-				<option value="block" <?php selected( $s['fraud_action'], 'block' ); ?>><?php esc_html_e( 'Block checkout', 'aisooq-connector' ); ?></option>
-				<option value="hold" <?php selected( $s['fraud_action'], 'hold' ); ?>><?php esc_html_e( 'Allow, set order On hold', 'aisooq-connector' ); ?></option>
-				<option value="flag" <?php selected( $s['fraud_action'], 'flag' ); ?>><?php esc_html_e( 'Allow, add a flag note', 'aisooq-connector' ); ?></option>
-			</select>
-		</div>
-		<?php
-		$fraud_state  = isset( $fraud['state'] ) ? $fraud['state'] : 'disconnected';
-		$fraud_config = isset( $fraud['config'] ) && is_array( $fraud['config'] ) ? $fraud['config'] : null;
-		?>
-		<?php if ( 'disconnected' === $fraud_state ) : ?>
-			<div class="aisooq-field">
-				<p class="description"><?php esc_html_e( 'Connect the store (Verify connection) to configure the screening layers.', 'aisooq-connector' ); ?></p>
-			</div>
-		<?php elseif ( 'error' === $fraud_state ) : ?>
-			<div class="aisooq-field">
-				<p class="description aisooq-error">
-					<?php
-					printf(
-						/* translators: %s: the error the platform returned. */
-						esc_html__( 'Could not read the screening layers from the platform: %s', 'aisooq-connector' ),
-						esc_html( isset( $fraud['message'] ) ? $fraud['message'] : '' )
-					);
-					?>
-					<br />
-					<?php esc_html_e( 'Check that the OAuth app is registered with the fraud scope, then press Verify connection. The master switch above is still saved and still sent to the platform.', 'aisooq-connector' ); ?>
-				</p>
-			</div>
-		<?php else :
-			$fraud = $fraud_config;
-			$fv = function ( $key, $default ) use ( $fraud ) { return array_key_exists( $key, $fraud ) ? $fraud[ $key ] : $default; };
-			$pm = $fv( 'phoneMode', 'bd' );
-			?>
-			<input type="hidden" name="aisooq_fraud[_present]" value="1" />
-			<div class="aisooq-field"<?php echo $this->depends_on( 'enable_fraud', __( 'Fraud screening is off', 'aisooq-connector' ) ); // phpcs:ignore WordPress.Security.EscapeOutput ?>>
-				<span class="h"><?php esc_html_e( 'Layer 1 — basic validation', 'aisooq-connector' ); ?></span>
-				<label class="aisooq-check"><input type="checkbox" name="aisooq_fraud[name_validation]" value="1" <?php checked( ! empty( $fv( 'nameValidation', true ) ) ); ?> /> <?php esc_html_e( 'Block fake / gibberish customer names', 'aisooq-connector' ); ?></label>
-				<label class="aisooq-check"><input type="checkbox" name="aisooq_fraud[address_validation]" value="1" <?php checked( ! empty( $fv( 'addressValidation', true ) ) ); ?> /> <?php esc_html_e( 'Block fake / gibberish delivery addresses', 'aisooq-connector' ); ?></label>
-				<p class="description"><?php esc_html_e( 'Smart heuristics reject keyboard-mash names ("Ahshs Hsjs"), junk addresses and malformed numbers instantly.', 'aisooq-connector' ); ?></p>
-			</div>
-			<div class="aisooq-field"<?php echo $this->depends_on( 'enable_fraud', __( 'Fraud screening is off', 'aisooq-connector' ) ); // phpcs:ignore WordPress.Security.EscapeOutput ?>>
-				<label class="h" for="aisooq_fraud_phone_mode"><?php esc_html_e( 'Phone number check', 'aisooq-connector' ); ?></label>
-				<select name="aisooq_fraud[phone_mode]" id="aisooq_fraud_phone_mode">
-					<option value="bd" <?php selected( $pm, 'bd' ); ?>><?php esc_html_e( 'Bangladesh mobile only (recommended)', 'aisooq-connector' ); ?></option>
-					<option value="intl" <?php selected( $pm, 'intl' ); ?>><?php esc_html_e( 'International', 'aisooq-connector' ); ?></option>
-					<option value="off" <?php selected( $pm, 'off' ); ?>><?php esc_html_e( 'Off', 'aisooq-connector' ); ?></option>
-				</select>
-			</div>
-			<div class="aisooq-field"<?php echo $this->depends_on( 'enable_fraud', __( 'Fraud screening is off', 'aisooq-connector' ) ); // phpcs:ignore WordPress.Security.EscapeOutput ?>>
-				<span class="h"><?php esc_html_e( 'Layer 2 — IP rate limiting', 'aisooq-connector' ); ?></span>
-				<span class="aisooq-inline">
-					<?php esc_html_e( 'Auto-block after', 'aisooq-connector' ); ?>
-					<input name="aisooq_fraud[ip_max_attempts]" type="number" min="1" max="100" step="1" value="<?php echo esc_attr( (int) $fv( 'ipMaxAttempts', 3 ) ); ?>" class="small-text" aria-label="<?php esc_attr_e( 'Blocked attempts before an IP is auto-blocked', 'aisooq-connector' ); ?>" />
-					<?php esc_html_e( 'blocked attempts within', 'aisooq-connector' ); ?>
-					<input name="aisooq_fraud[ip_window_hours]" type="number" min="1" max="168" step="1" value="<?php echo esc_attr( (int) $fv( 'ipWindowHours', 24 ) ); ?>" class="small-text" aria-label="<?php esc_attr_e( 'Window in hours', 'aisooq-connector' ); ?>" />
-					<?php esc_html_e( 'hours from one IP', 'aisooq-connector' ); ?>
-				</span>
-				<p class="description"><?php esc_html_e( 'Detects spam bursts from a single IP.', 'aisooq-connector' ); ?></p>
-			</div>
-		<?php endif; ?>
-
-		<hr class="aisooq-rule" />
-		<p class="aisooq-subhead"><?php esc_html_e( 'Layer 3 — courier delivery history', 'aisooq-connector' ); ?></p>
-		<p class="description aisooq-subnote"><?php esc_html_e( 'BDCourier knows how many past parcels a phone number accepted and how many came back. Each lookup is billed to your store, so both settings below are about when it is worth spending one.', 'aisooq-connector' ); ?></p>
-
-		<div class="aisooq-field">
-			<label class="h" for="aisooq_courier_ratio"><?php esc_html_e( 'Block checkout below a success rate', 'aisooq-connector' ); ?></label>
-			<span class="aisooq-inline">
-				<?php esc_html_e( 'Block orders below', 'aisooq-connector' ); ?>
-				<input name="aisooq[courier_min_ratio]" id="aisooq_courier_ratio" type="number" min="0" max="100" step="1" value="<?php echo esc_attr( $s['courier_min_ratio'] ); ?>" class="small-text" /> %
-				<?php esc_html_e( 'success, once the customer has', 'aisooq-connector' ); ?>
-				<input name="aisooq[courier_min_parcels]" type="number" min="1" step="1" value="<?php echo esc_attr( $s['courier_min_parcels'] ); ?>" class="small-text" aria-label="<?php esc_attr_e( 'Minimum parcel history before the gate applies', 'aisooq-connector' ); ?>" />
-				<?php esc_html_e( 'parcels', 'aisooq-connector' ); ?>
-			</span>
-			<p class="description"><?php esc_html_e( 'Set 0 to disable. e.g. 60 or 75 — customers whose delivery-success ratio is below this (with enough parcel history) are blocked at checkout. Fails open if the API is unreachable.', 'aisooq-connector' ); ?></p>
-		</div>
-
-		<div class="aisooq-field">
-			<label class="aisooq-check"><input type="checkbox" name="aisooq[auto_courier_check]" value="1" <?php checked( $s['auto_courier_check'] ); ?> /> <strong><?php esc_html_e( 'Look up courier history automatically on every new order', 'aisooq-connector' ); ?></strong></label>
-			<p class="description"><?php esc_html_e( 'The result appears in a Courier column on WooCommerce → Orders and on the order screen, so nobody has to press a button per order. Looked up once in the background, kept until you press Recheck. Leave off to check by hand only.', 'aisooq-connector' ); ?></p>
-			<p class="description aisooq-cost"><span class="dashicons dashicons-info-outline" aria-hidden="true"></span><?php esc_html_e( 'One billed lookup per order that has a phone number.', 'aisooq-connector' ); ?></p>
-		</div>
-
-		<hr class="aisooq-rule" />
-		<p class="aisooq-subhead"><?php esc_html_e( 'Duplicate orders', 'aisooq-connector' ); ?></p>
-
-		<div class="aisooq-field aisooq-field--switch">
-			<label class="aisooq-check"><input type="checkbox" name="aisooq[dup_order_block]" value="1" <?php checked( $s['dup_order_block'] ); ?> /> <strong><?php esc_html_e( 'Disable duplicate orders for the same customer', 'aisooq-connector' ); ?></strong></label>
-			<p class="description"><?php esc_html_e( 'Refuses a second checkout from the same mobile number or e-mail inside the window below. Checked against this store’s own orders — no API call, nothing billed, and it keeps working if the platform is unreachable.', 'aisooq-connector' ); ?></p>
-		</div>
-		<div class="aisooq-field"<?php echo $this->depends_on( 'dup_order_block', __( 'Duplicate-order blocking is off', 'aisooq-connector' ) ); // phpcs:ignore WordPress.Security.EscapeOutput ?>>
-			<label class="h" for="aisooq_dup_hours"><?php esc_html_e( 'Time period', 'aisooq-connector' ); ?></label>
-			<span class="aisooq-inline">
-				<?php esc_html_e( 'Block a repeat order within', 'aisooq-connector' ); ?>
-				<input name="aisooq[dup_order_window_hours]" id="aisooq_dup_hours" type="number" min="1" max="168" step="1" value="<?php echo esc_attr( $s['dup_order_window_hours'] ); ?>" class="small-text" />
-				<?php esc_html_e( 'hours', 'aisooq-connector' ); ?>
-			</span>
-			<p class="description"><?php esc_html_e( 'Time period in hours to prevent duplicate orders from the same customer. Cancelled, failed and refunded orders never count — a shopper whose payment failed must be able to try again.', 'aisooq-connector' ); ?></p>
-		</div>
-
-		<hr class="aisooq-rule" />
-		<p class="aisooq-subhead"><?php esc_html_e( 'When a shopper is blocked', 'aisooq-connector' ); ?></p>
-		<div class="aisooq-field">
-			<span class="h"><?php esc_html_e( 'Support contacts', 'aisooq-connector' ); ?></span>
-			<div class="aisooq-row">
-				<input name="aisooq[support_phone]" id="aisooq_support_phone" type="text" value="<?php echo esc_attr( $s['support_phone'] ); ?>" placeholder="<?php esc_attr_e( 'Call number, e.g. 01XXXXXXXXX', 'aisooq-connector' ); ?>" aria-label="<?php esc_attr_e( 'Support phone number', 'aisooq-connector' ); ?>" />
-				<input name="aisooq[support_whatsapp]" id="aisooq_support_whatsapp" type="text" value="<?php echo esc_attr( $s['support_whatsapp'] ); ?>" placeholder="<?php esc_attr_e( 'WhatsApp, e.g. 8801XXXXXXXXX', 'aisooq-connector' ); ?>" aria-label="<?php esc_attr_e( 'Support WhatsApp number', 'aisooq-connector' ); ?>" />
-				<input name="aisooq[support_messenger]" id="aisooq_support_messenger" type="url" value="<?php echo esc_attr( $s['support_messenger'] ); ?>" placeholder="<?php esc_attr_e( 'Messenger, e.g. https://m.me/yourpage', 'aisooq-connector' ); ?>" aria-label="<?php esc_attr_e( 'Support Messenger link', 'aisooq-connector' ); ?>" />
-			</div>
-			<p class="description"><?php esc_html_e( 'A blocked shopper sees a popup with these Call / WhatsApp buttons, so a genuine buyer can still reach you. Leave blank to use the connected store’s contact number.', 'aisooq-connector' ); ?></p>
-		</div>
-		<?php
-		$this->panel_close();
-	}
-
-	/** "What exactly does the shopper read when we turn them away?" */
-	private function render_messages_section( $s ) {
-		$this->panel_open( 'messages', 'format-chat', __( 'Checkout messages', 'aisooq-connector' ) );
-		?>
-		<p class="description aisooq-subnote"><?php esc_html_e( 'The exact text a shopper sees when checkout is blocked. Write it in Bangla, English, or both. Leave a box blank to use the built-in default.', 'aisooq-connector' ); ?></p>
-		<div class="aisooq-field">
-			<label class="h" for="aisooq_msg_courier"><?php esc_html_e( 'Courier delivery gate', 'aisooq-connector' ); ?></label>
-			<textarea name="aisooq[msg_courier]" id="aisooq_msg_courier" rows="2"><?php echo esc_textarea( $s['msg_courier'] ); ?></textarea>
-			<p class="description"><?php esc_html_e( 'Tokens: {ratio} = delivery-success %, {parcels} = past parcel count.', 'aisooq-connector' ); ?></p>
-		</div>
-		<div class="aisooq-field">
-			<label class="h" for="aisooq_msg_fraud_contact"><?php esc_html_e( 'Fraud — details could not be verified', 'aisooq-connector' ); ?></label>
-			<textarea name="aisooq[msg_fraud_contact]" id="aisooq_msg_fraud_contact" rows="2"><?php echo esc_textarea( $s['msg_fraud_contact'] ); ?></textarea>
-		</div>
-		<div class="aisooq-field">
-			<label class="h" for="aisooq_msg_fraud_velocity"><?php esc_html_e( 'Fraud — too many attempts', 'aisooq-connector' ); ?></label>
-			<textarea name="aisooq[msg_fraud_velocity]" id="aisooq_msg_fraud_velocity" rows="2"><?php echo esc_textarea( $s['msg_fraud_velocity'] ); ?></textarea>
-		</div>
-		<div class="aisooq-field">
-			<label class="h" for="aisooq_msg_fraud_generic"><?php esc_html_e( 'Fraud — other / fallback', 'aisooq-connector' ); ?></label>
-			<textarea name="aisooq[msg_fraud_generic]" id="aisooq_msg_fraud_generic" rows="2"><?php echo esc_textarea( $s['msg_fraud_generic'] ); ?></textarea>
-		</div>
-		<div class="aisooq-field">
-			<label class="h" for="aisooq_msg_duplicate"><?php esc_html_e( 'Duplicate order', 'aisooq-connector' ); ?></label>
-			<textarea name="aisooq[msg_duplicate]" id="aisooq_msg_duplicate" rows="2"><?php echo esc_textarea( $s['msg_duplicate'] ); ?></textarea>
-			<p class="description"><?php esc_html_e( '{hours} is replaced with the configured window.', 'aisooq-connector' ); ?></p>
-		</div>
-		<div class="aisooq-field">
-			<label class="h" for="aisooq_msg_blocked"><?php esc_html_e( 'Blocked by your list', 'aisooq-connector' ); ?></label>
-			<textarea name="aisooq[msg_blocked]" id="aisooq_msg_blocked" rows="2"><?php echo esc_textarea( $s['msg_blocked'] ); ?></textarea>
-			<p class="description"><?php esc_html_e( 'Shown when a checkout matches an entry on your own block list. Keep it vague about the reason — naming it tells an abuser which detail to change. Blank uses the built-in wording.', 'aisooq-connector' ); ?></p>
-		</div>
-		<div class="aisooq-field">
-			<label class="h" for="aisooq_msg_help"><?php esc_html_e( 'Popup contact prompt', 'aisooq-connector' ); ?></label>
-			<input name="aisooq[msg_help]" id="aisooq_msg_help" type="text" value="<?php echo esc_attr( $s['msg_help'] ); ?>" />
-			<p class="description"><?php esc_html_e( 'Line shown above the Call / WhatsApp buttons in the blocked-checkout popup.', 'aisooq-connector' ); ?></p>
-		</div>
-		<?php
-		$this->panel_close();
-	}
-
-	/** "Which platform rate does this WooCommerce shipping method mean?" */
-	private function render_shipping_section( $s, $ship_methods, $ship_rates ) {
-		$this->panel_open( 'shipping', 'location', __( 'Shipping mapping', 'aisooq-connector' ) );
-		if ( empty( $ship_methods ) ) {
-			echo '<p class="description aisooq-subnote">' . esc_html__( 'No WooCommerce shipping methods found. Add zones + methods in WooCommerce › Settings › Shipping.', 'aisooq-connector' ) . '</p>';
-			$this->panel_close();
-			return;
-		}
-		?>
-		<p class="description aisooq-subnote"><?php esc_html_e( 'Map each WooCommerce shipping method to a platform shipping rate. Mapped charges link to that rate on the platform; unmapped ones raise a reconciliation alert.', 'aisooq-connector' ); ?></p>
-		<?php $map = (array) $s['shipping_map']; ?>
-		<?php foreach ( $ship_methods as $key => $label ) : ?>
-			<div class="aisooq-field">
-				<label class="h" for="aisooq_ship_<?php echo esc_attr( sanitize_key( $key ) ); ?>"><?php echo esc_html( $label ); ?> <span class="description">(<?php echo esc_html( $key ); ?>)</span></label>
-				<?php if ( ! empty( $ship_rates ) ) : ?>
-					<select id="aisooq_ship_<?php echo esc_attr( sanitize_key( $key ) ); ?>" name="aisooq[shipping_map][<?php echo esc_attr( $key ); ?>]">
-						<option value="0"><?php esc_html_e( '— not mapped —', 'aisooq-connector' ); ?></option>
-						<?php foreach ( $ship_rates as $r ) : $rid = isset( $r['id'] ) ? (int) $r['id'] : 0; ?>
-							<option value="<?php echo esc_attr( $rid ); ?>" <?php selected( isset( $map[ $key ] ) ? (int) $map[ $key ] : 0, $rid ); ?>>
-								<?php echo esc_html( ( isset( $r['zoneName'] ) ? $r['zoneName'] . ' / ' : '' ) . ( isset( $r['name'] ) ? $r['name'] : '' ) . ( isset( $r['amount'] ) ? ' (' . $r['amount'] . ')' : '' ) ); ?>
-							</option>
-						<?php endforeach; ?>
-					</select>
-				<?php else : ?>
-					<input type="number" min="0" id="aisooq_ship_<?php echo esc_attr( sanitize_key( $key ) ); ?>" name="aisooq[shipping_map][<?php echo esc_attr( $key ); ?>]" value="<?php echo esc_attr( isset( $map[ $key ] ) ? $map[ $key ] : '' ); ?>" placeholder="<?php esc_attr_e( 'platform rate id', 'aisooq-connector' ); ?>" class="small-text" />
-				<?php endif; ?>
-			</div>
-		<?php endforeach; ?>
-		<?php if ( empty( $ship_rates ) ) : ?>
-			<p class="description"><?php esc_html_e( 'Could not load platform rates — Verify the connection, or create shipping rates on the platform first. You can enter rate ids manually meanwhile.', 'aisooq-connector' ); ?></p>
-		<?php endif; ?>
-		<?php
-		$this->panel_close();
-	}
-
-	/** "Something is wrong and I need to see why." */
-	/** Human wording for the update channel's state, with no I/O. */
-	private static function update_state_badge() {
-		$st = class_exists( 'AI_Sooq_Updater' ) ? AI_Sooq_Updater::instance()->state() : array( 'state' => 'unknown', 'latest' => '' );
-		switch ( $st['state'] ) {
-			case 'available':
-				/* translators: %s: the version available on GitHub. */
-				return array( 'warn', sprintf( __( 'Version %s is available', 'aisooq-connector' ), $st['latest'] ) );
-			case 'current':
-				return array( 'ok', __( 'Up to date', 'aisooq-connector' ) );
-			case 'unreachable':
-				return array( 'err', __( 'Could not reach GitHub last time it looked', 'aisooq-connector' ) );
-			case 'off':
-				return array( 'muted', __( 'Turned off', 'aisooq-connector' ) );
-			case 'disabled':
-				return array( 'muted', __( 'Disabled on this server', 'aisooq-connector' ) );
-		}
-		return array( 'muted', __( 'Not checked yet', 'aisooq-connector' ) );
-	}
-
-	private function render_advanced_section( $s ) {
-		$this->panel_open( 'advanced', 'admin-generic', __( 'Advanced', 'aisooq-connector' ) );
-		?>
-		<div class="aisooq-field">
-			<?php list( $upd_tone, $upd_text ) = self::update_state_badge(); ?>
-			<label class="aisooq-check">
-				<input type="checkbox" name="aisooq[enable_updates]" value="1" <?php checked( $s['enable_updates'] ); ?> <?php disabled( ! current_user_can( 'update_plugins' ) ); ?> />
-				<strong><?php esc_html_e( 'Offer plugin updates from GitHub', 'aisooq-connector' ); ?></strong>
-				<span class="aisooq-badge <?php echo esc_attr( $upd_tone ); ?>"><?php echo esc_html( $upd_text ); ?></span>
-			</label>
-			<p class="description">
-				<?php esc_html_e( 'This plugin is not on WordPress.org, so without this it can only be updated by uploading a zip by hand — which is how security fixes stop reaching stores. Updates appear on Dashboard › Updates like any other plugin.', 'aisooq-connector' ); ?>
-				<?php if ( ! current_user_can( 'update_plugins' ) ) : ?>
-					<br /><em><?php esc_html_e( 'Only a user who can install plugin updates may change this.', 'aisooq-connector' ); ?></em>
-				<?php endif; ?>
-			</p>
-		</div>
-		<div class="aisooq-field">
-			<label class="aisooq-check"><input type="checkbox" name="aisooq[debug_log]" value="1" <?php checked( $s['debug_log'] ); ?> /> <strong><?php esc_html_e( 'Verbose debug logging', 'aisooq-connector' ); ?></strong></label>
-			<p class="description">
-				<?php esc_html_e( 'Every request and response is written to WooCommerce › Status › Logs. Useful while setting up; noisy afterwards.', 'aisooq-connector' ); ?>
-				<a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-status&tab=logs' ) ); ?>"><?php esc_html_e( 'Open logs', 'aisooq-connector' ); ?></a>
-			</p>
-		</div>
-		<div class="aisooq-field">
-			<span class="h"><?php esc_html_e( 'Background queue', 'aisooq-connector' ); ?></span>
-			<p class="description">
-				<?php esc_html_e( 'Syncs run through Action Scheduler. A stuck queue is almost always a paused WP-Cron.', 'aisooq-connector' ); ?>
-				<a href="<?php echo esc_url( admin_url( 'admin.php?page=wc-status&tab=action-scheduler&s=' . rawurlencode( AISOOQ_AS_GROUP ) ) ); ?>"><?php esc_html_e( 'Inspect scheduled actions', 'aisooq-connector' ); ?></a>
-			</p>
-		</div>
-		<?php
-		$this->panel_close();
 	}
 
 	/**
-	 * The screen's behaviour. Four small jobs, no framework:
-	 * tab switching, find-a-setting, dependent-field dimming, unsaved warning —
-	 * plus the pre-existing Verify / Sync calls.
+	 * The setup guide, with each step's "done" derived from the real settings
+	 * rather than remembered in an option.
 	 *
-	 * Printed inline rather than enqueued because it is short, single-screen,
-	 * and needs three translated strings and a nonce interpolated into it.
+	 * Deriving it is the whole point: a stored checklist goes stale the moment
+	 * someone clears a credential, and then the guide cheerfully reports a
+	 * finished setup for a store that is not syncing.
+	 */
+	private function setup_steps( array $s, array $status, array $ship_methods ) {
+		$mapped = true;
+		if ( $ship_methods ) {
+			$map = (array) $s['shipping_map'];
+			foreach ( array_keys( $ship_methods ) as $method ) {
+				if ( empty( $map[ $method ] ) ) {
+					$mapped = false;
+					break;
+				}
+			}
+		}
+
+		return array(
+			array(
+				'label' => __( 'Add credentials', 'aisooq-connector' ),
+				'done'  => '' !== $s['api_base'] && '' !== $s['client_id'] && '' !== $s['sid'],
+				'tab'   => 'connection',
+			),
+			array(
+				'label' => __( 'Verify connection', 'aisooq-connector' ),
+				'done'  => ! empty( $status['ok'] ),
+				// Not a place you can navigate to — it is the button in the bar.
+				'tab'   => '',
+			),
+			array(
+				'label' => __( 'Choose what to sync', 'aisooq-connector' ),
+				'done'  => ! empty( $s['enable_orders'] ) || ! empty( $s['enable_abandoned'] ),
+				'tab'   => 'sync',
+			),
+			array(
+				'label' => __( 'Turn on fraud screening', 'aisooq-connector' ),
+				'done'  => ! empty( $s['enable_fraud'] ),
+				'tab'   => 'fraud',
+			),
+			array(
+				'label' => __( 'Map shipping', 'aisooq-connector' ),
+				'done'  => $mapped,
+				'tab'   => 'shipping',
+			),
+		);
+	}
+
+	/**
+	 * The screen's behaviour. Small jobs, no framework:
+	 * tab switching, search, dependent-field dimming, the unsaved bar, and the
+	 * pre-existing Verify / Sync calls.
+	 *
+	 * Printed inline rather than enqueued because it is single-screen and needs
+	 * a nonce and several translated strings interpolated into it.
+	 *
+	 * EVERY PROGRESSIVE-ENHANCEMENT DECISION HERE POINTS THE SAME WAY: nothing
+	 * below is required to use the page. Panels are hidden by this script and
+	 * by nothing else, so a blocked or broken script leaves all six visible,
+	 * each under its own heading, with one Save at the bottom that still works.
 	 */
 	private function render_page_script() {
 		$default = key( $this->sections() );
 		?>
 		<script>
 		( function () {
-			var wrap = document.querySelector( '.wrap.aisooq' );
+			var wrap = document.querySelector( '.wrap.aisooq-app' );
 			if ( ! wrap ) { return; }
 
 			/* ── Tabs ────────────────────────────────────────────────────────
-			 * The class is what hides panels, and it is only ever added here —
-			 * so if this script fails to run, every panel stays visible and the
-			 * page is still completely usable. */
+			 * One tablist at every width. The nav is a column on a desktop and
+			 * a scrolling row of pills on a phone, but it is the same six
+			 * buttons either way — see AI_Sooq_Admin_Shell::sidebar() for why
+			 * rendering a second set was wrong. */
 			var tabs   = [].slice.call( wrap.querySelectorAll( '.aisooq-tab' ) );
 			var panels = [].slice.call( wrap.querySelectorAll( '.aisooq-panel' ) );
 			var KEY    = 'aisooq_settings_tab';
@@ -1592,6 +1200,8 @@ class AI_Sooq_Settings {
 					t.setAttribute( 'aria-selected', on ? 'true' : 'false' );
 					t.tabIndex = on ? 0 : -1;
 					if ( on && focusTab ) { t.focus(); }
+					// Keep the active item in view while the nav is a scroller.
+					if ( on && t.scrollIntoView ) { t.scrollIntoView( { block: 'nearest', inline: 'nearest' } ); }
 				} );
 				try { window.sessionStorage.setItem( KEY, name ); } catch ( e ) {}
 				if ( history.replaceState ) {
@@ -1599,77 +1209,152 @@ class AI_Sooq_Settings {
 				}
 			}
 
-			wrap.classList.add( 'aisooq-has-tabs' );
 			tabs.forEach( function ( t, i ) {
 				t.addEventListener( 'click', function () { show( t.dataset.tab ); } );
 				// Roving focus: a tablist is one stop, arrows move within it.
 				t.addEventListener( 'keydown', function ( e ) {
-					var d = { ArrowRight: 1, ArrowLeft: -1, Home: -Infinity, End: Infinity }[ e.key ];
+					/*
+					 * Both axes are accepted because the nav is a column on a
+					 * desktop and a row on a phone, and the same markup serves
+					 * both. Binding only one pair would leave whichever arrow
+					 * matches what the user sees doing nothing.
+					 */
+					var d = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1, Home: -Infinity, End: Infinity }[ e.key ];
 					if ( undefined === d ) { return; }
 					e.preventDefault();
 					var next = d === -Infinity ? 0 : d === Infinity ? tabs.length - 1 : ( i + d + tabs.length ) % tabs.length;
 					show( tabs[ next ].dataset.tab, true );
 				} );
 			} );
+			// The setup guide's steps are shortcuts to the tab that finishes them.
+			[].slice.call( wrap.querySelectorAll( '[data-goto]' ) ).forEach( function ( b ) {
+				b.addEventListener( 'click', function () { show( b.dataset.goto ); } );
+			} );
 
 			var stored = '';
 			try { stored = window.sessionStorage.getItem( KEY ) || ''; } catch ( e ) {}
 			show( ( location.hash || '' ).replace( '#', '' ) || stored );
 
-			/* ── Find a setting ──────────────────────────────────────────────
-			 * With six tabs, "which tab is that in?" becomes the new problem the
-			 * grouping created. Typing here searches every panel at once and
-			 * counts hits per tab, so the answer is visible without opening
-			 * each one. */
-			var find   = document.getElementById( 'aisooq-find' );
-			var nores  = wrap.querySelector( '.aisooq-nores' );
-			var fields = [].slice.call( wrap.querySelectorAll( '.aisooq-field' ) );
-			// Group headings and rules belong to the fields under them. Left up
-			// during a filter they become captions over nothing — worse than
-			// absent, because "When a shopper is blocked" with no controls reads
-			// as a section whose settings went missing.
-			var trim = [].slice.call( wrap.querySelectorAll( '.aisooq-subhead, .aisooq-subnote, .aisooq-rule' ) );
-			fields.forEach( function ( f ) { f._hay = ( f.textContent || '' ).toLowerCase(); } );
+			/* ── Search ──────────────────────────────────────────────────────
+			 * With six tabs, "which tab is that in?" is the problem the
+			 * grouping created. The index is built from the rendered labels
+			 * rather than from a hand-kept list, so a setting added to a panel
+			 * is findable the same day without anyone remembering to register
+			 * it — the failure mode of every hardcoded search index. */
+			var index = [];
+			panels.forEach( function ( p ) {
+				var tabBtn = wrap.querySelector( '#aisooq-tab-' + p.dataset.panel );
+				var tabLbl = tabBtn ? ( tabBtn.querySelector( 'span' ) || {} ).textContent || '' : '';
+				[].slice.call( p.querySelectorAll( '.aisooq-field, .aisooq-check, .aisooq-row-item' ) ).forEach( function ( f ) {
+					var label = f.querySelector( '.h, .aisooq-row-item__label' );
+					var text  = ( label ? label.textContent : f.textContent ) || '';
+					text = text.replace( /\s+/g, ' ' ).trim();
+					if ( ! text ) { return; }
+					// A whole field's prose makes every query match everything.
+					if ( text.length > 60 ) { text = text.slice( 0, 60 ).trim() + '…'; }
+					index.push( { text: text, hay: text.toLowerCase(), tab: p.dataset.panel, tabLabel: tabLbl, el: f } );
+				} );
+			} );
 
-			function filter() {
-				var q = find.value.trim().toLowerCase();
-				if ( ! q ) {
-					fields.forEach( function ( f ) { f.hidden = false; } );
-					trim.forEach( function ( e ) { e.hidden = false; } );
-					tabs.forEach( function ( t ) { t.querySelector( '.aisooq-tab__count' ).hidden = true; } );
-					wrap.classList.remove( 'is-filtering' );
-					nores.hidden = true;
-					show( current );
-					return;
+			var NO_MATCH = <?php echo wp_json_encode( __( 'No matches', 'aisooq-connector' ) ); ?>;
+
+			function wireSearch( input ) {
+				if ( ! input ) { return; }
+				var box = input.closest( '.aisooq-search' );
+				var pop = null;
+				var hits = [];
+				var at = -1;
+
+				function close() {
+					if ( pop ) { pop.remove(); pop = null; }
+					at = -1;
+					input.setAttribute( 'aria-expanded', 'false' );
 				}
-				wrap.classList.add( 'is-filtering' );
-				trim.forEach( function ( e ) { e.hidden = true; } );
-				var total = 0;
-				panels.forEach( function ( p ) {
-					var hits = 0;
-					[].slice.call( p.querySelectorAll( '.aisooq-field' ) ).forEach( function ( f ) {
-						var hit = f._hay.indexOf( q ) !== -1;
-						f.hidden = ! hit;
-						if ( hit ) { hits++; }
+
+				function pick( h ) {
+					close();
+					input.value = '';
+					show( h.tab );
+					// Highlight rather than only scroll: on a short panel the
+					// scroll is a no-op and the jump looks like nothing happened.
+					h.el.classList.add( 'is-found' );
+					setTimeout( function () { h.el.classList.remove( 'is-found' ); }, 1600 );
+					if ( h.el.scrollIntoView ) { h.el.scrollIntoView( { block: 'center' } ); }
+					var focusable = h.el.querySelector( 'input, select, textarea' );
+					if ( focusable ) { focusable.focus( { preventScroll: true } ); }
+				}
+
+				function render() {
+					if ( pop ) { pop.remove(); }
+					pop = document.createElement( 'div' );
+					pop.className = 'aisooq-results';
+					pop.setAttribute( 'role', 'listbox' );
+					if ( ! hits.length ) {
+						var none = document.createElement( 'div' );
+						none.className = 'aisooq-results__none';
+						none.textContent = NO_MATCH;
+						pop.appendChild( none );
+					}
+					hits.forEach( function ( h, i ) {
+						var b = document.createElement( 'button' );
+						b.type = 'button';
+						b.className = 'aisooq-results__item' + ( i === at ? ' is-active' : '' );
+						b.setAttribute( 'role', 'option' );
+						b.setAttribute( 'aria-selected', i === at ? 'true' : 'false' );
+						var l = document.createElement( 'span' );
+						l.textContent = h.text;
+						var t = document.createElement( 'span' );
+						t.className = 'aisooq-results__tab';
+						t.textContent = h.tabLabel;
+						b.appendChild( l );
+						b.appendChild( t );
+						b.addEventListener( 'mousedown', function ( e ) { e.preventDefault(); pick( h ); } );
+						pop.appendChild( b );
 					} );
-					total += hits;
-					// While filtering, every panel with a hit is open at once —
-					// scanning results beats hunting through tabs for them.
-					p.hidden = hits === 0;
-					var badge = wrap.querySelector( '#aisooq-tab-' + p.dataset.panel + ' .aisooq-tab__count' );
-					if ( badge ) {
-						badge.textContent = hits;
-						badge.hidden = hits === 0;
+					box.appendChild( pop );
+					input.setAttribute( 'aria-expanded', 'true' );
+				}
+
+				input.setAttribute( 'role', 'combobox' );
+				input.setAttribute( 'aria-expanded', 'false' );
+				input.setAttribute( 'aria-autocomplete', 'list' );
+
+				input.addEventListener( 'input', function () {
+					var q = input.value.trim().toLowerCase();
+					if ( ! q ) { close(); return; }
+					var seen = {};
+					hits = index.filter( function ( r ) {
+						if ( r.hay.indexOf( q ) === -1 || seen[ r.text ] ) { return false; }
+						seen[ r.text ] = 1;
+						return true;
+					} ).slice( 0, 8 );
+					at = hits.length ? 0 : -1;
+					render();
+				} );
+
+				input.addEventListener( 'keydown', function ( e ) {
+					if ( 'Escape' === e.key ) { input.value = ''; close(); return; }
+					if ( ! pop || ! hits.length ) { return; }
+					if ( 'ArrowDown' === e.key || 'ArrowUp' === e.key ) {
+						e.preventDefault();
+						at = ( at + ( 'ArrowDown' === e.key ? 1 : -1 ) + hits.length ) % hits.length;
+						render();
+					} else if ( 'Enter' === e.key ) {
+						e.preventDefault();
+						pick( hits[ at < 0 ? 0 : at ] );
 					}
 				} );
-				nores.hidden = total > 0;
+
+				input.addEventListener( 'blur', function () { setTimeout( close, 120 ); } );
 			}
-			if ( find ) {
-				find.addEventListener( 'input', filter );
-				find.addEventListener( 'keydown', function ( e ) {
-					if ( 'Escape' === e.key ) { find.value = ''; filter(); }
+			wireSearch( document.getElementById( 'aisooq-find' ) );
+
+			/* ── Status chips ────────────────────────────────────────────── */
+			[].slice.call( wrap.querySelectorAll( '.aisooq-chip input[type="checkbox"]' ) ).forEach( function ( cb ) {
+				cb.addEventListener( 'change', function () {
+					cb.closest( '.aisooq-chip' ).classList.toggle( 'is-on', cb.checked );
 				} );
-			}
+			} );
 
 			/* ── Dependent fields ────────────────────────────────────────────
 			 * Dimmed, not hidden: an operator who came to change this setting
@@ -1693,10 +1378,11 @@ class AI_Sooq_Settings {
 			syncDeps();
 
 			/* ── Unsaved changes ─────────────────────────────────────────────
-			 * Now that most of the form is off-screen, an edit you made two tabs
-			 * ago is easy to walk away from. */
-			var form  = document.getElementById( 'aisooq-settings-form' );
-			var dirty = wrap.querySelector( '.aisooq-dirty' );
+			 * Most of the form is off-screen behind a tab, so an edit made two
+			 * tabs ago is easy to walk away from. The bar is the only thing
+			 * that says so, and it offers both ways out. */
+			var form    = document.getElementById( 'aisooq-settings-form' );
+			var bar     = document.getElementById( 'aisooq-unsaved' );
 			var isDirty = false;
 			if ( form ) {
 				// Compare against the state the page loaded with, rather than
@@ -1718,7 +1404,7 @@ class AI_Sooq_Settings {
 					var now = serialise() !== initial;
 					if ( now === isDirty ) { return; }
 					isDirty = now;
-					if ( dirty ) { dirty.hidden = ! now; }
+					if ( bar ) { bar.hidden = ! now; }
 					wrap.classList.toggle( 'is-dirty', now );
 				};
 				form.addEventListener( 'input', recheck );
@@ -1729,11 +1415,67 @@ class AI_Sooq_Settings {
 					e.preventDefault();
 					e.returnValue = '';
 				} );
+
+				var proxy = document.getElementById( 'aisooq-save-proxy' );
+				if ( proxy ) {
+					/*
+					 * Clicks the one real submit rather than being a second one
+					 * — see the comment where this button is printed. Found by
+					 * id and not by a name attribute selector: this comment is
+					 * JavaScript, so it is printed into the page, and spelling
+					 * the submit's name out here would put that string in the
+					 * source a second time. test-settings-page.php counts those
+					 * occurrences to prove there is only one such control, and
+					 * a comment must not be what breaks it.
+					 */
+					proxy.addEventListener( 'click', function () {
+						var real = document.getElementById( 'aisooq-save' );
+						if ( real ) { real.click(); }
+					} );
+				}
+				var discard = document.getElementById( 'aisooq-discard' );
+				if ( discard ) {
+					discard.addEventListener( 'click', function () {
+						form.reset();
+						// `reset()` restores the DOM defaults, which are the
+						// values this page rendered with — the same baseline
+						// `initial` was taken from. Everything derived from
+						// those values has to be recomputed by hand.
+						[].slice.call( wrap.querySelectorAll( '.aisooq-chip input[type="checkbox"]' ) ).forEach( function ( cb ) {
+							cb.closest( '.aisooq-chip' ).classList.toggle( 'is-on', cb.checked );
+						} );
+						syncDeps();
+						recheck();
+					} );
+				}
 			}
 
 			/* ── Verify + Sync ───────────────────────────────────────────── */
 			var out   = document.getElementById( 'aisooq-test-result' );
 			var nonce = <?php echo wp_json_encode( wp_create_nonce( self::NONCE ) ); ?>;
+			var toastEl = null;
+			var toastT  = null;
+
+			/*
+			 * The toast is the design's feedback, and it is `aria-hidden` on
+			 * purpose: `out` in the app bar already carries the same words in a
+			 * live region that does not vanish after two seconds. Announcing
+			 * both would say everything twice.
+			 */
+			function toast( msg, ok ) {
+				if ( ! toastEl ) {
+					toastEl = document.createElement( 'div' );
+					toastEl.className = 'aisooq-toast';
+					toastEl.setAttribute( 'aria-hidden', 'true' );
+					wrap.appendChild( toastEl );
+				}
+				toastEl.className = 'aisooq-toast' + ( ok ? '' : ' is-err' );
+				toastEl.textContent = msg;
+				toastEl.hidden = false;
+				clearTimeout( toastT );
+				toastT = setTimeout( function () { toastEl.hidden = true; }, 2600 );
+			}
+
 			// Every button that can start one of these requests. Disabling them
 			// for the duration is not cosmetic: without it a second click queues
 			// a second backfill, and `aria-busy` is the only signal a
@@ -1748,7 +1490,7 @@ class AI_Sooq_Settings {
 			function call( action, pending, entity ) {
 				setBusy( true );
 				out.textContent = pending;
-				out.className = 'aisooq-result is-pending';
+				out.className = 'aisooq-appbar__result is-pending';
 				var data = new FormData();
 				data.append( 'action', action );
 				data.append( 'nonce', nonce );
@@ -1757,11 +1499,14 @@ class AI_Sooq_Settings {
 					.then( function ( r ) { return r.json(); } )
 					.then( function ( j ) {
 						setBusy( false );
-						out.textContent = ( j && j.data && j.data.message ) ? j.data.message : 'Error';
-						out.className = 'aisooq-result ' + ( ( j && j.success ) ? 'is-ok' : 'is-err' );
-						// Verify success returns fresh store profile + permissions;
-						// reload to render the connection panel from the saved status.
-						if ( j && j.success && j.data && j.data.reload ) {
+						var ok  = !! ( j && j.success );
+						var msg = ( j && j.data && j.data.message ) ? j.data.message : 'Error';
+						out.textContent = msg;
+						out.className = 'aisooq-appbar__result ' + ( ok ? 'is-ok' : 'is-err' );
+						toast( msg, ok );
+						// Verify success returns a fresh store profile + permissions;
+						// reload to render the overview from the saved status.
+						if ( ok && j.data && j.data.reload ) {
 							isDirty = false;
 							setBusy( true ); // the page is about to go
 							setTimeout( function () { location.reload(); }, 900 );
@@ -1769,8 +1514,10 @@ class AI_Sooq_Settings {
 					} )
 					.catch( function () {
 						setBusy( false );
-						out.textContent = <?php echo wp_json_encode( __( 'Request failed', 'aisooq-connector' ) ); ?>;
-						out.className = 'aisooq-result is-err';
+						var msg = <?php echo wp_json_encode( __( 'Request failed', 'aisooq-connector' ) ); ?>;
+						out.textContent = msg;
+						out.className = 'aisooq-appbar__result is-err';
+						toast( msg, false );
 					} );
 			}
 			var t = document.getElementById( 'aisooq-test-connection' );

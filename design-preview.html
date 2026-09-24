@@ -3,98 +3,90 @@
 <title>AI Sooq — design system preview</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
+/* @generated:tokens — do not edit by hand.
+   Written by bin/make-design-tokens.php from the token block in
+   assets/css/aisooq-admin.css. This file is opened straight off disk with no
+   build step, so it cannot fetch the JSON at runtime: `file://` blocks it.
+   Generating it into the file instead is what keeps this a copy that cannot
+   drift rather than one that merely should not. */
 :root {
-	--pri: #08294C;          /* AI Sooq navy — plays X-blue's role */
-	--pri-d: #04162B;        /* night — hover/active */
+	--pri-100: #0b2a4a;
+	--pri-200: #103d6b;
+	--pri-300: #1766b3;
+	--pri-400: #1f74c7;
+	--pri-500: #2b8ae6;
+	--pri-600: #62a9ee;
+	--pri-700: #a3cdf6;
+	--pri-800: #d6e9fc;
+	--pri-900: #eef6fe;
+	--pri: #2b8ae6;
+	--pri-d: #1f74c7;
+	--pri-dd: #1766b3;
 	--pri-fg: #ffffff;
-	--pri-wash: rgba(8, 41, 76, .1);   /* ghost-button hover, X's blue wash */
-	--hl: #FDC137;           /* AI Sooq gold — the only accent */
+	--pri-solid: #1f74c7;
+	--pri-wash: rgba(43, 138, 230, .1);
+	--pri-tint: #eef6fe;
+	--hl: #FDC137;
 	--hl-d: #E0A81F;
-	/* Gold is a SURFACE, never ink: #FDC137 is 1.63:1 on white and fails as
-	   text at any size. It only ever carries this dark brown, at 11.3:1. */
 	--hl-fg: #3d2c00;
-
 	--ok: #00754b;
 	--warn: #8a5a00;
 	--err: #c0392b;
-	--info: #1f6f9c;
-
-	/* Status tints — the pale bed each ink above sits on, so a badge is one
-	   named pair rather than two hand-picked hexes. There were two warm tints
-	   a shade apart (#fcf5e6 and #fdf3e0) doing the identical job on different
-	   screens; nobody could have told them apart, so they are now one. */
+	--info: #1766b3;
 	--ok-wash: #e8f3ec;
 	--warn-wash: #fdf3e0;
 	--err-wash: #fcebea;
-	--info-wash: #f0f6fc;
-	--pri-tint: #e9f0f8;     /* opaque counterpart to --pri-wash, for pills */
+	--info-wash: #eef6fe;
 	--ok-edge: #00844a33;
 	--warn-edge: #99680033;
 	--err-edge: #b32d2e33;
-
-	/* X's own greys. `--line` divides, `--edge` is for controls that must read
-	   as interactive (inputs, secondary buttons) and needs the extra weight. */
-	--line: #eff3f4;
-	--edge: #cfd9de;
-	--muted: #536471;        /* 6.1:1 on white */
-	--fg: #0f1419;
+	--n-100: #14171c;
+	--n-200: #2f3439;
+	--n-300: #56626e;
+	--n-400: #6c7884;
+	--n-500: #8b98a5;
+	--n-600: #aab5c0;
+	--n-700: #d3dbe1;
+	--n-800: #e6ebef;
+	--n-900: #f6f8fa;
+	--line: #e6ebef;
+	--edge: #d3dbe1;
+	--muted: #56626e;
+	--fg: #14171c;
 	--bg: #ffffff;
 	--card: #ffffff;
-	--wash: rgba(15, 20, 25, .03);     /* row / item hover */
-
-	/* Recessed surfaces — toolbars, sticky table heads, nested panels. Three
-	   steps only, and they are ordered: `--sunk` reads as "behind", `--sunk-2`
-	   as "behind that", `--track` is the empty half of a progress bar. */
-	--sunk: #fbfbfc;
-	--sunk-2: #f6f7f7;
-	--track: #f0f0f1;
-
-	--radius: 16px;          /* X's module radius */
-	--radius-sm: 4px;        /* inputs */
-	--radius-md: 8px;        /* thumbnails, nested tables, menus */
+	--wash: rgba(20, 23, 28, .03);
+	--sunk: #fbfcfd;
+	--sunk-2: #f6f8fa;
+	--track: #e6ebef;
+	--radius: 16px;
+	--radius-sm: 6px;
+	--radius-md: 10px;
 	--pill: 9999px;
-
-	/* TYPE. The header above commits this file to "15px/20px base — X's exact
-	   metrics", and everything here is that scale or a step off it. Before
-	   these existed the sheet used fourteen sizes (10,11,12,13,14,15,16,17,18,
-	   20,22,24,26,28) with 13px — wp-admin's default, not X's — the most
-	   common, so the stated design was not the one shipping. */
-	--text-xs: 11px;         /* uppercase table heads, meta */
-	--text-sm: 13px;         /* dense table cells */
-	--text: 15px;            /* base — X's body copy */
-	--text-lg: 17px;         /* card and section headings */
-	--text-xl: 20px;         /* page and panel titles */
-	--text-2xl: 26px;        /* KPI numerals */
-	--lh-tight: 1.15;        /* numerals and headings */
-	--lh: 1.35;              /* 20/15 — the other half of X's base metric */
-
-	/* SPACE. A 4px base. The sheet previously used 57 distinct px values,
-	   including nearly every integer from 10 to 16, which is freehand rather
-	   than a rhythm. Reach for a step; add a literal only when a real optical
-	   correction demands it, and say why. */
+	--sh-sm: 0 0 0 1px #e6ebef;
+	--sh-md: 0 0 0 1px #e6ebef, 0 8px 24px rgba(20, 23, 28, .10);
+	--sh-lg: 0 0 0 1px #e6ebef, 0 12px 32px rgba(20, 23, 28, .16);
+	--sh-elev: 0 0 0 1px #e6ebef, 0 12px 32px rgba(20, 23, 28, .16);
+	--text-xs: 11px;
+	--text-sm: 13px;
+	--text: 14px;
+	--text-lg: 16px;
+	--text-xl: 22px;
+	--text-2xl: 24px;
+	--lh-tight: 1.15;
+	--lh: 1.45;
 	--sp-1: 4px;
 	--sp-2: 8px;
 	--sp-3: 12px;
 	--sp-4: 16px;
 	--sp-5: 20px;
 	--sp-6: 24px;
-
-	/* BREAKPOINTS cannot be custom properties in a media query, so they are
-	   fixed here as the only three this sheet may use:
-	     782px — wp-admin's own admin-bar/table breakpoint. Non-negotiable.
-	     600px — one column.
-	     400px — smallest phone.
-	   400/480/560/600/782/860 were all in use; the middle three were ad hoc. */
-	/* Only things that float get elevation. */
-	--sh-elev: 0 0 15px rgba(101, 119, 134, .2), 0 0 3px 1px rgba(101, 119, 134, .15);
-
-	/* Repaint WordPress's own admin accent within our screens — recolours
-	   checkbox/radio checks, focus rings and any theme-var-driven control to
-	   navy in one shot. */
-	--wp-admin-theme-color: #08294C;
-	--wp-admin-theme-color-darker-10: #061F3A;
-	--wp-admin-theme-color-darker-20: #04162B;
+	--sp-8: 32px;
+	--wp-admin-theme-color: #2b8ae6;
+	--wp-admin-theme-color-darker-10: #1f74c7;
+	--wp-admin-theme-color-darker-20: #1766b3;
 }
+/* @end:tokens */
 
 *{box-sizing:border-box}
 body{margin:0;padding:var(--sp-6);background:var(--sunk);color:var(--fg);
@@ -148,51 +140,111 @@ tbody tr:hover{background:var(--wash)}
 </style>
 
 <h1>AI Sooq — admin design system</h1>
-<p class="lede">X/Twitter's visual language, AI Sooq's palette. Generated from
-<code>design-tokens.json</code>, which is extracted from <code>assets/css/aisooq-admin.css</code>.
-Contrast ratios are computed live against white — nothing here is hand-typed.</p>
+<p class="lede">The plugin's admin palette. The token block and every swatch below are
+<strong>generated</strong> by <code>bin/make-design-tokens.php</code> from
+<code>assets/css/aisooq-admin.css</code>, and the contrast ratios are computed, not typed. Re-run it
+after changing a token; <code>--check</code> tells you whether this file is stale.</p>
 
-<h2>Brand</h2><div class="grid"><figure class="sw"><div class="chip" style="background:#08294C"></div>
-    <code>--pri</code><span class="val">#08294C</span><span class="r ok">14.67:1 AA</span></figure><figure class="sw"><div class="chip" style="background:#04162B"></div>
-    <code>--pri-d</code><span class="val">#04162B</span><span class="r ok">18.18:1 AA</span></figure><figure class="sw"><div class="chip" style="background:#ffffff"></div>
-    <code>--pri-fg</code><span class="val">#ffffff</span><span class="r no">1.00:1 bg only</span></figure><figure class="sw"><div class="chip" style="background:rgba(8, 41, 76, .1)"></div>
-    <code>--pri-wash</code><span class="val">rgba(8, 41, 76, .1)</span></figure><figure class="sw"><div class="chip" style="background:#FDC137"></div>
-    <code>--hl</code><span class="val">#FDC137</span><span class="r no">1.63:1 bg only</span></figure><figure class="sw"><div class="chip" style="background:#E0A81F"></div>
-    <code>--hl-d</code><span class="val">#E0A81F</span><span class="r no">2.14:1 bg only</span></figure><figure class="sw"><div class="chip" style="background:#3d2c00"></div>
-    <code>--hl-fg</code><span class="val">#3d2c00</span><span class="r ok">13.47:1 AA</span></figure><figure class="sw"><div class="chip" style="background:#e9f0f8"></div>
-    <code>--pri-tint</code><span class="val">#e9f0f8</span><span class="r no">1.15:1 bg only</span></figure></div>
-<p class="note"><strong>Gold is a surface, never ink.</strong> <code>--hl</code> is 1.63:1 on white
-and fails as text at any size. It only ever carries <code>--hl-fg</code>, at 11.34:1.</p>
-
+<!-- @generated:swatches — written by bin/make-design-tokens.php. -->
+<h2>Accent ramp</h2><div class="grid"><figure class="sw"><div class="chip" style="background:#0b2a4a"></div>
+    <code>--pri-100</code><span class="val">#0b2a4a</span><span class="r ok">14.54:1 AA text</span></figure>
+<figure class="sw"><div class="chip" style="background:#103d6b"></div>
+    <code>--pri-200</code><span class="val">#103d6b</span><span class="r ok">11.04:1 AA text</span></figure>
+<figure class="sw"><div class="chip" style="background:#1766b3"></div>
+    <code>--pri-300</code><span class="val">#1766b3</span><span class="r ok">5.85:1 AA text</span></figure>
+<figure class="sw"><div class="chip" style="background:#1f74c7"></div>
+    <code>--pri-400</code><span class="val">#1f74c7</span><span class="r ok">4.79:1 AA text</span></figure>
+<figure class="sw"><div class="chip" style="background:#2b8ae6"></div>
+    <code>--pri-500</code><span class="val">#2b8ae6</span><span class="r mid">3.57:1 UI / large only</span></figure>
+<figure class="sw"><div class="chip" style="background:#62a9ee"></div>
+    <code>--pri-600</code><span class="val">#62a9ee</span><span class="r no">2.49:1 background only</span></figure>
+<figure class="sw"><div class="chip" style="background:#a3cdf6"></div>
+    <code>--pri-700</code><span class="val">#a3cdf6</span><span class="r no">1.66:1 background only</span></figure>
+<figure class="sw"><div class="chip" style="background:#d6e9fc"></div>
+    <code>--pri-800</code><span class="val">#d6e9fc</span><span class="r no">1.24:1 background only</span></figure>
+<figure class="sw"><div class="chip" style="background:#eef6fe"></div>
+    <code>--pri-900</code><span class="val">#eef6fe</span><span class="r no">1.09:1 background only</span></figure></div>
+<h2>Neutral ramp</h2><div class="grid"><figure class="sw"><div class="chip" style="background:#14171c"></div>
+    <code>--n-100</code><span class="val">#14171c</span><span class="r ok">17.96:1 AA text</span></figure>
+<figure class="sw"><div class="chip" style="background:#2f3439"></div>
+    <code>--n-200</code><span class="val">#2f3439</span><span class="r ok">12.57:1 AA text</span></figure>
+<figure class="sw"><div class="chip" style="background:#56626e"></div>
+    <code>--n-300</code><span class="val">#56626e</span><span class="r ok">6.24:1 AA text</span></figure>
+<figure class="sw"><div class="chip" style="background:#6c7884"></div>
+    <code>--n-400</code><span class="val">#6c7884</span><span class="r ok">4.51:1 AA text</span></figure>
+<figure class="sw"><div class="chip" style="background:#8b98a5"></div>
+    <code>--n-500</code><span class="val">#8b98a5</span><span class="r no">2.94:1 background only</span></figure>
+<figure class="sw"><div class="chip" style="background:#aab5c0"></div>
+    <code>--n-600</code><span class="val">#aab5c0</span><span class="r no">2.08:1 background only</span></figure>
+<figure class="sw"><div class="chip" style="background:#d3dbe1"></div>
+    <code>--n-700</code><span class="val">#d3dbe1</span><span class="r no">1.40:1 background only</span></figure>
+<figure class="sw"><div class="chip" style="background:#e6ebef"></div>
+    <code>--n-800</code><span class="val">#e6ebef</span><span class="r no">1.20:1 background only</span></figure>
+<figure class="sw"><div class="chip" style="background:#f6f8fa"></div>
+    <code>--n-900</code><span class="val">#f6f8fa</span><span class="r no">1.06:1 background only</span></figure></div>
+<h2>Brand</h2><div class="grid"><figure class="sw"><div class="chip" style="background:#2b8ae6"></div>
+    <code>--pri</code><span class="val">#2b8ae6</span><span class="r mid">3.57:1 UI / large only</span></figure>
+<figure class="sw"><div class="chip" style="background:#1f74c7"></div>
+    <code>--pri-d</code><span class="val">#1f74c7</span><span class="r ok">4.79:1 AA text</span></figure>
+<figure class="sw"><div class="chip" style="background:#1766b3"></div>
+    <code>--pri-dd</code><span class="val">#1766b3</span><span class="r ok">5.85:1 AA text</span></figure>
+<figure class="sw"><div class="chip" style="background:#1f74c7"></div>
+    <code>--pri-solid</code><span class="val">#1f74c7</span><span class="r ok">4.79:1 AA text</span></figure>
+<figure class="sw"><div class="chip" style="background:#ffffff"></div>
+    <code>--pri-fg</code><span class="val">#ffffff</span><span class="r no">1.00:1 background only</span></figure>
+<figure class="sw"><div class="chip" style="background:rgba(43, 138, 230, .1)"></div>
+    <code>--pri-wash</code><span class="val">rgba(43, 138, 230, .1)</span></figure>
+<figure class="sw"><div class="chip" style="background:#eef6fe"></div>
+    <code>--pri-tint</code><span class="val">#eef6fe</span><span class="r no">1.09:1 background only</span></figure>
+<figure class="sw"><div class="chip" style="background:#FDC137"></div>
+    <code>--hl</code><span class="val">#FDC137</span><span class="r no">1.63:1 background only</span></figure>
+<figure class="sw"><div class="chip" style="background:#E0A81F"></div>
+    <code>--hl-d</code><span class="val">#E0A81F</span><span class="r no">2.14:1 background only</span></figure>
+<figure class="sw"><div class="chip" style="background:#3d2c00"></div>
+    <code>--hl-fg</code><span class="val">#3d2c00</span><span class="r ok">13.47:1 AA text</span></figure></div>
 <h2>Status ink</h2><div class="grid"><figure class="sw"><div class="chip" style="background:#00754b"></div>
-    <code>--ok</code><span class="val">#00754b</span><span class="r ok">5.76:1 AA</span></figure><figure class="sw"><div class="chip" style="background:#8a5a00"></div>
-    <code>--warn</code><span class="val">#8a5a00</span><span class="r ok">5.93:1 AA</span></figure><figure class="sw"><div class="chip" style="background:#c0392b"></div>
-    <code>--err</code><span class="val">#c0392b</span><span class="r ok">5.44:1 AA</span></figure><figure class="sw"><div class="chip" style="background:#1f6f9c"></div>
-    <code>--info</code><span class="val">#1f6f9c</span><span class="r ok">5.51:1 AA</span></figure></div>
+    <code>--ok</code><span class="val">#00754b</span><span class="r ok">5.76:1 AA text</span></figure>
+<figure class="sw"><div class="chip" style="background:#8a5a00"></div>
+    <code>--warn</code><span class="val">#8a5a00</span><span class="r ok">5.93:1 AA text</span></figure>
+<figure class="sw"><div class="chip" style="background:#c0392b"></div>
+    <code>--err</code><span class="val">#c0392b</span><span class="r ok">5.44:1 AA text</span></figure>
+<figure class="sw"><div class="chip" style="background:#1766b3"></div>
+    <code>--info</code><span class="val">#1766b3</span><span class="r ok">5.85:1 AA text</span></figure></div>
 <h2>Status surfaces</h2><div class="grid"><figure class="sw"><div class="chip" style="background:#e8f3ec"></div>
-    <code>--ok-wash</code><span class="val">#e8f3ec</span><span class="r no">1.14:1 bg only</span></figure><figure class="sw"><div class="chip" style="background:#fdf3e0"></div>
-    <code>--warn-wash</code><span class="val">#fdf3e0</span><span class="r no">1.10:1 bg only</span></figure><figure class="sw"><div class="chip" style="background:#fcebea"></div>
-    <code>--err-wash</code><span class="val">#fcebea</span><span class="r no">1.15:1 bg only</span></figure><figure class="sw"><div class="chip" style="background:#f0f6fc"></div>
-    <code>--info-wash</code><span class="val">#f0f6fc</span><span class="r no">1.09:1 bg only</span></figure><figure class="sw"><div class="chip" style="background:#e9f0f8"></div>
-    <code>--pri-tint</code><span class="val">#e9f0f8</span><span class="r no">1.15:1 bg only</span></figure><figure class="sw"><div class="chip" style="background:#00844a33"></div>
-    <code>--ok-edge</code><span class="val">#00844a33</span></figure><figure class="sw"><div class="chip" style="background:#99680033"></div>
-    <code>--warn-edge</code><span class="val">#99680033</span></figure><figure class="sw"><div class="chip" style="background:#b32d2e33"></div>
-    <code>--err-edge</code><span class="val">#b32d2e33</span></figure><figure class="sw"><div class="chip" style="background:#cfd9de"></div>
-    <code>--edge</code><span class="val">#cfd9de</span><span class="r no">1.44:1 bg only</span></figure></div>
-<h2>Surfaces</h2><div class="grid"><figure class="sw"><div class="chip" style="background:rgba(8, 41, 76, .1)"></div>
-    <code>--pri-wash</code><span class="val">rgba(8, 41, 76, .1)</span></figure><figure class="sw"><div class="chip" style="background:#eff3f4"></div>
-    <code>--line</code><span class="val">#eff3f4</span><span class="r no">1.12:1 bg only</span></figure><figure class="sw"><div class="chip" style="background:#cfd9de"></div>
-    <code>--edge</code><span class="val">#cfd9de</span><span class="r no">1.44:1 bg only</span></figure><figure class="sw"><div class="chip" style="background:#ffffff"></div>
-    <code>--bg</code><span class="val">#ffffff</span><span class="r no">1.00:1 bg only</span></figure><figure class="sw"><div class="chip" style="background:#ffffff"></div>
-    <code>--card</code><span class="val">#ffffff</span><span class="r no">1.00:1 bg only</span></figure><figure class="sw"><div class="chip" style="background:rgba(15, 20, 25, .03)"></div>
-    <code>--wash</code><span class="val">rgba(15, 20, 25, .03)</span></figure><figure class="sw"><div class="chip" style="background:#fbfbfc"></div>
-    <code>--sunk</code><span class="val">#fbfbfc</span><span class="r no">1.03:1 bg only</span></figure><figure class="sw"><div class="chip" style="background:#f6f7f7"></div>
-    <code>--sunk-2</code><span class="val">#f6f7f7</span><span class="r no">1.07:1 bg only</span></figure><figure class="sw"><div class="chip" style="background:#f0f0f1"></div>
-    <code>--track</code><span class="val">#f0f0f1</span><span class="r no">1.14:1 bg only</span></figure></div>
-<h2>Text</h2><div class="grid"><figure class="sw"><div class="chip" style="background:#536471"></div>
-    <code>--muted</code><span class="val">#536471</span><span class="r ok">6.12:1 AA</span></figure><figure class="sw"><div class="chip" style="background:#0f1419"></div>
-    <code>--fg</code><span class="val">#0f1419</span><span class="r ok">18.51:1 AA</span></figure></div>
-
+    <code>--ok-wash</code><span class="val">#e8f3ec</span><span class="r no">1.14:1 background only</span></figure>
+<figure class="sw"><div class="chip" style="background:#fdf3e0"></div>
+    <code>--warn-wash</code><span class="val">#fdf3e0</span><span class="r no">1.10:1 background only</span></figure>
+<figure class="sw"><div class="chip" style="background:#fcebea"></div>
+    <code>--err-wash</code><span class="val">#fcebea</span><span class="r no">1.15:1 background only</span></figure>
+<figure class="sw"><div class="chip" style="background:#eef6fe"></div>
+    <code>--info-wash</code><span class="val">#eef6fe</span><span class="r no">1.09:1 background only</span></figure>
+<figure class="sw"><div class="chip" style="background:#00844a33"></div>
+    <code>--ok-edge</code><span class="val">#00844a33</span></figure>
+<figure class="sw"><div class="chip" style="background:#99680033"></div>
+    <code>--warn-edge</code><span class="val">#99680033</span></figure>
+<figure class="sw"><div class="chip" style="background:#b32d2e33"></div>
+    <code>--err-edge</code><span class="val">#b32d2e33</span></figure></div>
+<h2>Surfaces</h2><div class="grid"><figure class="sw"><div class="chip" style="background:#ffffff"></div>
+    <code>--bg</code><span class="val">#ffffff</span><span class="r no">1.00:1 background only</span></figure>
+<figure class="sw"><div class="chip" style="background:#ffffff"></div>
+    <code>--card</code><span class="val">#ffffff</span><span class="r no">1.00:1 background only</span></figure>
+<figure class="sw"><div class="chip" style="background:rgba(20, 23, 28, .03)"></div>
+    <code>--wash</code><span class="val">rgba(20, 23, 28, .03)</span></figure>
+<figure class="sw"><div class="chip" style="background:#fbfcfd"></div>
+    <code>--sunk</code><span class="val">#fbfcfd</span><span class="r no">1.03:1 background only</span></figure>
+<figure class="sw"><div class="chip" style="background:#f6f8fa"></div>
+    <code>--sunk-2</code><span class="val">#f6f8fa</span><span class="r no">1.06:1 background only</span></figure>
+<figure class="sw"><div class="chip" style="background:#e6ebef"></div>
+    <code>--track</code><span class="val">#e6ebef</span><span class="r no">1.20:1 background only</span></figure>
+<figure class="sw"><div class="chip" style="background:#e6ebef"></div>
+    <code>--line</code><span class="val">#e6ebef</span><span class="r no">1.20:1 background only</span></figure>
+<figure class="sw"><div class="chip" style="background:#d3dbe1"></div>
+    <code>--edge</code><span class="val">#d3dbe1</span><span class="r no">1.40:1 background only</span></figure></div>
+<h2>Text</h2><div class="grid"><figure class="sw"><div class="chip" style="background:#56626e"></div>
+    <code>--muted</code><span class="val">#56626e</span><span class="r ok">6.24:1 AA text</span></figure>
+<figure class="sw"><div class="chip" style="background:#14171c"></div>
+    <code>--fg</code><span class="val">#14171c</span><span class="r ok">17.96:1 AA text</span></figure></div>
+<!-- @end:swatches -->
 <h2>Type scale</h2><div class="card">
 <div class="type-row"><code>--text-xs</code>
     <span style="font-size:11px">The quick brown fox — 11px</span></div><div class="type-row"><code>--text-sm</code>

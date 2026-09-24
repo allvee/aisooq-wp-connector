@@ -4,7 +4,7 @@
  * Plugin URI:        https://github.com/allvee/aisooq-wp-connector
  * Update URI:        https://github.com/allvee/aisooq-wp-connector
  * Description:        Mirrors WooCommerce orders, incomplete/abandoned carts and analytics into the AI Sooq platform so a store can be managed from there. Connects any WooCommerce site to one AI Sooq store via OAuth.
- * Version:           2.15.1
+ * Version:           2.16.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            AI Sooq
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'AISOOQ_VERSION', '2.15.1' );
+define( 'AISOOQ_VERSION', '2.16.0' );
 define( 'AISOOQ_FILE', __FILE__ );
 define( 'AISOOQ_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AISOOQ_URL', plugin_dir_url( __FILE__ ) );
@@ -66,7 +66,10 @@ define( 'AISOOQ_META_LAST_TRY', '_aisooq_last_attempt_at' );
 // reachable only through its consumers is one missed `git add` from never
 // shipping at all. require_once makes the belt and the braces free.
 require_once AISOOQ_DIR . 'includes/class-aisooq-palette.php';
+require_once AISOOQ_DIR . 'includes/class-aisooq-icons.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-logger.php';
+require_once AISOOQ_DIR . 'includes/class-aisooq-admin-shell.php';
+require_once AISOOQ_DIR . 'includes/class-aisooq-settings-fields.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-settings.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-api-client.php';
 require_once AISOOQ_DIR . 'includes/class-aisooq-attribution.php';

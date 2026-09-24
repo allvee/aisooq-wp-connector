@@ -73,18 +73,19 @@ class AI_Sooq_Palette {
 	 * they disagree; without that this file would just be a third place for the
 	 * palette to rot.
 	 *
-	 * Mapped by VALUE, not by role, wherever the two differ. `#f0f0f1` is used
-	 * below as a divider, and the sheet's divider token is `--line` (#eff3f4) —
-	 * but `--track` is the token that holds #f0f0f1, so `track` is the honest
-	 * mapping. Renaming a colour is allowed here; changing one is not.
+	 * Mapped by VALUE, not by role, wherever the two differ. `#e6ebef` is used
+	 * below as a divider, and the sheet's divider token is `--line` — but
+	 * `--line` is an alias of `--n-800` rather than a literal, and this test
+	 * compares literals, so `track` (which holds the same hex outright) is the
+	 * honest mapping. Renaming a colour is allowed here; changing one is not.
 	 */
 	const TOKENS = array(
-		'pri-tint' => '#e9f0f8', // Pale navy bed — the parcels-sent pill.
+		'pri-tint' => '#eef6fe', // Pale accent bed — the parcels-sent pill.
 		'ok-wash'  => '#e8f3ec', // Pale green bed — the delivered pill.
-		'track'    => '#f0f0f1', // Empty half of the ratio bar; also the
+		'track'    => '#e6ebef', // Empty half of the ratio bar; also the
 								 // neutral pill bed and every 1px divider in
 								 // the courier block (see the note above).
-		'sunk-2'   => '#f6f7f7', // Recessed surface — the breakdown table head.
+		'sunk-2'   => '#f6f8fa', // Recessed surface — the breakdown table head.
 		'card'     => '#ffffff', // Floating surface — the history modal.
 		'hl'       => '#FDC137', // AI Sooq gold — the active admin-menu glyph.
 	);

@@ -446,14 +446,14 @@ class AI_Sooq_Abandoned_Admin {
 							aria-expanded="false"
 							title="<?php esc_attr_e( 'Show the per-courier breakdown', 'aisooq-connector' ); ?>"
 							aria-label="<?php esc_attr_e( 'Breakdown', 'aisooq-connector' ); ?>">
-							<span class="dashicons dashicons-visibility" aria-hidden="true"></span>
+							<?php echo AI_Sooq_Icons::svg( 'eye' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 						</button>
 					<?php endif; ?>
 					<button type="button" class="button-link aisooq-check-courier aisooq-icon-btn"
 						title="<?php echo esc_attr( $why ); ?>"
 						aria-label="<?php esc_attr_e( 'Recheck courier history', 'aisooq-connector' ); ?>"
 						<?php disabled( ! $active ); ?>>
-						<span class="dashicons dashicons-update" aria-hidden="true"></span>
+						<?php echo AI_Sooq_Icons::svg( 'arrow-clockwise' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 					</button>
 					<?php if ( ! $active ) : ?>
 						<span class="aisooq-courier-why"><?php esc_html_e( 'connection paused', 'aisooq-connector' ); ?></span>
@@ -576,8 +576,8 @@ class AI_Sooq_Abandoned_Admin {
 					<div class="aisooq-td-val">
 						<div class="aisooq-cust"><?php echo esc_html( $row->customer_name ? $row->customer_name : __( 'Anonymous', 'aisooq-connector' ) ); ?></div>
 						<div class="aisooq-contact">
-							<?php if ( $row->phone ) : ?><span><span class="dashicons dashicons-phone" aria-hidden="true"></span> <?php echo esc_html( $row->phone ); ?></span><br /><?php endif; ?>
-							<?php if ( $row->email ) : ?><span><span class="dashicons dashicons-email" aria-hidden="true"></span> <?php echo esc_html( $row->email ); ?></span><?php endif; ?>
+							<?php if ( $row->phone ) : ?><span><?php echo AI_Sooq_Icons::svg( 'phone', array( 'size' => 13 ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?> <?php echo esc_html( $row->phone ); ?></span><br /><?php endif; ?>
+							<?php if ( $row->email ) : ?><span><?php echo AI_Sooq_Icons::svg( 'envelope-simple', array( 'size' => 13 ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?> <?php echo esc_html( $row->email ); ?></span><?php endif; ?>
 						</div>
 						<?php echo $this->courier_cell( $row, $active ); // phpcs:ignore WordPress.Security.EscapeOutput ?>
 					</div>
@@ -606,16 +606,16 @@ class AI_Sooq_Abandoned_Admin {
 					<div class="aisooq-menu-wrap">
 						<button type="button" class="button button-small aisooq-menu-btn" aria-haspopup="true" aria-expanded="false"><?php esc_html_e( 'Actions', 'aisooq-connector' ); ?> <span class="aisooq-caret">▾</span></button>
 						<div class="aisooq-menu" hidden>
-							<button type="button" class="aisooq-act" data-op="details"><span class="dashicons dashicons-visibility"></span> <?php esc_html_e( 'Details', 'aisooq-connector' ); ?></button>
+							<button type="button" class="aisooq-act" data-op="details"><?php echo AI_Sooq_Icons::svg( 'eye' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?> <?php esc_html_e( 'Details', 'aisooq-connector' ); ?></button>
 							<?php if ( $is_active ) : ?>
-								<button type="button" class="aisooq-act aisooq-primary" data-op="convert"><span class="dashicons dashicons-cart"></span> <?php esc_html_e( 'Convert to order', 'aisooq-connector' ); ?></button>
-								<button type="button" class="aisooq-act" data-op="resync" <?php disabled( ! $active ); ?>><span class="dashicons dashicons-update"></span> <?php esc_html_e( 'Resync', 'aisooq-connector' ); ?></button>
-								<button type="button" class="aisooq-act" data-op="cancel"><span class="dashicons dashicons-no-alt"></span> <?php esc_html_e( 'Cancel', 'aisooq-connector' ); ?></button>
-								<button type="button" class="aisooq-act" data-op="fake"><span class="dashicons dashicons-flag"></span> <?php esc_html_e( 'Mark fake', 'aisooq-connector' ); ?></button>
+								<button type="button" class="aisooq-act aisooq-primary" data-op="convert"><?php echo AI_Sooq_Icons::svg( 'shopping-cart' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?> <?php esc_html_e( 'Convert to order', 'aisooq-connector' ); ?></button>
+								<button type="button" class="aisooq-act" data-op="resync" <?php disabled( ! $active ); ?>><?php echo AI_Sooq_Icons::svg( 'arrow-clockwise' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?> <?php esc_html_e( 'Resync', 'aisooq-connector' ); ?></button>
+								<button type="button" class="aisooq-act" data-op="cancel"><?php echo AI_Sooq_Icons::svg( 'prohibit' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?> <?php esc_html_e( 'Cancel', 'aisooq-connector' ); ?></button>
+								<button type="button" class="aisooq-act" data-op="fake"><?php echo AI_Sooq_Icons::svg( 'warning-circle' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?> <?php esc_html_e( 'Mark fake', 'aisooq-connector' ); ?></button>
 							<?php elseif ( 'cancelled' === $row->status || 'fake' === $row->status ) : ?>
-								<button type="button" class="aisooq-act" data-op="reopen"><span class="dashicons dashicons-backup"></span> <?php esc_html_e( 'Reopen', 'aisooq-connector' ); ?></button>
+								<button type="button" class="aisooq-act" data-op="reopen"><?php echo AI_Sooq_Icons::svg( 'arrow-counter-clockwise' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?> <?php esc_html_e( 'Reopen', 'aisooq-connector' ); ?></button>
 							<?php endif; ?>
-							<button type="button" class="aisooq-act aisooq-danger" data-op="delete"><span class="dashicons dashicons-trash"></span> <?php esc_html_e( 'Delete', 'aisooq-connector' ); ?></button>
+							<button type="button" class="aisooq-act aisooq-danger" data-op="delete"><?php echo AI_Sooq_Icons::svg( 'trash' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?> <?php esc_html_e( 'Delete', 'aisooq-connector' ); ?></button>
 						</div>
 					</div>
 				</td>
@@ -886,12 +886,12 @@ class AI_Sooq_Abandoned_Admin {
 			<div class="aisooq-dl-grid">
 				<div class="aisooq-dl-sec">
 					<div class="aisooq-dl-label"><?php esc_html_e( 'Contact', 'aisooq-connector' ); ?></div>
-					<?php if ( $row->phone ) : ?><div><span class="dashicons dashicons-phone"></span> <a href="tel:<?php echo esc_attr( $row->phone ); ?>"><?php echo esc_html( $row->phone ); ?></a></div><?php endif; ?>
-					<?php if ( $row->email ) : ?><div><span class="dashicons dashicons-email"></span> <a href="mailto:<?php echo esc_attr( $row->email ); ?>"><?php echo esc_html( $row->email ); ?></a></div><?php endif; ?>
+					<?php if ( $row->phone ) : ?><div><?php echo AI_Sooq_Icons::svg( 'phone', array( 'size' => 14 ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?> <a href="tel:<?php echo esc_attr( $row->phone ); ?>"><?php echo esc_html( $row->phone ); ?></a></div><?php endif; ?>
+					<?php if ( $row->email ) : ?><div><?php echo AI_Sooq_Icons::svg( 'envelope-simple', array( 'size' => 14 ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?> <a href="mailto:<?php echo esc_attr( $row->email ); ?>"><?php echo esc_html( $row->email ); ?></a></div><?php endif; ?>
 					<?php if ( ! $reachable ) : ?><div class="aisooq-dim"><?php esc_html_e( 'No contact captured', 'aisooq-connector' ); ?></div><?php endif; ?>
 					<?php if ( $wc_user ) : ?>
 						<div class="aisooq-dl-cust">
-							<span class="dashicons dashicons-admin-users"></span>
+							<?php echo AI_Sooq_Icons::svg( 'user', array( 'size' => 14 ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 							<a href="<?php echo esc_url( get_edit_user_link( $wc_user->ID ) ); ?>"><?php echo esc_html( $wc_user->display_name ); ?></a>
 							<?php /* translators: %d: number of orders. */ if ( $order_count ) : ?><span class="aisooq-dim">· <?php echo esc_html( sprintf( _n( '%d order', '%d orders', $order_count, 'aisooq-connector' ), $order_count ) ); ?></span><?php endif; ?>
 						</div>
@@ -1010,38 +1010,98 @@ class AI_Sooq_Abandoned_Admin {
 		foreach ( $k['funnel'] as $ff ) {
 			$max_step = max( $max_step, (int) $ff['n'] );
 		}
-		?>
-		<div class="wrap aisooq-ab">
-			<?php // The layout for this screen lives in assets/css/aisooq-admin.css — see the "Abandoned-carts screen" section there. ?>
 
-			<div class="aisooq-top">
-				<div>
-					<h1><?php esc_html_e( 'Abandoned carts', 'aisooq-connector' ); ?></h1>
-					<p class="aisooq-sub"><?php esc_html_e( 'Incomplete orders captured on this store and mirrored to AI Sooq. Convert to a WooCommerce order, check courier ratio, or dispose locally — cancel / fake / delete stay on this site.', 'aisooq-connector' ); ?></p>
-				</div>
-				<div>
-					<button type="button" id="aisooq-resync-all" class="button button-primary" <?php disabled( ! $active || $k['pending'] < 1 ); ?>>
-						<?php
-						/* translators: %d: number of carts awaiting push */
-						echo esc_html( sprintf( __( 'Resync all pending (%d)', 'aisooq-connector' ), $k['pending'] ) );
-						?>
-					</button>
-					<span id="aisooq-resync-msg" class="aisooq-msg" style="margin-left:8px;" role="status" aria-live="polite"></span>
-				</div>
+		$labels = array(
+			'active'    => __( 'Active', 'aisooq-connector' ),
+			'pending'   => __( 'Pending', 'aisooq-connector' ),
+			'recovered' => __( 'Recovered', 'aisooq-connector' ),
+			'cancelled' => __( 'Cancelled', 'aisooq-connector' ),
+			'fake'      => __( 'Fake', 'aisooq-connector' ),
+			'all'       => __( 'All', 'aisooq-connector' ),
+		);
+		$icons = array(
+			'active'    => 'basket',
+			'pending'   => 'hourglass',
+			'recovered' => 'seal-check',
+			'cancelled' => 'prohibit',
+			'fake'      => 'warning-circle',
+			'all'       => 'list-checks',
+		);
+
+		AI_Sooq_Admin_Shell::open( array(
+			'slug'     => self::PAGE_SLUG,
+			'legacy'   => 'aisooq-ab',
+			'title'    => __( 'Abandoned carts', 'aisooq-connector' ),
+			'settings' => $this->settings,
+			'nav'      => function () use ( $labels, $icons, $f ) {
+				$items = array();
+				foreach ( $labels as $key => $label ) {
+					$items[] = array(
+						'url'    => add_query_arg( array( 'page' => self::PAGE_SLUG, 'status' => $key ), admin_url( 'admin.php' ) ),
+						'icon'   => $icons[ $key ],
+						'label'  => $label,
+						'active' => $f['status'] === $key,
+					);
+				}
+				AI_Sooq_Admin_Shell::link_nav( $items, __( 'Filter carts by status', 'aisooq-connector' ) );
+			},
+		) );
+		?>
+			<div class="aisooq-rowline">
+				<h2 class="aisooq-tabtitle"><?php esc_html_e( 'Abandoned carts', 'aisooq-connector' ); ?></h2>
+				<button type="button" id="aisooq-resync-all" class="aisooq-btn aisooq-btn--primary" <?php disabled( ! $active || $k['pending'] < 1 ); ?>>
+					<?php echo AI_Sooq_Icons::svg( 'arrow-clockwise' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+					<?php
+					/* translators: %d: number of carts awaiting push */
+					echo esc_html( sprintf( __( 'Resync all pending (%d)', 'aisooq-connector' ), $k['pending'] ) );
+					?>
+				</button>
+				<span id="aisooq-resync-msg" class="aisooq-msg" role="status" aria-live="polite"></span>
 			</div>
+
+			<p class="description"><?php esc_html_e( 'Incomplete orders captured on this store and mirrored to AI Sooq. Convert to a WooCommerce order, check courier ratio, or dispose locally — cancel / fake / delete stay on this site.', 'aisooq-connector' ); ?></p>
 
 			<?php if ( ! $active ) : ?>
-				<div class="notice notice-warning inline" style="margin:8px 0;"><p><?php esc_html_e( 'Abandoned-cart sync is paused or disabled. Resync + courier check need an active connection; the rest of the worklist still works.', 'aisooq-connector' ); ?></p></div>
+				<?php
+				AI_Sooq_Admin_Shell::note(
+					'warning-circle',
+					__( 'Abandoned-cart sync is paused or disabled. Resync + courier check need an active connection; the rest of the worklist still works.', 'aisooq-connector' ),
+					'warn'
+				);
+				?>
 			<?php endif; ?>
 
-			<div class="aisooq-kpis">
-				<div class="aisooq-kpi"><div class="aisooq-kpi__label"><?php esc_html_e( 'Total', 'aisooq-connector' ); ?></div><div class="aisooq-kpi__num"><?php echo esc_html( number_format_i18n( $k['total'] ) ); ?></div></div>
-				<div class="aisooq-kpi warn"><div class="aisooq-kpi__label"><?php esc_html_e( 'Open', 'aisooq-connector' ); ?></div><div class="aisooq-kpi__num"><?php echo esc_html( number_format_i18n( $k['open'] ) ); ?></div><div class="aisooq-kpi__sub"><?php esc_html_e( 'incomplete orders', 'aisooq-connector' ); ?></div></div>
-				<div class="aisooq-kpi info"><div class="aisooq-kpi__label"><?php /* translators: %s: formatted count of carts not yet pushed. */ esc_html_e( 'Pushed', 'aisooq-connector' ); ?></div><div class="aisooq-kpi__num"><?php echo esc_html( number_format_i18n( $k['pushed'] ) ); ?></div><div class="aisooq-kpi__sub"><?php echo esc_html( sprintf( __( '%s pending', 'aisooq-connector' ), number_format_i18n( $k['pending'] ) ) ); ?></div></div>
-				<div class="aisooq-kpi ok"><div class="aisooq-kpi__label"><?php /* translators: %s: recovery rate as a percentage. */ esc_html_e( 'Recovered', 'aisooq-connector' ); ?></div><div class="aisooq-kpi__num"><?php echo esc_html( number_format_i18n( $k['recovered'] ) ); ?></div><div class="aisooq-kpi__sub"><?php echo esc_html( sprintf( __( '%s rate', 'aisooq-connector' ), number_format_i18n( $k['recovery_rate'] * 100, 1 ) . '%' ) ); ?></div></div>
-				<div class="aisooq-kpi err"><div class="aisooq-kpi__label"><?php esc_html_e( 'Cancelled / Fake', 'aisooq-connector' ); ?></div><div class="aisooq-kpi__num"><?php echo esc_html( number_format_i18n( $k['cancelled'] + $k['fake'] ) ); ?></div></div>
-				<div class="aisooq-kpi"><div class="aisooq-kpi__label"><?php /* translators: %s: average cart value, already money-formatted. */ esc_html_e( 'Open value', 'aisooq-connector' ); ?></div><div class="aisooq-kpi__num aisooq-mono"><?php echo esc_html( $this->money( $k['open_value'], $currency ) ); ?></div><div class="aisooq-kpi__sub"><?php echo esc_html( sprintf( __( 'avg %s', 'aisooq-connector' ), $this->money( $k['avg_open'], $currency ) ) ); ?></div></div>
-			</div>
+			<?php
+			AI_Sooq_Admin_Shell::stats( array(
+				array( 'icon' => 'shopping-cart-simple', 'label' => __( 'Total', 'aisooq-connector' ),     'value' => number_format_i18n( $k['total'] ),     'sub' => __( 'Carts captured', 'aisooq-connector' ), 'tone' => '' ),
+				array( 'icon' => 'basket',               'label' => __( 'Open', 'aisooq-connector' ),      'value' => number_format_i18n( $k['open'] ),      'sub' => __( 'Incomplete orders', 'aisooq-connector' ), 'tone' => $k['open'] > 0 ? 'is-warn' : '' ),
+				array(
+					'icon'  => 'paper-plane-tilt',
+					'label' => __( 'Pushed', 'aisooq-connector' ),
+					'value' => number_format_i18n( $k['pushed'] ),
+					/* translators: %s: formatted count of carts not yet pushed. */
+					'sub'   => sprintf( __( '%s pending', 'aisooq-connector' ), number_format_i18n( $k['pending'] ) ),
+					'tone'  => '',
+				),
+				array(
+					'icon'  => 'seal-check',
+					'label' => __( 'Recovered', 'aisooq-connector' ),
+					'value' => number_format_i18n( $k['recovered'] ),
+					/* translators: %s: recovery rate as a percentage. */
+					'sub'   => sprintf( __( '%s rate', 'aisooq-connector' ), number_format_i18n( $k['recovery_rate'] * 100, 1 ) . '%' ),
+					'tone'  => '',
+				),
+				array( 'icon' => 'prohibit', 'label' => __( 'Cancelled / Fake', 'aisooq-connector' ), 'value' => number_format_i18n( $k['cancelled'] + $k['fake'] ), 'sub' => __( 'Disposed locally', 'aisooq-connector' ), 'tone' => '' ),
+				array(
+					'icon'  => 'currency-circle-dollar',
+					'label' => __( 'Open value', 'aisooq-connector' ),
+					'value' => $this->money( $k['open_value'], $currency ),
+					/* translators: %s: average cart value, already money-formatted. */
+					'sub'   => sprintf( __( 'avg %s', 'aisooq-connector' ), $this->money( $k['avg_open'], $currency ) ),
+					'tone'  => '',
+				),
+			) );
+			?>
 
 			<?php
 			if ( ! empty( $k['funnel'] ) ) :
@@ -1057,71 +1117,70 @@ class AI_Sooq_Abandoned_Admin {
 					}
 				}
 				?>
-			<?php // Same card row as the KPIs above, in checkout order. The list of
-			      // carts is the working surface of this screen; this is context,
-			      // and context does not get to push the work below the fold. ?>
-			<div class="aisooq-kpis aisooq-kpis--funnel">
-				<?php
-				foreach ( $k['funnel'] as $ff ) :
-					$step = (string) $ff['step'];
-					$n    = (int) $ff['n'];
-					$pct  = $open_tot > 0 ? round( $n / $open_tot * 100 ) : 0;
-					$meta = isset( $steps[ $step ] ) ? $steps[ $step ] : array( 'label' => ucfirst( $step ), 'hint' => '' );
-					?>
-					<div class="aisooq-kpi<?php echo ( $worst && $step === (string) $worst['step'] ) ? ' warn' : ''; ?>"
-						title="<?php echo esc_attr( $meta['hint'] ); ?>">
-						<div class="aisooq-kpi__label"><?php echo esc_html( $meta['label'] ); ?></div>
-						<div class="aisooq-kpi__num"><?php echo esc_html( number_format_i18n( $n ) ); ?></div>
-						<div class="aisooq-kpi__sub">
-							<?php /* translators: %s: percentage of open carts */ ?>
-							<?php echo esc_html( sprintf( __( '%s%% of open', 'aisooq-connector' ), number_format_i18n( $pct ) ) ); ?>
-						</div>
+				<?php // Where open carts stopped, in checkout order. The worklist below is
+				      // the working surface of this screen; this is context, and context
+				      // does not get to push the work below the fold. ?>
+				<div class="aisooq-card">
+					<span class="aisooq-card__label"><?php esc_html_e( 'Where open carts stopped', 'aisooq-connector' ); ?></span>
+					<div class="aisooq-funnel">
+						<?php
+						foreach ( $k['funnel'] as $ff ) :
+							$step = (string) $ff['step'];
+							$n    = (int) $ff['n'];
+							$pct  = $open_tot > 0 ? round( $n / $open_tot * 100 ) : 0;
+							$meta = isset( $steps[ $step ] ) ? $steps[ $step ] : array( 'label' => ucfirst( $step ), 'hint' => '' );
+							?>
+							<div class="aisooq-funnel__step<?php echo ( $worst && $step === (string) $worst['step'] ) ? ' is-worst' : ''; ?>" title="<?php echo esc_attr( $meta['hint'] ); ?>">
+								<span class="aisooq-funnel__label"><?php echo esc_html( $meta['label'] ); ?></span>
+								<span class="aisooq-funnel__num"><?php echo esc_html( number_format_i18n( $n ) ); ?></span>
+								<span class="aisooq-funnel__bar" aria-hidden="true"><span style="width:<?php echo esc_attr( $pct ); ?>%"></span></span>
+								<span class="aisooq-funnel__pct">
+									<?php
+									/* translators: %s: percentage of open carts */
+									echo esc_html( sprintf( __( '%s%% of open', 'aisooq-connector' ), number_format_i18n( $pct ) ) );
+									?>
+								</span>
+							</div>
+						<?php endforeach; ?>
 					</div>
-				<?php endforeach; ?>
-			</div>
+				</div>
 			<?php endif; ?>
 
-			<div class="aisooq-panel">
-				<div class="aisooq-panel__head">
-					<span class="aisooq-filters">
-						<?php
-						$labels = array(
-							'active'      => __( 'Active', 'aisooq-connector' ),
-							'pending'     => __( 'Pending', 'aisooq-connector' ),
-							'recovered'   => __( 'Recovered', 'aisooq-connector' ),
-							'cancelled'   => __( 'Cancelled', 'aisooq-connector' ),
-							'fake'        => __( 'Fake', 'aisooq-connector' ),
-							'all'         => __( 'All', 'aisooq-connector' ),
-						);
-						foreach ( $labels as $key => $label ) :
-							$url = add_query_arg( array( 'page' => self::PAGE_SLUG, 'status' => $key ), admin_url( 'admin.php' ) );
-							?>
-							<a class="<?php echo $f['status'] === $key ? 'on' : ''; ?>" href="<?php echo esc_url( $url ); ?>"><?php echo esc_html( $label ); ?></a>
-						<?php endforeach; ?>
-					</span>
-					<span id="aisooq-count" class="aisooq-dim" aria-live="polite"></span>
-					<span id="aisooq-query-error" class="aisooq-error" role="alert" hidden></span>
-				</div>
-
+			<div class="aisooq-card aisooq-card--rows">
 				<div class="aisooq-toolbar">
-					<div><label for="aisooq-search"><?php esc_html_e( 'Search', 'aisooq-connector' ); ?></label>
-						<input type="search" id="aisooq-search" value="<?php echo esc_attr( $f['search'] ); ?>" placeholder="<?php esc_attr_e( 'name, phone, email, product…', 'aisooq-connector' ); ?>" style="min-width:220px;" /></div>
-					<div><label for="aisooq-product"><?php esc_html_e( 'Product', 'aisooq-connector' ); ?></label>
-						<select id="aisooq-product">
-							<option value="0"><?php esc_html_e( 'Any product', 'aisooq-connector' ); ?></option>
-							<?php foreach ( $products as $pid => $label ) : ?>
-								<option value="<?php echo (int) $pid; ?>" <?php selected( $f['product'], $pid ); ?>><?php echo esc_html( wp_html_excerpt( $label, 48, '…' ) ); ?></option>
-							<?php endforeach; ?>
-						</select></div>
-					<div><label for="aisooq-from"><?php esc_html_e( 'From', 'aisooq-connector' ); ?></label>
-						<input type="date" id="aisooq-from" value="<?php echo esc_attr( $f['from'] ); ?>" /></div>
-					<div><label for="aisooq-to"><?php esc_html_e( 'To', 'aisooq-connector' ); ?></label>
-						<input type="date" id="aisooq-to" value="<?php echo esc_attr( $f['to'] ); ?>" /></div>
-					<div><button type="button" class="button" id="aisooq-clear"><?php esc_html_e( 'Clear', 'aisooq-connector' ); ?></button></div>
-					<div><span class="spinner" id="aisooq-spin" style="float:none;margin:0;"></span></div>
+					<div class="aisooq-search">
+						<span class="aisooq-search__icon" aria-hidden="true"><?php echo AI_Sooq_Icons::svg( 'magnifying-glass' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
+						<label class="screen-reader-text" for="aisooq-search"><?php esc_html_e( 'Search carts', 'aisooq-connector' ); ?></label>
+						<input type="search" id="aisooq-search" value="<?php echo esc_attr( $f['search'] ); ?>" placeholder="<?php esc_attr_e( 'Name, phone, email, product…', 'aisooq-connector' ); ?>" />
+					</div>
+
+					<label class="screen-reader-text" for="aisooq-product"><?php esc_html_e( 'Product', 'aisooq-connector' ); ?></label>
+					<select id="aisooq-product">
+						<option value="0"><?php esc_html_e( 'Any product', 'aisooq-connector' ); ?></option>
+						<?php foreach ( $products as $pid => $label ) : ?>
+							<option value="<?php echo (int) $pid; ?>" <?php selected( $f['product'], $pid ); ?>><?php echo esc_html( wp_html_excerpt( $label, 48, '…' ) ); ?></option>
+						<?php endforeach; ?>
+					</select>
+
+					<?php
+					AI_Sooq_Admin_Shell::date_range( array(
+						'from_id' => 'aisooq-from',
+						'to_id'   => 'aisooq-to',
+						'from'    => $f['from'],
+						'to'      => $f['to'],
+						'label'   => __( 'Filter carts by date', 'aisooq-connector' ),
+					) );
+					?>
+
+					<button type="button" class="aisooq-btn aisooq-btn--ghost" id="aisooq-clear"><?php esc_html_e( 'Clear', 'aisooq-connector' ); ?></button>
+					<span class="spinner" id="aisooq-spin"></span>
+					<span class="aisooq-toolbar__spacer"></span>
+					<span id="aisooq-count" class="aisooq-dim" aria-live="polite"></span>
+					<span id="aisooq-query-error" class="aisooq-msg is-err" role="alert" hidden></span>
 				</div>
 
-				<div class="aisooq-bulkbar">
+				<div class="aisooq-toolbar aisooq-toolbar--bulk">
+					<label class="screen-reader-text" for="aisooq-bulk-op"><?php esc_html_e( 'Bulk action', 'aisooq-connector' ); ?></label>
 					<select id="aisooq-bulk-op">
 						<option value=""><?php esc_html_e( 'Bulk actions', 'aisooq-connector' ); ?></option>
 						<option value="resync"><?php esc_html_e( 'Resync', 'aisooq-connector' ); ?></option>
@@ -1130,16 +1189,16 @@ class AI_Sooq_Abandoned_Admin {
 						<option value="fake"><?php esc_html_e( 'Mark fake', 'aisooq-connector' ); ?></option>
 						<option value="delete"><?php esc_html_e( 'Delete', 'aisooq-connector' ); ?></option>
 					</select>
-					<button type="button" class="button" id="aisooq-bulk-apply"><?php esc_html_e( 'Apply', 'aisooq-connector' ); ?></button>
+					<button type="button" class="aisooq-btn aisooq-btn--secondary" id="aisooq-bulk-apply"><?php esc_html_e( 'Apply', 'aisooq-connector' ); ?></button>
 					<span id="aisooq-bulk-count" class="aisooq-dim"></span>
 					<span id="aisooq-bulk-msg" class="aisooq-msg" role="status" aria-live="polite"></span>
 				</div>
 
-				<div style="overflow-x:auto;">
-					<table class="aisooq-tbl">
+				<div class="aisooq-tablewrap">
+					<table class="aisooq-table">
 						<thead>
 							<tr>
-								<th class="aisooq-cb-cell"><input type="checkbox" id="aisooq-cb-all" aria-label="<?php esc_attr_e( 'Select all', 'aisooq-connector' ); ?>" /></th>
+								<th class="aisooq-table__pick"><input type="checkbox" id="aisooq-cb-all" aria-label="<?php esc_attr_e( 'Select all', 'aisooq-connector' ); ?>" /></th>
 								<th><?php esc_html_e( 'Customer', 'aisooq-connector' ); ?></th>
 								<th><?php esc_html_e( 'Last seen', 'aisooq-connector' ); ?></th>
 								<th><?php esc_html_e( 'Address', 'aisooq-connector' ); ?></th>
@@ -1147,7 +1206,7 @@ class AI_Sooq_Abandoned_Admin {
 								<th><?php esc_html_e( 'Value', 'aisooq-connector' ); ?></th>
 								<th><?php esc_html_e( 'Step', 'aisooq-connector' ); ?></th>
 								<th><?php esc_html_e( 'Status', 'aisooq-connector' ); ?></th>
-								<th style="text-align:right;"><?php esc_html_e( 'Actions', 'aisooq-connector' ); ?></th>
+								<th class="aisooq-table__actions"><?php esc_html_e( 'Actions', 'aisooq-connector' ); ?></th>
 							</tr>
 						</thead>
 						<tbody id="aisooq-rows">
@@ -1158,7 +1217,8 @@ class AI_Sooq_Abandoned_Admin {
 			</div>
 
 			<div id="aisooq-modal-root"></div>
-		</div>
+
+			<?php AI_Sooq_Admin_Shell::close( array( 'slug' => self::PAGE_SLUG ) ); ?>
 
 		<script>
 		( function () {
@@ -1246,7 +1306,25 @@ class AI_Sooq_Abandoned_Admin {
 			if ( search ) { search.addEventListener( 'input', debounced ); }
 			[ product, from, to ].forEach( function ( el ) { if ( el ) { el.addEventListener( 'change', runQuery ); } } );
 			var clear = document.getElementById( 'aisooq-clear' );
-			if ( clear ) { clear.addEventListener( 'click', function () { search.value=''; product.value='0'; from.value=''; to.value=''; runQuery(); } ); }
+			if ( clear ) {
+				clear.addEventListener( 'click', function () {
+					search.value = '';
+					product.value = '0';
+					from.value = '';
+					to.value = '';
+					/*
+					 * Assigning `.value` fires nothing, so the date picker that
+					 * owns these two inputs would go on showing the range it
+					 * last applied — a control claiming a filter that is no
+					 * longer filtering. `input` rather than `change`, because
+					 * `change` is what the picker fires when IT applies and is
+					 * already wired to runQuery below; using it here would run
+					 * the query twice for one press.
+					 */
+					from.dispatchEvent( new Event( 'input', { bubbles: true } ) );
+					runQuery();
+				} );
+			}
 
 			// ── Row actions (delegated) ────────────────────────────────────
 			function closeMenus( except ) {
