@@ -112,7 +112,18 @@ rsync -a \
 # git but never that it reached the zip — and the zip is what a merchant
 # installs. These checks run in both release workflows, so nothing publishes
 # without them.
-for required in LICENSE NOTICE.md readme.txt; do
+# The two stylesheets and the icon table are listed because the settings screen
+# cannot render without them and their absence is SILENT: rsync includes them by
+# default, so the only way they go missing is a future --exclude that is wider
+# than its author meant. A zip that installs cleanly and paints an unstyled form
+# is worse than one that fails to build.
+for required in LICENSE NOTICE.md readme.txt \
+	assets/css/aisooq-admin.css \
+	assets/css/aisooq-app.css \
+	assets/js/aisooq-daterange.js \
+	includes/class-aisooq-icons.php \
+	includes/class-aisooq-admin-shell.php \
+	includes/class-aisooq-settings-fields.php; do
 	if [[ ! -f "$STAGE/$required" ]]; then
 		echo "error: $required is missing from the package" >&2
 		exit 1

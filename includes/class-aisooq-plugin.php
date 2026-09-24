@@ -93,7 +93,7 @@ class AI_Sooq_Plugin {
 		$this->poller         = new AI_Sooq_Status_Poller( $this->settings, $this->api, $this->logger );
 		$this->privacy        = new AI_Sooq_Privacy();
 		$this->blocklist       = new AI_Sooq_Blocklist();
-		$this->blocklist_admin = new AI_Sooq_Blocklist_Admin( $this->logger );
+		$this->blocklist_admin = new AI_Sooq_Blocklist_Admin( $this->logger, $this->settings );
 		$this->failed_admin    = new AI_Sooq_Failed_Admin( $this->settings, $this->order_sync, $this->logger );
 		$this->orders_column  = new AI_Sooq_Orders_Column( $this->settings, $this->logger );
 		$this->products_column = new AI_Sooq_Products_Column( $this->settings, $this->logger );

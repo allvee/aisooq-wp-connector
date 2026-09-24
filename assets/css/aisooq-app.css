@@ -1,0 +1,1482 @@
+/**
+ * AI Sooq — the application shell.
+ *
+ * Loaded on all four plugin screens, on top of aisooq-admin.css (which supplies
+ * the tokens and the control base layer). It was `aisooq-settings.css` while
+ * only one screen wore this design; it was renamed rather than copied when the
+ * other three adopted it, because a second copy of an app bar is how two app
+ * bars start disagreeing.
+ *
+ * THE SHAPE
+ * ---------
+ * An application shell, not a WordPress form: a fixed-height bar across the
+ * top, a 220px sidebar that owns navigation, and a single scrolling column of
+ * cards. wp-admin's own `.wrap` padding and `h1` are suppressed, because the
+ * bar has to reach the edges to read as chrome rather than as the first item of
+ * content.
+ *
+ * Three of the four screens are lists rather than forms, so the components
+ * below the shell come in two families: the form pieces the settings screen
+ * needs (fields, chips, pairs) and the list pieces the other three need
+ * (toolbar, table, pager, empty state). Both are here because both are this
+ * design, and a screen that used one family would have had to re-derive the
+ * other's spacing from scratch.
+ *
+ * ELEVATION. Every card is `--sh-sm`, which is a 1px ring and no blur, so the
+ * page stays flat. Blur is reserved for the three things that genuinely float:
+ * the search results popover, the unsaved bar and the toast.
+ *
+ * SPECIFICITY. Rules are written `.wrap.aisooq .x` (0,2,x) to match the shared
+ * sheet, and this file is enqueued after it, so equal-specificity rules here
+ * win on source order. Where a shared rule has to be beaten outright the
+ * selector carries `.aisooq-app` as well — that is deliberate and always
+ * commented, never a reflex `!important`.
+ */
+
+/* ── Shell ──────────────────────────────────────────────────────────────── */
+
+/* wp-admin gives `.wrap` 10px of right margin and a 2px left pad, which would
+   stop the app bar short of the screen edge on the right only — visibly
+   lopsided. The negative left margin swallows #wpbody-content's 20px pad. */
+.wrap.aisooq.aisooq-app {
+	margin: 0 0 0 -20px;
+	padding: 0;
+	max-width: none;
+	background: var(--bg);
+	color: var(--fg);
+	font-size: var(--text);
+	line-height: var(--lh);
+}
+/* The screen title lives in the app bar. wp-admin still needs one in the DOM
+   for its own admin-notice insertion point and for screen readers. */
+.wrap.aisooq.aisooq-app > h1.screen-reader-text { margin: 0; }
+.wrap.aisooq.aisooq-app .notice,
+.wrap.aisooq.aisooq-app .notice-success,
+.wrap.aisooq.aisooq-app .notice-error { margin: var(--sp-4) var(--sp-8) 0; }
+
+/* ── Unsaved bar ────────────────────────────────────────────────────────────
+ * Sticks above everything, including the app bar, because it is a modal-ish
+ * claim on the operator's attention: there is exactly one thing to do next. */
+.wrap.aisooq .aisooq-unsaved {
+	position: sticky;
+	top: 0;
+	z-index: 30;
+	display: flex;
+	align-items: center;
+	gap: var(--sp-4);
+	flex-wrap: wrap;
+	padding: var(--sp-3) var(--sp-8);
+	background: var(--n-100);
+	color: var(--n-900);
+	box-shadow: var(--sh-md);
+}
+.wrap.aisooq .aisooq-unsaved__icon { color: var(--pri-600); flex: 0 0 auto; }
+.wrap.aisooq .aisooq-unsaved__msg { font-weight: 500; margin-right: auto; }
+
+/* ── App bar ────────────────────────────────────────────────────────────── */
+.wrap.aisooq .aisooq-appbar {
+	position: relative;
+	z-index: 20;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--sp-3) var(--sp-4);
+	padding: var(--sp-4) var(--sp-8);
+	background: var(--card);
+	box-shadow: var(--sh-sm);
+}
+.wrap.aisooq .aisooq-appbar__brand {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-3);
+	margin-right: auto;
+	min-width: 0;
+}
+.wrap.aisooq .aisooq-appbar__mark {
+	width: 34px;
+	height: 34px;
+	border-radius: 50%;
+	display: grid;
+	place-items: center;
+	background: var(--pri);
+	color: var(--pri-fg);
+	flex: 0 0 auto;
+}
+.wrap.aisooq .aisooq-appbar__name {
+	font-size: 18px;
+	font-weight: 800;
+	letter-spacing: -.02em;
+	color: var(--fg);
+}
+.wrap.aisooq .aisooq-appbar__result {
+	font-size: var(--text-sm);
+	font-weight: 600;
+	color: var(--muted);
+}
+.wrap.aisooq .aisooq-appbar__result.is-ok { color: var(--ok); }
+.wrap.aisooq .aisooq-appbar__result.is-err { color: var(--err); }
+
+/* Connection state. A dot and a word — the SID and the verification time are
+   in the title, because they are what you need only once. */
+.wrap.aisooq .aisooq-state {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	padding: 4px 10px;
+	border-radius: var(--pill);
+	background: var(--pri-900);
+	box-shadow: 0 0 0 1px var(--pri-800);
+	cursor: help;
+	font-size: 12px;
+	color: var(--pri-300);
+	white-space: nowrap;
+}
+.wrap.aisooq .aisooq-state__dot {
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: var(--pri);
+	box-shadow: 0 0 6px var(--pri);
+	flex: 0 0 auto;
+}
+.wrap.aisooq .aisooq-state.is-warn { background: var(--warn-wash); box-shadow: 0 0 0 1px var(--warn-edge); color: var(--warn); }
+.wrap.aisooq .aisooq-state.is-warn .aisooq-state__dot { background: var(--warn); box-shadow: 0 0 6px var(--warn); }
+.wrap.aisooq .aisooq-state.is-err { background: var(--err-wash); box-shadow: 0 0 0 1px var(--err-edge); color: var(--err); }
+.wrap.aisooq .aisooq-state.is-err .aisooq-state__dot { background: var(--err); box-shadow: 0 0 6px var(--err); }
+
+/* The sync group reads as one segmented control, so the ring is on the group
+   and never on the buttons inside it. */
+.wrap.aisooq .aisooq-syncgroup {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	padding: 2px;
+	border-radius: var(--pill);
+	box-shadow: 0 0 0 1px var(--line);
+	overflow-x: auto;
+	max-width: 100%;
+	scrollbar-width: none;
+}
+.wrap.aisooq .aisooq-syncgroup::-webkit-scrollbar { display: none; }
+.wrap.aisooq .aisooq-syncgroup__icon {
+	padding: 0 6px 0 8px;
+	color: var(--n-400);
+	flex: 0 0 auto;
+	display: inline-flex;
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────────
+ * The shared sheet styles `.button`; these are the design's own three, used
+ * where the markup is a real <button> rather than a WordPress one. */
+.wrap.aisooq .aisooq-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 7px;
+	border: 1px solid transparent;
+	border-radius: var(--pill);
+	font-weight: 700;
+	font-size: var(--text);
+	padding: 7px 16px;
+	min-height: 34px;
+	cursor: pointer;
+	background: transparent;
+	color: var(--fg);
+	text-decoration: none;
+	transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+}
+.wrap.aisooq .aisooq-btn:disabled { opacity: .55; cursor: default; }
+/* `--pri-solid`, not `--pri`: this label is white on the fill, and `--pri`
+   does not clear 4.5:1 behind it. See the token's own note. */
+.wrap.aisooq .aisooq-btn--primary { background: var(--pri-solid); color: var(--pri-fg); border-color: var(--pri-solid); }
+.wrap.aisooq .aisooq-btn--primary:hover:not(:disabled) { background: var(--pri-dd); border-color: var(--pri-dd); color: var(--pri-fg); }
+.wrap.aisooq .aisooq-btn--primary:active:not(:disabled) { background: var(--pri-200); border-color: var(--pri-200); }
+.wrap.aisooq .aisooq-btn--secondary { border-color: var(--n-700); color: var(--fg); }
+.wrap.aisooq .aisooq-btn--secondary:hover:not(:disabled) { background: var(--n-900); color: var(--fg); }
+/* A ghost button reads as an action, so it carries the accent — except inside
+   the sync group, where four of them sit in a row and four blue words look
+   like a broken breadcrumb rather than one segmented control. */
+.wrap.aisooq .aisooq-btn--ghost { color: var(--pri-300); padding-inline: 10px; padding-block: 5px; min-height: 30px; font-weight: 700; }
+.wrap.aisooq .aisooq-btn--ghost:hover:not(:disabled) { background: var(--pri-900); color: var(--pri-200); }
+.wrap.aisooq .aisooq-syncgroup .aisooq-btn--ghost { color: var(--fg); padding-inline: 9px; }
+.wrap.aisooq .aisooq-syncgroup .aisooq-btn--ghost:hover:not(:disabled) { background: var(--pri-900); color: var(--pri-200); }
+/* On the dark unsaved bar the two buttons invert. */
+.wrap.aisooq .aisooq-unsaved .aisooq-btn--secondary { color: var(--n-900); border-color: var(--n-300); }
+.wrap.aisooq .aisooq-unsaved .aisooq-btn--secondary:hover { background: var(--n-200); color: var(--n-900); }
+
+/* ── Checkboxes ─────────────────────────────────────────────────────────────
+ * The shared sheet paints its own tick with a ::before glyph, which was right
+ * for the previous design's rounded control. This one is the platform's own
+ * square box tinted with `accent-color` — fewer moving parts, and it inherits
+ * the OS's focus and high-contrast treatment for free. Undoing the glyph is
+ * required, not cosmetic: left in, it draws a second tick over the native one. */
+.wrap.aisooq.aisooq-app input[type="checkbox"],
+.wrap.aisooq.aisooq-app input[type="radio"] {
+	accent-color: var(--pri);
+	appearance: auto;
+	-webkit-appearance: auto;
+	background: initial;
+	border: initial;
+	box-shadow: none;
+	min-width: 0;
+}
+.wrap.aisooq.aisooq-app input[type="checkbox"]:checked::before,
+.wrap.aisooq.aisooq-app input[type="radio"]:checked::before { content: none; }
+
+/* wp-admin prints its own "Thank you for creating with WordPress" bar below
+   every screen. This page draws that line itself, as part of the design, so
+   the stock one would say it twice. Hidden only here. */
+body.toplevel_page_aisooq-connector #wpfooter { display: none; }
+
+/* ── Search ─────────────────────────────────────────────────────────────── */
+.wrap.aisooq .aisooq-search { position: relative; }
+.wrap.aisooq .aisooq-search__icon {
+	position: absolute;
+	left: 10px;
+	top: 50%;
+	transform: translateY(-50%);
+	color: var(--n-400);
+	pointer-events: none;
+}
+/* `.aisooq-app` beats the shared sheet's `.wrap.aisooq input[type=search]`,
+   which sets its own padding — the icon would otherwise sit on the caret. */
+.wrap.aisooq.aisooq-app .aisooq-search input[type="search"] {
+	width: 100%;
+	padding: 6px 10px 6px 32px;
+	min-height: 36px;
+	border-radius: var(--radius-sm);
+	border: 1px solid var(--n-700);
+	background: var(--card);
+	font-size: var(--text);
+	box-shadow: none;
+}
+.wrap.aisooq .aisooq-search input[type="search"]:focus {
+	border-color: var(--pri);
+	box-shadow: 0 0 0 1px var(--pri);
+	outline: 0;
+}
+/* The results popover floats, so it is the one part of search that gets blur. */
+.wrap.aisooq .aisooq-results {
+	position: absolute;
+	top: calc(100% + 6px);
+	left: 0;
+	right: 0;
+	z-index: 20;
+	background: var(--card);
+	border-radius: var(--radius-md);
+	box-shadow: var(--sh-lg);
+	padding: 4px;
+	display: flex;
+	flex-direction: column;
+	max-height: 320px;
+	overflow-y: auto;
+	/* Wider than the 220px sidebar it hangs off. The design's own popover is
+	   flush with the column, which worked because its index was a hand-written
+	   list of short names; these labels come from the rendered fields and
+	   "Courier delivery gate · Checkout messages" wraps to three lines at that
+	   width. A popover already floats over the page, so the extra 60px costs
+	   nothing. */
+	min-width: 280px;
+}
+.wrap.aisooq .aisooq-results__item {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: var(--sp-2);
+	padding: 7px 10px;
+	border: 0;
+	background: transparent;
+	border-radius: var(--radius-sm);
+	font-size: var(--text-sm);
+	color: var(--fg);
+	text-align: left;
+	cursor: pointer;
+	width: 100%;
+}
+.wrap.aisooq .aisooq-results__item:hover,
+.wrap.aisooq .aisooq-results__item.is-active { background: var(--pri-900); }
+.wrap.aisooq .aisooq-results__item > span:first-child { min-width: 0; }
+.wrap.aisooq .aisooq-results__tab { font-size: 11px; color: var(--n-400); flex: 0 0 auto; }
+.wrap.aisooq .aisooq-results__none { padding: 10px; font-size: 12.5px; color: var(--n-400); }
+
+/* ── Body: sidebar + main ───────────────────────────────────────────────── */
+.wrap.aisooq .aisooq-body {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--sp-8);
+	padding: var(--sp-8);
+	max-width: 1240px;
+	align-items: flex-start;
+}
+.wrap.aisooq .aisooq-side {
+	flex: 0 0 220px;
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-6);
+	position: sticky;
+	/* 32px clears the admin bar, which is itself sticky on desktop. */
+	top: var(--sp-8);
+	align-self: flex-start;
+	min-width: 0;
+}
+.wrap.aisooq .aisooq-nav { display: flex; flex-direction: column; gap: 2px; }
+.wrap.aisooq .aisooq-navitem {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 10px 14px;
+	border: 0;
+	border-radius: var(--pill);
+	background: transparent;
+	color: var(--muted);
+	font-size: var(--text-lg);
+	font-weight: 500;
+	cursor: pointer;
+	text-align: left;
+	width: 100%;
+	/* On the list screens these are anchors, and they are excluded from the
+	   shared sheet's link rule — which is also where they would have got their
+	   `text-decoration: none`. Without this they underline. */
+	text-decoration: none;
+	box-sizing: border-box;
+	transition: background-color .15s ease, color .15s ease;
+}
+.wrap.aisooq .aisooq-navitem:hover { text-decoration: none; }
+/* A nav of links carries the current page rather than a selected tab, so the
+   marker is the same but the mechanism is `aria-current`, not `aria-selected`. */
+.wrap.aisooq .aisooq-nav--links .aisooq-navitem__count { margin-left: auto; }
+.wrap.aisooq .aisooq-navitem:hover { background: var(--n-900); color: var(--fg); }
+.wrap.aisooq .aisooq-navitem.is-active { color: var(--fg); font-weight: 800; }
+.wrap.aisooq .aisooq-navitem__count {
+	margin-left: auto;
+	min-width: 20px;
+	padding: 0 6px;
+	border-radius: var(--pill);
+	background: var(--pri-800);
+	color: var(--pri-200);
+	font-size: 11px;
+	line-height: 18px;
+	text-align: center;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+}
+/* The three sibling screens. A link, not a tab — it leaves this page. */
+.wrap.aisooq .aisooq-side__links {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding-top: var(--sp-4);
+	box-shadow: inset 0 1px 0 var(--line);
+}
+.wrap.aisooq .aisooq-sidelink {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 7px 10px;
+	border-radius: var(--radius-md);
+	color: var(--muted);
+	text-decoration: none;
+	font-size: 13.5px;
+}
+.wrap.aisooq .aisooq-sidelink:hover { background: var(--pri-900); color: var(--pri-200); }
+
+.wrap.aisooq .aisooq-main {
+	flex: 1 1 300px;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-6);
+}
+
+/* The same three sibling-screen links, at the foot of the column on a phone. */
+.wrap.aisooq .aisooq-main__links { display: none; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.wrap.aisooq .aisooq-main__links::-webkit-scrollbar { display: none; }
+.wrap.aisooq .aisooq-sidelink--pill {
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	min-height: 36px;
+	padding: 0 12px;
+	border-radius: var(--pill);
+	box-shadow: 0 0 0 1px var(--line);
+	color: var(--muted);
+	text-decoration: none;
+	font-size: var(--text-sm);
+	white-space: nowrap;
+}
+.wrap.aisooq .aisooq-sidelink--pill:hover { background: var(--pri-900); color: var(--pri-200); }
+
+/* ── Overview ───────────────────────────────────────────────────────────── */
+.wrap.aisooq .aisooq-overview { display: flex; flex-direction: column; gap: var(--sp-4); }
+
+.wrap.aisooq .aisooq-storebar {
+	background: var(--card);
+	border-radius: var(--radius);
+	box-shadow: var(--sh-sm);
+	padding: var(--sp-4) var(--sp-6);
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--sp-4) var(--sp-8);
+}
+.wrap.aisooq .aisooq-storebar__id { display: flex; align-items: center; gap: var(--sp-3); margin-right: auto; min-width: 0; }
+.wrap.aisooq .aisooq-storebar__avatar {
+	width: 36px;
+	height: 36px;
+	border-radius: 50%;
+	display: grid;
+	place-items: center;
+	background: var(--pri-800);
+	color: var(--pri-200);
+	font-size: 15px;
+	font-weight: 500;
+	flex: 0 0 auto;
+}
+.wrap.aisooq .aisooq-storebar__name { font-size: var(--text-lg); font-weight: 500; }
+.wrap.aisooq .aisooq-storebar__meta {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: var(--text-sm);
+	color: var(--muted);
+	min-width: 0;
+}
+.wrap.aisooq .aisooq-storebar__meta > svg { color: var(--n-400); flex: 0 0 auto; }
+.wrap.aisooq .aisooq-storebar__meta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.wrap.aisooq .aisooq-stats {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+	gap: var(--sp-3);
+}
+.wrap.aisooq .aisooq-stat {
+	background: var(--card);
+	border-radius: var(--radius);
+	box-shadow: var(--sh-sm);
+	padding: var(--sp-4);
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.wrap.aisooq .aisooq-stat__label {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	color: var(--n-400);
+}
+.wrap.aisooq .aisooq-stat__num {
+	font-size: var(--text-2xl);
+	font-weight: 800;
+	letter-spacing: -.02em;
+	line-height: var(--lh-tight);
+	font-variant-numeric: tabular-nums;
+	color: var(--fg);
+}
+.wrap.aisooq .aisooq-stat.is-warn .aisooq-stat__num { color: var(--warn); }
+.wrap.aisooq .aisooq-stat.is-err .aisooq-stat__num { color: var(--err); }
+
+/* Two collapsibles side by side, each falling to full width before it squashes. */
+.wrap.aisooq .aisooq-discs { display: flex; flex-wrap: wrap; gap: var(--sp-4); }
+.wrap.aisooq .aisooq-disc {
+	flex: 1 1 280px;
+	min-width: 0;
+	background: var(--card);
+	border-radius: var(--radius);
+	box-shadow: var(--sh-sm);
+	overflow: hidden;
+}
+.wrap.aisooq .aisooq-disc__head {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-3);
+	padding: var(--sp-4) var(--sp-6);
+	width: 100%;
+	box-sizing: border-box;
+	border: 0;
+	background: transparent;
+	cursor: pointer;
+	text-align: left;
+	font-size: var(--text);
+	color: var(--fg);
+}
+.wrap.aisooq .aisooq-disc__head:hover { background: var(--n-900); }
+.wrap.aisooq .aisooq-disc__icon { color: var(--pri); flex: 0 0 auto; }
+.wrap.aisooq .aisooq-disc__label { font-weight: 500; margin-right: auto; }
+.wrap.aisooq .aisooq-disc__count { font-size: 12px; color: var(--n-400); font-variant-numeric: tabular-nums; }
+.wrap.aisooq .aisooq-disc__chev { color: var(--n-400); flex: 0 0 auto; }
+.wrap.aisooq .aisooq-progress {
+	width: 64px;
+	height: 4px;
+	border-radius: 2px;
+	background: var(--n-800);
+	overflow: hidden;
+	display: block;
+	flex: 0 0 auto;
+}
+.wrap.aisooq .aisooq-progress__fill { display: block; height: 100%; background: var(--pri); }
+.wrap.aisooq .aisooq-disc__body { display: flex; flex-direction: column; padding: 0 var(--sp-4) var(--sp-4); }
+.wrap.aisooq .aisooq-step {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 7px 8px;
+	border: 0;
+	background: transparent;
+	border-radius: var(--radius-md);
+	font-size: 13.5px;
+	color: var(--fg);
+	text-align: left;
+	cursor: pointer;
+	text-decoration: none;
+}
+.wrap.aisooq .aisooq-step:hover { background: var(--pri-900); }
+.wrap.aisooq .aisooq-step__icon { color: var(--pri); flex: 0 0 auto; }
+.wrap.aisooq .aisooq-step.is-todo .aisooq-step__icon { color: var(--n-600); }
+
+.wrap.aisooq .aisooq-perms {
+	background: var(--card);
+	border-radius: var(--radius);
+	box-shadow: var(--sh-sm);
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+	gap: var(--sp-3);
+	padding: var(--sp-6);
+}
+.wrap.aisooq .aisooq-perm { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.wrap.aisooq .aisooq-perm__name {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	font-size: var(--text-sm);
+	font-weight: 500;
+	color: var(--fg);
+}
+.wrap.aisooq .aisooq-perm__name > svg { color: var(--n-400); flex: 0 0 auto; }
+.wrap.aisooq .aisooq-perm__acts { display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* ── Tags ───────────────────────────────────────────────────────────────── */
+.wrap.aisooq .aisooq-tag {
+	display: inline-flex;
+	align-items: center;
+	border-radius: var(--pill);
+	font-weight: 700;
+	padding: 1px 8px;
+	font-size: 11px;
+	line-height: 1.6;
+	white-space: nowrap;
+}
+.wrap.aisooq .aisooq-tag--accent { background: var(--pri-800); color: var(--pri-200); }
+.wrap.aisooq .aisooq-tag--outline { box-shadow: inset 0 0 0 1px var(--n-700); color: var(--muted); }
+.wrap.aisooq .aisooq-tag--neutral { background: var(--n-900); color: var(--muted); }
+.wrap.aisooq .aisooq-tag--ok { background: var(--ok-wash); color: var(--ok); }
+.wrap.aisooq .aisooq-tag--warn { background: var(--warn-wash); color: var(--warn); }
+.wrap.aisooq .aisooq-tag--err { background: var(--err-wash); color: var(--err); }
+/* Scopes arrive lowercase from the platform (`orders.write`). Capitalising is
+   right for those and wrong for a tag carrying a sentence ("Up to date"), so it
+   lives here rather than on every tag. */
+.wrap.aisooq .aisooq-perm__acts .aisooq-tag { padding: 0 7px; font-size: 10.5px; text-transform: capitalize; }
+
+/* ── Panels and cards ───────────────────────────────────────────────────── */
+.wrap.aisooq .aisooq-tabtitle {
+	margin: var(--sp-4) 0 0;
+	padding: 0;
+	font-size: var(--text-xl);
+	font-weight: 800;
+	letter-spacing: -.02em;
+	line-height: var(--lh-tight);
+	color: var(--fg);
+}
+.wrap.aisooq .aisooq-panels { display: flex; flex-direction: column; gap: var(--sp-6); }
+.wrap.aisooq .aisooq-panel { display: flex; flex-direction: column; gap: var(--sp-4); }
+.wrap.aisooq .aisooq-panel:focus { outline: 0; }
+
+.wrap.aisooq.aisooq-app .aisooq-card {
+	background: var(--card);
+	border: 0;
+	border-radius: var(--radius);
+	box-shadow: var(--sh-sm);
+	padding: var(--sp-6);
+	display: flex;
+	flex-direction: column;
+	gap: var(--sp-4);
+	/* Prose in a form is unreadable at 1200px. The cap is on the card so the
+	   ring still reaches the column edge on the wide screens it was drawn for. */
+	max-width: 100%;
+}
+.wrap.aisooq .aisooq-card__label {
+	font-size: var(--text-sm);
+	font-weight: 700;
+	color: var(--fg);
+	display: flex;
+	align-items: center;
+	gap: var(--sp-2);
+}
+/* A card whose body is a list of rows manages its own padding per row. */
+.wrap.aisooq.aisooq-app .aisooq-card--rows { padding: 0; gap: 0; }
+.wrap.aisooq .aisooq-card--rows > .aisooq-card__label { padding: var(--sp-6) var(--sp-6) var(--sp-2); }
+.wrap.aisooq .aisooq-row-item {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--sp-4);
+	padding: var(--sp-3) var(--sp-6);
+	box-shadow: inset 0 1px 0 var(--line);
+}
+.wrap.aisooq .aisooq-row-item:last-child { padding-bottom: var(--sp-4); }
+.wrap.aisooq .aisooq-row-item__head {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-4);
+	padding: var(--sp-4) var(--sp-6);
+	font-size: 11px;
+	letter-spacing: .08em;
+	text-transform: uppercase;
+	color: var(--n-400);
+}
+.wrap.aisooq .aisooq-row-item__head > span { flex: 1 1 0; display: flex; align-items: center; gap: 6px; }
+.wrap.aisooq .aisooq-row-item__label { flex: 1 1 200px; min-width: 0; display: flex; align-items: center; gap: var(--sp-2); }
+.wrap.aisooq.aisooq-app .aisooq-row-item select { flex: 0 1 240px; width: auto; min-width: 0; }
+/* The shipping map's two columns are equal and headed, so its control has to
+   start where "Platform rate" does rather than hugging the right edge. */
+.wrap.aisooq.aisooq-app .aisooq-card--map .aisooq-row-item select,
+.wrap.aisooq.aisooq-app .aisooq-card--map .aisooq-row-item input[type="number"] {
+	flex: 1 1 200px;
+	width: auto;
+	min-width: 0;
+}
+
+/* ── Fields ─────────────────────────────────────────────────────────────── */
+.wrap.aisooq .aisooq-field { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.wrap.aisooq.aisooq-app .aisooq-field > label.h,
+.wrap.aisooq.aisooq-app .aisooq-field > span.h {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 0;
+	font-size: var(--text-sm);
+	font-weight: 400;
+	color: var(--n-200);
+}
+.wrap.aisooq.aisooq-app .aisooq-field .description { margin: 0; font-size: 12.5px; color: var(--muted); }
+.wrap.aisooq.aisooq-app .aisooq-field input[type="url"],
+.wrap.aisooq.aisooq-app .aisooq-field input[type="text"],
+.wrap.aisooq.aisooq-app .aisooq-field input[type="password"],
+.wrap.aisooq.aisooq-app .aisooq-field input[type="number"],
+.wrap.aisooq.aisooq-app .aisooq-field textarea,
+.wrap.aisooq.aisooq-app .aisooq-field select,
+.wrap.aisooq.aisooq-app .aisooq-row-item select {
+	border-radius: var(--radius-sm);
+	border: 1px solid var(--n-700);
+	background: var(--card);
+	font-size: var(--text);
+	box-shadow: none;
+}
+.wrap.aisooq.aisooq-app .aisooq-field input:focus,
+.wrap.aisooq.aisooq-app .aisooq-field select:focus,
+.wrap.aisooq.aisooq-app .aisooq-field textarea:focus,
+.wrap.aisooq.aisooq-app .aisooq-row-item select:focus {
+	border-color: var(--pri);
+	box-shadow: 0 0 0 1px var(--pri);
+	outline: 0;
+}
+.wrap.aisooq.aisooq-app .aisooq-field input.code,
+.wrap.aisooq.aisooq-app .aisooq-field .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: var(--text-sm); }
+.wrap.aisooq.aisooq-app .aisooq-field textarea { min-height: 56px; line-height: 1.6; }
+.wrap.aisooq.aisooq-app .aisooq-field input.small-text { width: 64px; flex: 0 0 auto; }
+
+/* Two fields abreast wherever the column is wide enough for both. */
+.wrap.aisooq .aisooq-pair {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+	gap: var(--sp-4);
+}
+.wrap.aisooq .aisooq-check {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-2);
+	margin: 0;
+	cursor: pointer;
+	font-size: var(--text);
+}
+.wrap.aisooq .aisooq-check strong { font-weight: 500; }
+.wrap.aisooq.aisooq-app .aisooq-check input[type="checkbox"] { width: 16px; height: 16px; margin: 0; flex: 0 0 auto; }
+.wrap.aisooq .aisooq-checks { display: flex; flex-wrap: wrap; gap: var(--sp-4) var(--sp-8); }
+.wrap.aisooq .aisooq-inline { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; font-size: var(--text-sm); color: var(--muted); }
+/* A field whose label, control and unit read as one sentence — "Cart abandoned
+   after [30] min". The label sits INSIDE the inline run, so the block-level
+   `.aisooq-field > label.h` rule deliberately does not reach it. */
+.wrap.aisooq.aisooq-app .aisooq-inline .h {
+	display: inline;
+	margin: 0;
+	font-size: var(--text-sm);
+	font-weight: 400;
+	color: var(--n-200);
+}
+.wrap.aisooq .aisooq-row { display: flex; flex-direction: column; gap: var(--sp-2); }
+
+/* Order statuses: a checkbox inside a pill that fills in when it is on, so the
+   selected set is readable as a shape without reading nine labels. */
+.wrap.aisooq .aisooq-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.wrap.aisooq .aisooq-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	margin: 0;
+	padding: 5px 10px;
+	border-radius: var(--pill);
+	box-shadow: 0 0 0 1px var(--line);
+	background: transparent;
+	cursor: pointer;
+	font-size: var(--text-sm);
+	white-space: nowrap;
+}
+.wrap.aisooq .aisooq-chip.is-on { box-shadow: 0 0 0 1px var(--pri-700); background: var(--pri-900); }
+.wrap.aisooq.aisooq-app .aisooq-chip input[type="checkbox"] { width: 14px; height: 14px; margin: 0; }
+
+/* An input with a glyph in its gutter — the three support contacts. */
+.wrap.aisooq .aisooq-affix { position: relative; display: block; }
+.wrap.aisooq .aisooq-affix__icon {
+	position: absolute;
+	left: 10px;
+	top: 50%;
+	transform: translateY(-50%);
+	color: var(--n-400);
+	pointer-events: none;
+}
+.wrap.aisooq.aisooq-app .aisooq-affix input { padding-left: 32px; width: 100%; }
+
+/* A hint that carries a cost. Amber, because it is neither an error nor
+   neutral: doing this spends the merchant's money. */
+.wrap.aisooq .aisooq-cost { display: flex; align-items: flex-start; gap: 5px; color: var(--warn); }
+.wrap.aisooq .aisooq-cost > svg { flex: 0 0 auto; margin-top: 2px; }
+
+/* An info glyph that only exists to carry a `title`. */
+.wrap.aisooq .aisooq-hint { color: var(--n-400); cursor: help; flex: 0 0 auto; display: inline-flex; vertical-align: -2px; }
+
+/* Dependent field: dimmed so it reads as "no effect right now", never removed
+   and never disabled — you can still come here to change it. */
+.wrap.aisooq .aisooq-field.is-inactive,
+.wrap.aisooq .aisooq-card.is-inactive { opacity: .55; }
+.wrap.aisooq .aisooq-field.is-inactive:focus-within,
+.wrap.aisooq .aisooq-card.is-inactive:focus-within { opacity: 1; }
+.wrap.aisooq .aisooq-dep-note { font-style: italic; color: var(--warn); }
+/* Where search put you. A panel can be short enough that scrolling to a field
+   is a no-op, and then the jump looks like nothing happened at all. */
+.wrap.aisooq .is-found {
+	animation: aisooq-found 1.6s ease;
+	border-radius: var(--radius-sm);
+}
+@keyframes aisooq-found {
+	0%, 60% { background: var(--pri-900); box-shadow: 0 0 0 4px var(--pri-900); }
+	100% { background: transparent; box-shadow: 0 0 0 4px transparent; }
+}
+
+/* Two cards abreast, each dropping to full width before it squashes. The
+   design pairs the short fraud cards this way so the numbered layers read as
+   a sequence rather than a stack. */
+.wrap.aisooq .aisooq-cardgrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+	gap: var(--sp-4);
+	align-items: start;
+}
+
+/* A switch on the left, its consequence on the right, on one line. */
+.wrap.aisooq .aisooq-rowline {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--sp-3) var(--sp-4);
+}
+.wrap.aisooq .aisooq-rowline > .aisooq-check { margin-right: auto; }
+.wrap.aisooq .aisooq-field--inlineselect {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	gap: var(--sp-2);
+	flex-wrap: wrap;
+}
+.wrap.aisooq.aisooq-app .aisooq-field--inlineselect select { width: auto; }
+
+.wrap.aisooq .aisooq-error { color: var(--err); }
+.wrap.aisooq .aisooq-appbar__result.is-pending { color: var(--muted); }
+.wrap.aisooq .aisooq-toast[hidden] { display: none !important; }
+
+/* ── List screens ───────────────────────────────────────────────────────────
+ * Blocked, Failed syncs and Abandoned carts are the same shape: a heading with
+ * a search beside it, a table, and a pager. They share these rules so the three
+ * do not each invent their own row height.
+ *
+ * The table is deliberately NOT wp-admin's `.widefat`. That class brings its
+ * own border, its own striping and its own 13px, and overriding all three costs
+ * more rules than starting from nothing. */
+
+.wrap.aisooq .aisooq-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--sp-3) var(--sp-4);
+	padding: var(--sp-4) var(--sp-6);
+	box-shadow: inset 0 -1px 0 var(--line);
+}
+.wrap.aisooq .aisooq-toolbar__title {
+	margin: 0;
+	padding: 0;
+	font-size: var(--text-lg);
+	font-weight: 700;
+	letter-spacing: -.01em;
+	color: var(--fg);
+	margin-right: auto;
+	display: flex;
+	align-items: center;
+	gap: var(--sp-2);
+}
+.wrap.aisooq .aisooq-toolbar__count {
+	font-size: var(--text-sm);
+	font-weight: 500;
+	color: var(--n-400);
+	font-variant-numeric: tabular-nums;
+}
+/* The toolbar's search is narrower than the sidebar's and never grows past the
+   point where it starts to look like the page's primary input. */
+.wrap.aisooq .aisooq-toolbar .aisooq-search { flex: 0 1 260px; min-width: 0; }
+
+.wrap.aisooq .aisooq-tablewrap {
+	/* Tables are the one thing in this design allowed to scroll sideways: the
+	   alternative is either truncating a phone number or stacking eight columns
+	   into an unreadable ribbon. */
+	overflow-x: auto;
+	-webkit-overflow-scrolling: touch;
+}
+.wrap.aisooq.aisooq-app table.aisooq-table {
+	width: 100%;
+	border-collapse: collapse;
+	border-spacing: 0;
+	background: transparent;
+	border: 0;
+	font-size: var(--text-sm);
+}
+.wrap.aisooq.aisooq-app table.aisooq-table th {
+	padding: var(--sp-3) var(--sp-6);
+	text-align: left;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: .08em;
+	text-transform: uppercase;
+	color: var(--n-400);
+	background: transparent;
+	border: 0;
+	box-shadow: inset 0 -1px 0 var(--line);
+	white-space: nowrap;
+}
+.wrap.aisooq.aisooq-app table.aisooq-table td {
+	padding: var(--sp-3) var(--sp-6);
+	border: 0;
+	box-shadow: inset 0 -1px 0 var(--line);
+	color: var(--fg);
+	vertical-align: middle;
+}
+.wrap.aisooq.aisooq-app table.aisooq-table tbody tr:last-child td { box-shadow: none; }
+.wrap.aisooq.aisooq-app table.aisooq-table tbody tr:hover { background: var(--n-900); }
+.wrap.aisooq .aisooq-table__num { font-variant-numeric: tabular-nums; font-weight: 600; }
+.wrap.aisooq .aisooq-table__actions { text-align: right; white-space: nowrap; }
+.wrap.aisooq.aisooq-app table.aisooq-table code {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 12.5px;
+	background: var(--n-900);
+	padding: 1px 6px;
+	border-radius: var(--radius-sm);
+	color: var(--fg);
+	/* A phone number broken across two lines is not a phone number. The table
+	   already scrolls sideways, so there is somewhere for it to go. */
+	white-space: nowrap;
+}
+/* A cell stacking several facts about one person: name over number over email. */
+.wrap.aisooq .aisooq-stack { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.wrap.aisooq .aisooq-stack__lead { font-weight: 600; color: var(--fg); }
+.wrap.aisooq .aisooq-stack__meta {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	color: var(--muted);
+	font-size: 12.5px;
+}
+.wrap.aisooq .aisooq-stack__meta > svg { color: var(--n-500); flex: 0 0 auto; }
+
+.wrap.aisooq .aisooq-empty {
+	padding: var(--sp-8) var(--sp-6);
+	text-align: center;
+	color: var(--muted);
+}
+.wrap.aisooq .aisooq-empty__icon { color: var(--n-600); margin-bottom: var(--sp-3); }
+.wrap.aisooq .aisooq-empty__title { font-size: var(--text-lg); font-weight: 700; color: var(--fg); margin: 0 0 var(--sp-1); }
+.wrap.aisooq .aisooq-empty p { margin: 0; }
+
+/* Icon-only row action. 32px rather than the 44px a primary control gets:
+   these sit several to a row inside a table cell, and a finger-sized target
+   there would double the row height for every row. The coarse-pointer branch
+   below puts the 44px back where it matters. */
+.wrap.aisooq .aisooq-iconbtn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	padding: 0;
+	border: 1px solid var(--n-700);
+	border-radius: var(--radius-sm);
+	background: var(--card);
+	color: var(--muted);
+	cursor: pointer;
+	transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+}
+.wrap.aisooq .aisooq-iconbtn:hover:not(:disabled) { background: var(--n-900); color: var(--fg); }
+.wrap.aisooq .aisooq-iconbtn:disabled { opacity: .5; cursor: default; }
+.wrap.aisooq .aisooq-iconbtn--ok:hover:not(:disabled) { border-color: var(--ok); color: var(--ok); background: var(--ok-wash); }
+.wrap.aisooq .aisooq-iconbtn--err:hover:not(:disabled) { border-color: var(--err); color: var(--err); background: var(--err-wash); }
+.wrap.aisooq .aisooq-rowactions { display: inline-flex; gap: 6px; justify-content: flex-end; }
+@media (pointer: coarse) {
+	.wrap.aisooq .aisooq-iconbtn { width: 40px; height: 40px; }
+}
+
+/* Pagination. WordPress prints `.page-numbers` inside `.tablenav-pages`; these
+   rules restyle its output rather than replacing it, so `paginate_links()`
+   keeps handling the arithmetic and the accessible current-page markup. */
+.wrap.aisooq .aisooq-pager {
+	display: flex;
+	justify-content: center;
+	padding: var(--sp-4) var(--sp-6);
+	box-shadow: inset 0 1px 0 var(--line);
+}
+.wrap.aisooq .aisooq-pager .page-numbers {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 32px;
+	height: 32px;
+	padding: 0 10px;
+	margin: 0 2px;
+	border-radius: var(--radius-sm);
+	font-size: var(--text-sm);
+	font-weight: 600;
+	color: var(--muted);
+	text-decoration: none;
+	background: transparent;
+	border: 0;
+}
+.wrap.aisooq .aisooq-pager a.page-numbers:hover { background: var(--pri-900); color: var(--pri-200); }
+.wrap.aisooq .aisooq-pager .page-numbers.current { background: var(--fg); color: var(--bg); }
+.wrap.aisooq .aisooq-pager .page-numbers.dots { background: transparent; color: var(--n-500); }
+
+/* The toolbar's search sits left, the actions right; this is the gap between. */
+.wrap.aisooq .aisooq-toolbar__spacer { flex: 1 1 auto; min-width: 0; }
+
+/* The row of select-all / per-row checkboxes. Sized to the control so the
+   column does not claim width it never uses. */
+.wrap.aisooq.aisooq-app table.aisooq-table th.aisooq-table__pick,
+.wrap.aisooq.aisooq-app table.aisooq-table td.aisooq-table__pick {
+	width: 1%;
+	padding-right: 0;
+	white-space: nowrap;
+}
+.wrap.aisooq.aisooq-app table.aisooq-table .aisooq-table__pick input[type="checkbox"] {
+	margin: 0;
+	width: 16px;
+	height: 16px;
+	vertical-align: middle;
+}
+
+/* ── Active filters ─────────────────────────────────────────────────────────
+ * What is currently narrowing the list, and one control per filter to drop it.
+ * Above the card rather than inside it, because it describes the card. */
+.wrap.aisooq .aisooq-filterbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--sp-2) var(--sp-3);
+	font-size: var(--text-sm);
+}
+.wrap.aisooq .aisooq-filterchip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 6px 3px 10px;
+	border-radius: var(--pill);
+	background: var(--pri-900);
+	box-shadow: inset 0 0 0 1px var(--pri-800);
+	color: var(--pri-200);
+	font-size: var(--text-sm);
+	font-weight: 600;
+	max-width: 100%;
+	min-width: 0;
+}
+.wrap.aisooq.aisooq-app a.aisooq-filterchip__x {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	color: var(--pri-300);
+	text-decoration: none;
+	flex: 0 0 auto;
+}
+.wrap.aisooq.aisooq-app a.aisooq-filterchip__x:hover { background: var(--pri-800); color: var(--pri-100); }
+
+/* A cause rail can run to a dozen entries, so it gets the denser metrics the
+   six-item settings nav does not need. */
+.wrap.aisooq .aisooq-nav--causes .aisooq-navitem { font-size: var(--text); padding: 8px 12px; }
+.wrap.aisooq .aisooq-nav--causes .aisooq-navitem > span:not(.aisooq-navitem__count) {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	min-width: 0;
+}
+.wrap.aisooq .aisooq-nav--causes .aisooq-navitem svg { width: 16px; height: 16px; flex: 0 0 auto; }
+
+/* ── Carried-over row markup ────────────────────────────────────────────────
+ * The abandoned-carts rows are still produced by render_rows(), which predates
+ * this design and names its cells `.aisooq-td-val`, `.aisooq-cust` and so on.
+ * Rewriting that method would have meant rewriting the courier cell, the row
+ * action menu and the details modal with it — three AJAX-driven components
+ * whose markup the script reaches into by class. So the old names are mapped
+ * onto the new look here instead, and the method is left alone.
+ *
+ * This is a bridge, not a destination: when render_rows() is next opened it
+ * should emit `.aisooq-stack` directly and this block should go. */
+.wrap.aisooq.aisooq-app table.aisooq-table td.aisooq-cb-cell,
+.wrap.aisooq.aisooq-app table.aisooq-table th.aisooq-cb-cell { width: 1%; padding-right: 0; }
+.wrap.aisooq.aisooq-app table.aisooq-table .aisooq-cb-cell input[type="checkbox"] { margin: 0; width: 16px; height: 16px; }
+.wrap.aisooq .aisooq-td-val { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.wrap.aisooq .aisooq-cust { font-weight: 600; color: var(--fg); }
+.wrap.aisooq .aisooq-contact { color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+.wrap.aisooq .aisooq-contact svg { color: var(--n-500); vertical-align: -2px; }
+.wrap.aisooq .aisooq-mono { font-variant-numeric: tabular-nums; }
+.wrap.aisooq .aisooq-dim { color: var(--muted); }
+/* `<abbr title>` picks up the browser's dotted underline, which reads as a
+   spelling error in a table cell. The title still works on hover. */
+.wrap.aisooq.aisooq-app abbr[title] { text-decoration: none; border-bottom: 0; cursor: help; }
+
+/* The old badge names, repainted as this design's tags. */
+.wrap.aisooq.aisooq-app .aisooq-badge {
+	display: inline-flex;
+	align-items: center;
+	border-radius: var(--pill);
+	font-weight: 700;
+	padding: 1px 8px;
+	font-size: 11px;
+	line-height: 1.6;
+	white-space: nowrap;
+	background: var(--n-900);
+	color: var(--muted);
+	border: 0;
+}
+.wrap.aisooq.aisooq-app .aisooq-badge.ok { background: var(--ok-wash); color: var(--ok); }
+.wrap.aisooq.aisooq-app .aisooq-badge.warn { background: var(--warn-wash); color: var(--warn); }
+.wrap.aisooq.aisooq-app .aisooq-badge.err { background: var(--err-wash); color: var(--err); }
+.wrap.aisooq.aisooq-app .aisooq-badge.info { background: var(--pri-800); color: var(--pri-200); }
+.wrap.aisooq.aisooq-app .aisooq-badge.muted { background: var(--n-900); color: var(--muted); }
+
+/* ── Date range ─────────────────────────────────────────────────────────────
+ * A trigger that reads as one control, and a popover with the presets beside
+ * the calendar rather than under it — the shortcut is what most people want,
+ * so it must not be the thing they scroll past to reach the grid. */
+.wrap.aisooq .aisooq-dr { position: relative; display: inline-flex; }
+.wrap.aisooq .aisooq-dr__trigger {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--sp-2);
+	min-height: 36px;
+	padding: 0 10px;
+	border: 1px solid var(--n-700);
+	border-radius: var(--radius-sm);
+	background: var(--card);
+	color: var(--fg);
+	font-size: var(--text-sm);
+	font-weight: 500;
+	cursor: pointer;
+	white-space: nowrap;
+}
+.wrap.aisooq .aisooq-dr__trigger:hover { background: var(--n-900); }
+.wrap.aisooq .aisooq-dr__trigger > svg:first-child { color: var(--n-400); flex: 0 0 auto; }
+.wrap.aisooq .aisooq-dr.is-set .aisooq-dr__trigger { border-color: var(--pri-700); background: var(--pri-900); color: var(--pri-200); }
+.wrap.aisooq .aisooq-dr.is-set .aisooq-dr__trigger > svg { color: var(--pri-300); }
+.wrap.aisooq .aisooq-dr__trigger[aria-expanded="true"] { border-color: var(--pri); box-shadow: 0 0 0 1px var(--pri); }
+
+.wrap.aisooq .aisooq-dr__pop {
+	/* Fixed, and placed by the script — see the comment on place(). The card
+	   that hosts the toolbar sets `overflow: hidden` to round its table, which
+	   clipped an absolutely-positioned popover down the middle. */
+	position: fixed;
+	top: 0;
+	left: 0;
+	z-index: 100000;
+	display: flex;
+	background: var(--card);
+	border-radius: var(--radius-md);
+	box-shadow: var(--sh-lg);
+	overflow: hidden;
+}
+
+.wrap.aisooq .aisooq-dr__presets {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: var(--sp-3);
+	background: var(--n-900);
+	box-shadow: inset -1px 0 0 var(--line);
+	min-width: 148px;
+}
+.wrap.aisooq .aisooq-dr__preset {
+	border: 0;
+	background: transparent;
+	border-radius: var(--radius-sm);
+	padding: 7px 10px;
+	text-align: left;
+	font-size: var(--text-sm);
+	color: var(--muted);
+	cursor: pointer;
+	white-space: nowrap;
+}
+.wrap.aisooq .aisooq-dr__preset:hover { background: var(--pri-900); color: var(--pri-200); }
+.wrap.aisooq .aisooq-dr__preset.is-active { background: var(--fg); color: var(--bg); font-weight: 700; }
+
+.wrap.aisooq .aisooq-dr__cal { position: relative; padding: var(--sp-3); }
+/* The arrows sit ON the captions rather than between them, so two months read
+   as one control with one pair of arrows. */
+.wrap.aisooq .aisooq-dr__nav {
+	position: absolute;
+	top: var(--sp-3);
+	left: var(--sp-3);
+	right: var(--sp-3);
+	display: flex;
+	justify-content: space-between;
+	pointer-events: none;
+}
+.wrap.aisooq .aisooq-dr__nav .aisooq-iconbtn { pointer-events: auto; width: 28px; height: 28px; font-size: 18px; line-height: 1; }
+.wrap.aisooq .aisooq-dr__months { display: flex; gap: var(--sp-5); }
+.wrap.aisooq .aisooq-dr__caption {
+	text-align: center;
+	font-size: var(--text-sm);
+	font-weight: 700;
+	color: var(--fg);
+	min-height: 28px;
+	line-height: 28px;
+	margin-bottom: var(--sp-2);
+}
+.wrap.aisooq .aisooq-dr__week,
+.wrap.aisooq .aisooq-dr__days { display: grid; grid-template-columns: repeat(7, 34px); }
+.wrap.aisooq .aisooq-dr__week span {
+	height: 24px;
+	display: grid;
+	place-items: center;
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--n-400);
+}
+.wrap.aisooq .aisooq-dr__pad { height: 34px; }
+.wrap.aisooq .aisooq-dr__day {
+	height: 34px;
+	border: 0;
+	background: transparent;
+	color: var(--fg);
+	font-size: var(--text-sm);
+	cursor: pointer;
+	position: relative;
+	/* Square, not pill: the ends get the rounding, so a range reads as one
+	   continuous bar rather than a row of separate beads. */
+	border-radius: 0;
+}
+.wrap.aisooq .aisooq-dr__day:hover { background: var(--pri-900); }
+.wrap.aisooq .aisooq-dr__day.is-in { background: var(--pri-900); }
+.wrap.aisooq .aisooq-dr__day.is-start,
+.wrap.aisooq .aisooq-dr__day.is-end { background: var(--pri-solid); color: var(--pri-fg); font-weight: 700; }
+.wrap.aisooq .aisooq-dr__day.is-start { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.wrap.aisooq .aisooq-dr__day.is-end { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.wrap.aisooq .aisooq-dr__day.is-only { border-radius: var(--radius-sm); }
+/* Today is marked even when it is not selected, and the dot has to survive the
+   fill going dark under it. */
+.wrap.aisooq .aisooq-dr__day.is-today::after {
+	content: '';
+	position: absolute;
+	left: 50%;
+	bottom: 4px;
+	transform: translateX(-50%);
+	width: 4px;
+	height: 4px;
+	border-radius: 50%;
+	background: var(--pri);
+}
+.wrap.aisooq .aisooq-dr__day.is-start::after,
+.wrap.aisooq .aisooq-dr__day.is-end::after { background: var(--pri-fg); }
+/* A future day is dimmed but NOT disabled: a store can legitimately filter a
+   window that has not finished yet. */
+.wrap.aisooq .aisooq-dr__day.is-future { color: var(--n-500); }
+
+.wrap.aisooq .aisooq-dr__foot {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-2);
+	padding-top: var(--sp-3);
+	margin-top: var(--sp-3);
+	box-shadow: inset 0 1px 0 var(--line);
+}
+.wrap.aisooq .aisooq-dr__summary {
+	margin-right: auto;
+	font-size: var(--text-sm);
+	color: var(--muted);
+	font-variant-numeric: tabular-nums;
+}
+.wrap.aisooq .aisooq-dr__foot .aisooq-btn { min-height: 32px; padding: 4px 14px; font-size: var(--text-sm); }
+
+/* ── Funnel ─────────────────────────────────────────────────────────────────
+ * Where open carts stopped, in checkout order. A bar per step rather than six
+ * more stat tiles: the shape of the drop-off is the finding, and six equal
+ * cards flatten exactly that. */
+.wrap.aisooq .aisooq-funnel { display: flex; flex-direction: column; gap: var(--sp-2); }
+.wrap.aisooq .aisooq-funnel__step {
+	display: grid;
+	grid-template-columns: minmax(96px, 1fr) auto minmax(0, 2fr) auto;
+	align-items: center;
+	gap: var(--sp-3);
+	font-size: var(--text-sm);
+}
+.wrap.aisooq .aisooq-funnel__label { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wrap.aisooq .aisooq-funnel__num { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--fg); min-width: 3ch; text-align: right; }
+.wrap.aisooq .aisooq-funnel__bar {
+	display: block;
+	height: 8px;
+	border-radius: var(--pill);
+	background: var(--n-800);
+	overflow: hidden;
+}
+.wrap.aisooq .aisooq-funnel__bar > span {
+	display: block;
+	height: 100%;
+	background: var(--pri);
+	border-radius: var(--pill);
+	min-width: 2px;
+}
+/* The biggest drop-off is the one to fix, so it is the one that is coloured. */
+.wrap.aisooq .aisooq-funnel__step.is-worst .aisooq-funnel__bar > span { background: var(--warn); }
+.wrap.aisooq .aisooq-funnel__step.is-worst .aisooq-funnel__num { color: var(--warn); }
+.wrap.aisooq .aisooq-funnel__pct { color: var(--n-400); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* A second toolbar row for bulk controls, separated from the filters above it
+   rather than crowded onto the same line. */
+.wrap.aisooq .aisooq-toolbar--bulk { padding-top: var(--sp-3); padding-bottom: var(--sp-3); }
+.wrap.aisooq.aisooq-app .aisooq-toolbar select,
+.wrap.aisooq.aisooq-app .aisooq-toolbar input[type="date"] {
+	border-radius: var(--radius-sm);
+	border: 1px solid var(--n-700);
+	background: var(--card);
+	font-size: var(--text-sm);
+	min-height: 36px;
+	box-shadow: none;
+	width: auto;
+	max-width: 100%;
+}
+.wrap.aisooq.aisooq-app .aisooq-toolbar select:focus,
+.wrap.aisooq.aisooq-app .aisooq-toolbar input:focus {
+	border-color: var(--pri);
+	box-shadow: 0 0 0 1px var(--pri);
+	outline: 0;
+}
+.wrap.aisooq .aisooq-daterange { display: inline-flex; align-items: center; }
+/* WordPress floats its spinner and gives it a margin that breaks the row. */
+.wrap.aisooq.aisooq-app .aisooq-toolbar .spinner { float: none; margin: 0; flex: 0 0 auto; }
+
+/* A notice that belongs to the page rather than to wp-admin's notice stack. */
+.wrap.aisooq .aisooq-note {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--sp-3);
+	padding: var(--sp-4) var(--sp-6);
+	border-radius: var(--radius);
+	box-shadow: var(--sh-sm);
+	background: var(--card);
+	color: var(--fg);
+	font-size: var(--text-sm);
+}
+.wrap.aisooq .aisooq-note > svg { flex: 0 0 auto; margin-top: 1px; }
+.wrap.aisooq .aisooq-note p { margin: 0; }
+.wrap.aisooq .aisooq-note--warn { background: var(--warn-wash); box-shadow: 0 0 0 1px var(--warn-edge); color: var(--warn); }
+.wrap.aisooq .aisooq-note--warn > svg { color: var(--warn); }
+.wrap.aisooq .aisooq-note--err { background: var(--err-wash); box-shadow: 0 0 0 1px var(--err-edge); color: var(--err); }
+.wrap.aisooq .aisooq-note--err > svg { color: var(--err); }
+
+/* The status message an AJAX action writes beside the button that fired it. */
+.wrap.aisooq .aisooq-msg { font-size: var(--text-sm); font-weight: 600; color: var(--muted); }
+.wrap.aisooq .aisooq-msg.is-ok { color: var(--ok); }
+.wrap.aisooq .aisooq-msg.is-err { color: var(--err); }
+
+/* ── Save ───────────────────────────────────────────────────────────────── */
+.wrap.aisooq .aisooq-savebar {
+	display: flex;
+	align-items: center;
+	gap: var(--sp-3);
+	flex-wrap: wrap;
+	padding-top: var(--sp-2);
+	margin: 0;
+	background: transparent;
+	border: 0;
+}
+.wrap.aisooq .aisooq-savebar .aisooq-btn--primary {
+	padding: 10px 24px;
+	font-size: 15px;
+	min-height: 42px;
+}
+
+.wrap.aisooq .aisooq-footer {
+	display: flex;
+	justify-content: space-between;
+	gap: var(--sp-4);
+	flex-wrap: wrap;
+	font-size: 12px;
+	color: var(--n-400);
+	padding: var(--sp-6) 0;
+}
+
+/* ── Toast ──────────────────────────────────────────────────────────────── */
+.wrap.aisooq .aisooq-toast {
+	position: fixed;
+	bottom: 24px;
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 40;
+	display: flex;
+	align-items: center;
+	gap: var(--sp-2);
+	padding: 9px 16px;
+	border-radius: var(--pill);
+	/* White on the fill again — same reasoning as the primary button. */
+	background: var(--pri-solid);
+	color: var(--pri-fg);
+	box-shadow: var(--sh-lg);
+	font-size: var(--text);
+	font-weight: 700;
+}
+.wrap.aisooq .aisooq-toast.is-err { background: var(--err); }
+
+/* ── Responsive ─────────────────────────────────────────────────────────────
+ * WHY 960px AND NOT THE DESIGN'S 720px: the design's figure is the width of
+ * the page itself, and this page never gets the viewport. wp-admin keeps a
+ * 160px menu to the left of it (36px once it folds at 782px) plus 20px of
+ * body padding, so a 960px viewport is roughly the 780px of content where a
+ * 220px sidebar stops leaving the main column enough room for two fields
+ * abreast. Collapsing on the viewport figure instead would strand the sidebar
+ * in a column too narrow to use for the whole 720–940 range. */
+@media (max-width: 960px) {
+	/* The sidebar becomes the top bar. NOT `display:none` plus a second copy:
+	   hiding it would take the tablist out of the focus order, and on a phone
+	   that is the only way to change tab. Same buttons, same ARIA, laid on
+	   their side. */
+	.wrap.aisooq .aisooq-side {
+		flex: 1 1 100%;
+		position: sticky;
+		top: 0;
+		z-index: 25;
+		gap: var(--sp-3);
+		background: var(--bg);
+		/* Pull out to the body's gutter so the bar spans the full width and the
+		   pill scroller can run off both edges. */
+		margin: calc(var(--sp-4) * -1) calc(var(--sp-4) * -1) 0;
+		padding: var(--sp-3) var(--sp-4);
+		box-shadow: inset 0 -1px 0 var(--line);
+	}
+	.wrap.aisooq .aisooq-nav {
+		flex-direction: row;
+		gap: 6px;
+		overflow-x: auto;
+		scrollbar-width: none;
+		margin: 0 calc(var(--sp-4) * -1);
+		padding: 0 var(--sp-4) 2px;
+	}
+	.wrap.aisooq .aisooq-nav::-webkit-scrollbar { display: none; }
+	.wrap.aisooq .aisooq-navitem {
+		flex: none;
+		width: auto;
+		min-height: 36px;
+		padding: 0 12px;
+		font-size: var(--text);
+		box-shadow: 0 0 0 1px var(--n-700);
+		white-space: nowrap;
+	}
+	.wrap.aisooq .aisooq-navitem svg { width: 16px; height: 16px; }
+	.wrap.aisooq .aisooq-navitem:hover { background: var(--n-900); }
+	.wrap.aisooq .aisooq-navitem.is-active {
+		background: var(--fg);
+		color: var(--bg);
+		box-shadow: none;
+	}
+	.wrap.aisooq .aisooq-navitem.is-active:hover { background: var(--n-200); color: var(--bg); }
+	.wrap.aisooq .aisooq-navitem__count { margin-left: 0; }
+	/* The sibling screens move to the foot of the column — three more pills in
+	   the sticky bar would push the settings themselves below the fold. */
+	.wrap.aisooq .aisooq-side__links { display: none; }
+	.wrap.aisooq .aisooq-main__links { display: flex; }
+	.wrap.aisooq .aisooq-body { padding: var(--sp-4); gap: var(--sp-4); }
+	.wrap.aisooq .aisooq-appbar { padding: var(--sp-3) var(--sp-4); }
+	.wrap.aisooq .aisooq-unsaved { padding: var(--sp-3) var(--sp-4); }
+	.wrap.aisooq.aisooq-app .notice { margin: var(--sp-3) var(--sp-4) 0; }
+	/* The sync group takes its own row rather than squeezing the brand. */
+	.wrap.aisooq .aisooq-syncgroup { flex: 1 1 100%; }
+	.wrap.aisooq .aisooq-results__item { padding: 11px 10px; font-size: var(--text); }
+}
+
+@media (max-width: 782px) {
+	/* wp-admin folds its menu here and gives `.wrap` a different gutter. */
+	.wrap.aisooq.aisooq-app { margin-left: -10px; }
+}
+
+@media (max-width: 600px) {
+	.wrap.aisooq .aisooq-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	/* Two months beside a preset rail is ~640px; a phone has 390. Stack the
+	   rail on top, show one month, and let the presets scroll sideways — they
+	   are the part most likely to be what the operator wanted anyway. */
+	.wrap.aisooq .aisooq-dr__pop { flex-direction: column; max-width: calc(100vw - 16px); }
+	.wrap.aisooq .aisooq-dr__presets {
+		flex-direction: row;
+		overflow-x: auto;
+		scrollbar-width: none;
+		box-shadow: inset 0 -1px 0 var(--line);
+		min-width: 0;
+	}
+	.wrap.aisooq .aisooq-dr__presets::-webkit-scrollbar { display: none; }
+	.wrap.aisooq .aisooq-dr__preset { white-space: nowrap; flex: none; }
+	.wrap.aisooq .aisooq-dr__months > .aisooq-dr__month:last-child { display: none; }
+	.wrap.aisooq .aisooq-dr__week,
+	.wrap.aisooq .aisooq-dr__days { grid-template-columns: repeat(7, 1fr); }
+	.wrap.aisooq .aisooq-dr__months { gap: 0; }
+	.wrap.aisooq .aisooq-dr__month { flex: 1 1 100%; min-width: 0; }
+	.wrap.aisooq .aisooq-storebar { gap: var(--sp-3); }
+	.wrap.aisooq .aisooq-storebar__id { margin-right: 0; flex: 1 1 100%; }
+	.wrap.aisooq.aisooq-app .aisooq-card { padding: var(--sp-4); }
+	.wrap.aisooq .aisooq-card--rows > .aisooq-card__label,
+	.wrap.aisooq .aisooq-row-item,
+	.wrap.aisooq .aisooq-row-item__head,
+	.wrap.aisooq .aisooq-toolbar,
+	.wrap.aisooq .aisooq-pager { padding-left: var(--sp-4); padding-right: var(--sp-4); }
+	/* 24px of gutter either side of a cell is a quarter of a phone's width. */
+	.wrap.aisooq.aisooq-app table.aisooq-table th,
+	.wrap.aisooq.aisooq-app table.aisooq-table td { padding-left: var(--sp-4); padding-right: var(--sp-4); }
+	.wrap.aisooq .aisooq-empty { padding-left: var(--sp-4); padding-right: var(--sp-4); }
+	.wrap.aisooq .aisooq-perms { padding: var(--sp-4); }
+	.wrap.aisooq .aisooq-checks { gap: var(--sp-3) var(--sp-4); }
+	.wrap.aisooq .aisooq-tabtitle { font-size: 20px; }
+	/* A full-width Save is the one thumb target that must never be missed. */
+	.wrap.aisooq .aisooq-savebar .aisooq-btn--primary { flex: 1 1 auto; }
+	.wrap.aisooq.aisooq-app .aisooq-row-item select { flex: 1 1 100%; }
+}
+
+@media (max-width: 400px) {
+	.wrap.aisooq .aisooq-stats { grid-template-columns: 1fr; }
+}
+
+/* Respect the same motion preference the shared sheet sets for the other two
+   screens; this file adds transitions of its own. */
+@media (prefers-reduced-motion: reduce) {
+	.wrap.aisooq * { transition-duration: .001ms !important; animation-duration: .001ms !important; }
+}

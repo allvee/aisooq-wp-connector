@@ -292,14 +292,14 @@ class AI_Sooq_Order_Courier {
 	 * brand_of() below is the one exception — that pair IS ours.
 	 */
 	const COURIER_BRAND = array(
-		'steadfast' => array( 'label' => 'Steadfast', 'mono' => 'SF', 'bg' => '#e7f0fb', 'fg' => '#14539a' ),
-		'pathao'    => array( 'label' => 'Pathao',    'mono' => 'P',  'bg' => '#fdeaef', 'fg' => '#b21f45' ),
-		'redx'      => array( 'label' => 'RedX',      'mono' => 'RX', 'bg' => '#fdeaea', 'fg' => '#b32d2e' ),
-		'paperfly'  => array( 'label' => 'Paperfly',  'mono' => 'Pf', 'bg' => '#e8f4fd', 'fg' => '#12628f' ),
-		'ecourier'  => array( 'label' => 'eCourier',  'mono' => 'eC', 'bg' => '#e6f6ee', 'fg' => '#00844a' ),
-		'sundarban' => array( 'label' => 'Sundarban', 'mono' => 'Sb', 'bg' => '#e5f5f4', 'fg' => '#0f6f6a' ),
-		'carrybee'  => array( 'label' => 'CarryBee',  'mono' => 'CB', 'bg' => '#fdf3e0', 'fg' => '#8a5a00' ),
-		'parceldex' => array( 'label' => 'ParcelDex', 'mono' => 'Px', 'bg' => '#ecebfb', 'fg' => '#3f38a8' ),
+		'steadfast' => array( 'label' => 'Steadfast', 'mono' => 'SF', 'domain' => 'steadfast.com.bd', 'bg' => '#e7f0fb', 'fg' => '#14539a' ),
+		'pathao'    => array( 'label' => 'Pathao',    'mono' => 'P',  'domain' => 'pathao.com', 'bg' => '#fdeaef', 'fg' => '#b21f45' ),
+		'redx'      => array( 'label' => 'RedX',      'mono' => 'RX', 'domain' => 'redx.com.bd', 'bg' => '#fdeaea', 'fg' => '#b32d2e' ),
+		'paperfly'  => array( 'label' => 'Paperfly',  'mono' => 'Pf', 'domain' => 'paperfly.com.bd', 'bg' => '#e8f4fd', 'fg' => '#12628f' ),
+		'ecourier'  => array( 'label' => 'eCourier',  'mono' => 'eC', 'domain' => 'ecourier.com.bd', 'bg' => '#e6f6ee', 'fg' => '#00844a' ),
+		'sundarban' => array( 'label' => 'Sundarban', 'mono' => 'Sb', 'domain' => 'sundarbancourier.com.bd', 'bg' => '#e5f5f4', 'fg' => '#0f6f6a' ),
+		'carrybee'  => array( 'label' => 'CarryBee',  'mono' => 'CB', 'domain' => 'carrybee.com', 'bg' => '#fdf3e0', 'fg' => '#8a5a00' ),
+		'parceldex' => array( 'label' => 'ParcelDex', 'mono' => 'Px', 'domain' => 'parceldex.com', 'bg' => '#ecebfb', 'fg' => '#3f38a8' ),
 	);
 
 	/**
@@ -313,15 +313,16 @@ class AI_Sooq_Order_Courier {
 			return self::COURIER_BRAND[ $slug ];
 		}
 		return array(
-			'label' => '' === $slug ? __( 'Unknown courier', 'aisooq-connector' ) : ucfirst( $slug ),
-			'mono'  => '' === $slug ? '?' : strtoupper( substr( $slug, 0, 1 ) ),
+			'label'  => '' === $slug ? __( 'Unknown courier', 'aisooq-connector' ) : ucfirst( $slug ),
+			'mono'   => '' === $slug ? '?' : strtoupper( substr( $slug, 0, 1 ) ),
+			'domain' => '',
 			// The same neutral pair the "no previous order" pill uses, taken
 			// from the palette rather than re-typed: an unbranded tile is not
 			// a colour decision of its own. Real hex, not var(), because this
 			// lands in a style="" attribute on a <span> that also renders in
 			// contexts this class does not print CSS for.
-			'bg'    => AI_Sooq_Palette::value( 'track' ),
-			'fg'    => AI_Sooq_Palette::value( 'wp-muted' ),
+			'bg'     => AI_Sooq_Palette::value( 'track' ),
+			'fg'     => AI_Sooq_Palette::value( 'wp-muted' ),
 		);
 	}
 
@@ -336,6 +337,15 @@ class AI_Sooq_Order_Courier {
 	public static function courier_mark( $slug, $name = '' ) {
 		$b     = self::brand_of( $slug );
 		$label = '' !== trim( (string) $name ) ? trim( (string) $name ) : $b['label'];
+
+		if ( ! empty( $b['domain'] ) ) {
+			return sprintf(
+				'<img src="https://www.google.com/s2/favicons?domain=%s&sz=64" class="aisooq-cmark" style="background:#fff;border:1px solid #e2e8f0;border-radius:4px;object-fit:contain;padding:1px;" alt="%s" title="%s" aria-hidden="true" />',
+				rawurlencode( $b['domain'] ),
+				esc_attr( $label ),
+				esc_attr( $label )
+			);
+		}
 
 		return sprintf(
 			'<span class="aisooq-cmark" style="background:%s;color:%s" title="%s" aria-hidden="true">%s</span>',

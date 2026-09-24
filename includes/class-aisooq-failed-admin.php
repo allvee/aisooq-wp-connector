@@ -342,19 +342,44 @@ class AI_Sooq_Failed_Admin {
 		$filters = self::read_filters( $request );
 		$total   = AI_Sooq_Order_Sync::failed_count( true );
 		$active  = $this->settings->is_active();
+		$causes  = $total > 0 ? AI_Sooq_Order_Sync::failed_by_cause( true ) : array();
 
-		echo '<div class="wrap aisooq-bl aisooq-fo">';
-		$this->render_hero();
+		AI_Sooq_Admin_Shell::open( array(
+			'slug'     => self::PAGE_SLUG,
+			'legacy'   => 'aisooq-bl aisooq-fo',
+			'title'    => __( 'Failed syncs', 'aisooq-connector' ),
+			'settings' => $this->settings,
+			'nav'      => function () use ( $causes, $total, $filters ) {
+				$this->render_nav( $causes, $total, $filters );
+			},
+		) );
+
+		echo '<h2 class="aisooq-tabtitle">' . esc_html__( 'Failed syncs', 'aisooq-connector' ) . '</h2>';
+		echo '<p class="description">' . esc_html(
+			sprintf(
+				/* translators: %d: the number of attempts an order makes before giving up. */
+				__( 'Orders that tried %d times and stopped. Nothing will push them again on its own — they are here so you can see why, fix the cause, and send them.', 'aisooq-connector' ),
+				(int) AI_Sooq_Order_Sync::MAX_ATTEMPTS
+			)
+		) . '</p>';
 
 		if ( ! $active ) {
-			echo '<div class="notice notice-warning inline"><p>'
-				. esc_html__( 'The connection is paused, so retrying is disabled. Activate it in Settings first.', 'aisooq-connector' )
-				. '</p></div>';
+			AI_Sooq_Admin_Shell::note(
+				'warning-circle',
+				__( 'The connection is paused, so retrying is disabled. Activate it in Settings first.', 'aisooq-connector' ),
+				'warn'
+			);
 		}
 
 		if ( 0 === $total ) {
-			echo '<div class="aisooq-kpi"><div class="aisooq-kpi__label">' . esc_html__( 'Nothing has given up', 'aisooq-connector' ) . '</div>';
-			echo '<div class="aisooq-kpi__sub">' . esc_html__( 'Every order either synced or is still retrying.', 'aisooq-connector' ) . '</div></div></div>';
+			echo '<div class="aisooq-card aisooq-card--rows">';
+			AI_Sooq_Admin_Shell::empty_state(
+				'seal-check',
+				__( 'Nothing has given up', 'aisooq-connector' ),
+				__( 'Every order either synced or is still retrying.', 'aisooq-connector' )
+			);
+			echo '</div>';
+			AI_Sooq_Admin_Shell::close( array( 'slug' => self::PAGE_SLUG ) );
 			return;
 		}
 
@@ -370,105 +395,73 @@ class AI_Sooq_Failed_Admin {
 		$page   = min( max( 1, absint( self::scalar( $request, 'paged' ) ) ), $pages );
 		$orders = self::fetch_page( $filters, $page, $matching );
 
-		$this->render_causes( AI_Sooq_Order_Sync::failed_by_cause( true ), $total, $filters );
-
-		echo '<div class="aisooq-card">';
 		$this->render_chips( $filters, $matching, $total );
-		$this->render_search( $filters );
-		$this->render_bulkbar( $filters, $matching, $active );
+
+		echo '<div class="aisooq-card aisooq-card--rows">';
+		$this->render_toolbar( $filters, $matching, $active );
 		if ( $orders ) {
 			$this->render_table( $orders, $active );
 		} else {
 			$this->render_no_matches();
 		}
+		$this->render_pagination( $page, $pages, $filters );
 		echo '</div>';
 
-		$this->render_pagination( $page, $pages, $filters );
 		echo '<p class="description">'
 			. esc_html__( 'Retrying does not reset an order\'s attempt count, so an order that fails again stays on this list with a fresh reason rather than disappearing.', 'aisooq-connector' )
 			. '</p>';
+
 		$this->render_script( $filters, $active );
-		echo '</div>';
-	}
-
-	private function render_hero() {
-		echo '<div class="aisooq-hero"><div><h1>' . esc_html__( 'Failed syncs', 'aisooq-connector' ) . '</h1>';
-		echo '<p class="aisooq-hero__sub">' . esc_html(
-			sprintf(
-				/* translators: %d: the number of attempts an order makes before giving up. */
-				__( 'Orders that tried %d times and stopped. Nothing will push them again on its own — they are here so you can see why, fix the cause, and send them.', 'aisooq-connector' ),
-				(int) AI_Sooq_Order_Sync::MAX_ATTEMPTS
-			)
-		) . '</p></div></div>';
-	}
-
-	/** @return WC_Order[]|array */
-	private static function fetch_page( array $filters, $page, $matching ) {
-		if ( ! function_exists( 'wc_get_orders' ) || $matching < 1 ) {
-			return array();
-		}
-		return (array) wc_get_orders(
-			AI_Sooq_Order_Sync::failed_query_args(
-				array( 'limit' => self::PER_PAGE, 'offset' => ( $page - 1 ) * self::PER_PAGE ),
-				$filters
-			)
-		);
+		AI_Sooq_Admin_Shell::close( array( 'slug' => self::PAGE_SLUG ) );
 	}
 
 	/**
 	 * The cause rail — the headline of this screen and its navigation.
 	 *
-	 * Tiles rather than a dropdown because the counts ARE the information: an
-	 * operator seeing "30 / 5 / 3" knows immediately that one fix clears three
-	 * quarters of the pile, which is the decision this screen exists to support
-	 * and the one a collapsed <select> hides.
+	 * In the sidebar rather than across the top, because the counts ARE the
+	 * information: an operator seeing "30 / 5 / 3" knows immediately that one
+	 * fix clears three quarters of the pile, which is the decision this screen
+	 * exists to support and the one a collapsed <select> hides. A column also
+	 * holds a dozen causes without wrapping, which the old tile rail did not.
 	 *
 	 * The search survives a cause click. The rail only owns the code dimension,
 	 * and silently discarding the other filter would answer a click with a set
 	 * the operator did not ask for.
 	 */
-	private function render_causes( array $causes, $total, array $filters ) {
-		$keep = ( '' === $filters['search'] ) ? array() : array( self::ARG_SEARCH => $filters['search'] );
+	private function render_nav( array $causes, $total, array $filters ) {
+		$keep  = ( '' === $filters['search'] ) ? array() : array( self::ARG_SEARCH => $filters['search'] );
+		$items = array(
+			array(
+				'url'    => self::page_url( $keep ),
+				'icon'   => 'list-checks',
+				'label'  => __( 'All failures', 'aisooq-connector' ),
+				'count'  => $total,
+				'active' => '' === $filters['code'],
+			),
+		);
 
-		echo '<h2>' . esc_html__( 'Why they stopped', 'aisooq-connector' ) . '</h2>';
-		echo '<div class="aisooq-kpis aisooq-causes">';
-		self::cause_tile( __( 'All failures', 'aisooq-connector' ), $total, '', self::page_url( $keep ), '' === $filters['code'] );
 		foreach ( $causes as $cause ) {
 			$code = isset( $cause['code'] ) ? (string) $cause['code'] : '';
-			self::cause_tile(
-				self::cause_title( $cause ),
-				isset( $cause['count'] ) ? (int) $cause['count'] : 0,
-				$code,
-				self::page_url( array_merge( $keep, array( self::ARG_CODE => $code ) ) ),
-				'' !== $code && $code === $filters['code']
+			if ( '' === $code ) {
+				continue;
+			}
+			$items[] = array(
+				'url'    => self::page_url( array_merge( $keep, array( self::ARG_CODE => $code ) ) ),
+				'icon'   => AI_Sooq_Order_Sync::CAUSE_NONE === $code ? 'question' : 'warning-circle',
+				'label'  => self::cause_title( $cause ),
+				'count'  => isset( $cause['count'] ) ? (int) $cause['count'] : 0,
+				'active' => $code === $filters['code'],
 			);
 		}
-		echo '</div>';
-	}
 
-	/**
-	 * One tile in the rail. $code is '' on the "all" tile and CAUSE_NONE for the
-	 * bucket with nothing to show.
-	 *
-	 * Both $label and $code are platform text, so both are escaped here rather
-	 * than trusted to have been escaped by whoever assembled the rollup.
-	 */
-	private static function cause_tile( $label, $count, $code, $url, $is_on ) {
-		echo '<a class="aisooq-kpi aisooq-cause' . ( $is_on ? ' on' : '' ) . '" href="' . esc_url( $url ) . '"'
-			. ( $is_on ? ' aria-current="true"' : '' ) . '>';
-		echo '<span class="aisooq-kpi__label">' . esc_html( $label ) . '</span>';
-		echo '<span class="aisooq-kpi__num">' . esc_html( number_format_i18n( (int) $count ) ) . '</span>';
-		if ( '' !== $code && AI_Sooq_Order_Sync::CAUSE_NONE !== $code ) {
-			echo '<span class="aisooq-kpi__sub"><code class="aisooq-code">' . esc_html( $code ) . '</code></span>';
-		}
-		echo '</a>';
+		AI_Sooq_Admin_Shell::link_nav( $items, __( 'Filter by cause', 'aisooq-connector' ), 'aisooq-nav--causes' );
 	}
 
 	/**
 	 * What is currently selected, and how to unselect it.
 	 *
 	 * Rendered only when something is filtered: a permanently visible bar saying
-	 * "no filters" is noise, and the rail already shows which tile is lit. Each
+	 * "no filters" is noise, and the rail already shows which cause is lit. Each
 	 * chip drops its OWN filter rather than both, because "same search, all
 	 * causes" is a step an operator takes constantly and losing the typed term to
 	 * get there is the kind of small hostility that makes people stop filtering
@@ -480,32 +473,35 @@ class AI_Sooq_Failed_Admin {
 		}
 		$only_code   = ( '' === $filters['search'] ) ? array() : array( self::ARG_SEARCH => $filters['search'] );
 		$only_search = ( '' === $filters['code'] ) ? array() : array( self::ARG_CODE => $filters['code'] );
-
-		echo '<div class="aisooq-chips">';
-		echo '<span class="aisooq-dim">' . esc_html(
-			sprintf(
-				/* translators: 1: how many orders match the current filter, 2: how many have given up in total. */
-				__( 'Showing %1$s of %2$s failures', 'aisooq-connector' ),
-				number_format_i18n( (int) $matching ),
-				number_format_i18n( (int) $total )
-			)
-		) . '</span>';
-
-		if ( '' !== $filters['code'] ) {
-			// CAUSE_NONE is an internal sentinel, not something to show an operator.
-			$shown = ( AI_Sooq_Order_Sync::CAUSE_NONE === $filters['code'] )
-				? __( 'No reason recorded', 'aisooq-connector' )
-				: $filters['code'];
-			/* translators: %s: the error code the list is filtered to. */
-			self::chip( sprintf( __( 'Cause: %s', 'aisooq-connector' ), $shown ), self::page_url( $only_code ) );
-		}
-		if ( '' !== $filters['search'] ) {
-			/* translators: %s: the term the operator searched for. */
-			self::chip( sprintf( __( 'Search: %s', 'aisooq-connector' ), $filters['search'] ), self::page_url( $only_search ) );
-		}
-
-		echo '<a href="' . esc_url( self::page_url() ) . '">' . esc_html__( 'Clear filters', 'aisooq-connector' ) . '</a>';
-		echo '</div>';
+		?>
+		<div class="aisooq-filterbar">
+			<span class="aisooq-dim"><?php
+			echo esc_html(
+				sprintf(
+					/* translators: 1: how many orders match the current filter, 2: how many have given up in total. */
+					__( 'Showing %1$s of %2$s failures', 'aisooq-connector' ),
+					number_format_i18n( (int) $matching ),
+					number_format_i18n( (int) $total )
+				)
+			);
+			?></span>
+			<?php
+			if ( '' !== $filters['code'] ) {
+				// CAUSE_NONE is an internal sentinel, not something to show an operator.
+				$shown = ( AI_Sooq_Order_Sync::CAUSE_NONE === $filters['code'] )
+					? __( 'No reason recorded', 'aisooq-connector' )
+					: $filters['code'];
+				/* translators: %s: the error code the list is filtered to. */
+				self::chip( sprintf( __( 'Cause: %s', 'aisooq-connector' ), $shown ), self::page_url( $only_code ) );
+			}
+			if ( '' !== $filters['search'] ) {
+				/* translators: %s: the term the operator searched for. */
+				self::chip( sprintf( __( 'Search: %s', 'aisooq-connector' ), $filters['search'] ), self::page_url( $only_search ) );
+			}
+			?>
+			<a class="aisooq-btn aisooq-btn--ghost" href="<?php echo esc_url( self::page_url() ); ?>"><?php esc_html_e( 'Clear filters', 'aisooq-connector' ); ?></a>
+		</div>
+		<?php
 	}
 
 	/**
@@ -513,32 +509,13 @@ class AI_Sooq_Failed_Admin {
 	 * $text may carry the operator's own search term, so it is escaped here.
 	 */
 	private static function chip( $text, $off_url ) {
-		echo '<span class="aisooq-chip">' . esc_html( $text );
-		echo '<a class="aisooq-chip__x" href="' . esc_url( $off_url ) . '" aria-label="'
-			. esc_attr__( 'Remove this filter', 'aisooq-connector' ) . '">&times;</a></span>';
-	}
-
-	/**
-	 * The search box. A plain GET form, so the result is a URL the operator can
-	 * bookmark — and every link below, pagination included, is built from the
-	 * same two query args this form submits.
-	 */
-	private function render_search( array $filters ) {
 		?>
-		<form class="aisooq-toolbar" method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>">
-			<input type="hidden" name="page" value="<?php echo esc_attr( self::PAGE_SLUG ); ?>" />
-			<?php if ( '' !== $filters['code'] ) : ?>
-				<?php // Carried hidden, or searching inside a cause would quietly widen the view back to every cause. ?>
-				<input type="hidden" name="<?php echo esc_attr( self::ARG_CODE ); ?>" value="<?php echo esc_attr( $filters['code'] ); ?>" />
-			<?php endif; ?>
-			<div class="grow">
-				<label for="aisooq-fo-search"><?php esc_html_e( 'Search', 'aisooq-connector' ); ?></label>
-				<input type="search" id="aisooq-fo-search" name="<?php echo esc_attr( self::ARG_SEARCH ); ?>"
-					value="<?php echo esc_attr( $filters['search'] ); ?>"
-					placeholder="<?php esc_attr_e( 'order number, name, phone or email…', 'aisooq-connector' ); ?>" />
-			</div>
-			<div><button type="submit" class="button"><?php esc_html_e( 'Search', 'aisooq-connector' ); ?></button></div>
-		</form>
+		<span class="aisooq-filterchip">
+			<?php echo esc_html( $text ); ?>
+			<a class="aisooq-filterchip__x" href="<?php echo esc_url( $off_url ); ?>" aria-label="<?php esc_attr_e( 'Remove this filter', 'aisooq-connector' ); ?>">
+				<?php echo AI_Sooq_Icons::svg( 'x', array( 'size' => 12 ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+			</a>
+		</span>
 		<?php
 	}
 
@@ -561,15 +538,38 @@ class AI_Sooq_Failed_Admin {
 		return __( 'Try all again', 'aisooq-connector' );
 	}
 
-	private function render_bulkbar( array $filters, $matching, $active ) {
+	/**
+	 * Search and the two bulk levers, on one row above the table.
+	 *
+	 * The search is a plain GET form, so the result is a URL the operator can
+	 * bookmark — and every link below, pagination included, is built from the
+	 * same two query args this form submits.
+	 */
+	private function render_toolbar( array $filters, $matching, $active ) {
 		// Rendered at zero and rewritten by the script on every tick; the static
 		// label is what a JS-less admin sees rather than an empty button.
 		/* translators: %d: how many rows are ticked. */
 		$selected = sprintf( __( 'Retry selected (%d)', 'aisooq-connector' ), 0 );
 		?>
-		<div class="aisooq-bulkbar">
-			<button type="button" class="button button-primary" id="aisooq-fo-retry-selected" disabled><?php echo esc_html( $selected ); ?></button>
-			<button type="button" class="button" id="aisooq-fo-retry-scope" <?php disabled( ! $active || $matching < 1 ); ?>>
+		<div class="aisooq-toolbar">
+			<form class="aisooq-search" method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>">
+				<input type="hidden" name="page" value="<?php echo esc_attr( self::PAGE_SLUG ); ?>" />
+				<?php if ( '' !== $filters['code'] ) : ?>
+					<?php // Carried hidden, or searching inside a cause would quietly widen the view back to every cause. ?>
+					<input type="hidden" name="<?php echo esc_attr( self::ARG_CODE ); ?>" value="<?php echo esc_attr( $filters['code'] ); ?>" />
+				<?php endif; ?>
+				<span class="aisooq-search__icon" aria-hidden="true"><?php echo AI_Sooq_Icons::svg( 'magnifying-glass' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
+				<label class="screen-reader-text" for="aisooq-fo-search"><?php esc_html_e( 'Search failed orders', 'aisooq-connector' ); ?></label>
+				<input type="search" id="aisooq-fo-search" name="<?php echo esc_attr( self::ARG_SEARCH ); ?>"
+					value="<?php echo esc_attr( $filters['search'] ); ?>"
+					placeholder="<?php esc_attr_e( 'Order number, name, phone or email…', 'aisooq-connector' ); ?>" />
+			</form>
+
+			<span class="aisooq-toolbar__spacer"></span>
+
+			<button type="button" class="aisooq-btn aisooq-btn--secondary" id="aisooq-fo-retry-selected" disabled><?php echo esc_html( $selected ); ?></button>
+			<button type="button" class="aisooq-btn aisooq-btn--primary" id="aisooq-fo-retry-scope" <?php disabled( ! $active || $matching < 1 ); ?>>
+				<?php echo AI_Sooq_Icons::svg( 'arrow-clockwise' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 				<?php echo esc_html( self::bulk_label( $filters, $matching ) ); ?>
 			</button>
 			<span id="aisooq-fo-msg" class="aisooq-msg" role="status" aria-live="polite"></span>
@@ -579,16 +579,16 @@ class AI_Sooq_Failed_Admin {
 
 	private function render_table( array $orders, $active ) {
 		?>
-		<div class="aisooq-fo-scroll">
-		<table class="aisooq-tbl">
+		<div class="aisooq-tablewrap">
+		<table class="aisooq-table">
 			<thead><tr>
-				<th class="aisooq-fo-cb"><input type="checkbox" id="aisooq-fo-cb-all" aria-label="<?php esc_attr_e( 'Select all', 'aisooq-connector' ); ?>" <?php disabled( ! $active ); ?> /></th>
+				<th class="aisooq-table__pick"><input type="checkbox" id="aisooq-fo-cb-all" aria-label="<?php esc_attr_e( 'Select all', 'aisooq-connector' ); ?>" <?php disabled( ! $active ); ?> /></th>
 				<th><?php esc_html_e( 'Order', 'aisooq-connector' ); ?></th>
 				<th><?php esc_html_e( 'Customer', 'aisooq-connector' ); ?></th>
 				<th><?php esc_html_e( 'Why it stopped', 'aisooq-connector' ); ?></th>
 				<th><?php esc_html_e( 'Attempts', 'aisooq-connector' ); ?></th>
 				<th><?php esc_html_e( 'Last tried', 'aisooq-connector' ); ?></th>
-				<th class="aisooq-fo-act"><span class="screen-reader-text"><?php esc_html_e( 'Actions', 'aisooq-connector' ); ?></span></th>
+				<th class="aisooq-table__actions"><span class="screen-reader-text"><?php esc_html_e( 'Actions', 'aisooq-connector' ); ?></span></th>
 			</tr></thead>
 			<tbody>
 			<?php
@@ -606,40 +606,52 @@ class AI_Sooq_Failed_Admin {
 				$pick = sprintf( __( 'Select order %s', 'aisooq-connector' ), $order->get_order_number() );
 				?>
 				<tr data-order="<?php echo esc_attr( $order->get_id() ); ?>">
-					<td class="aisooq-fo-cb">
+					<td class="aisooq-table__pick">
 						<?php if ( '' === $blocker ) : ?>
 							<input type="checkbox" class="aisooq-fo-pick" aria-label="<?php echo esc_attr( $pick ); ?>" <?php disabled( ! $active ); ?> />
 						<?php endif; ?>
 					</td>
-					<td class="aisooq-fo-order" data-label="<?php esc_attr_e( 'Order', 'aisooq-connector' ); ?>">
-						<a href="<?php echo esc_url( $order->get_edit_order_url() ); ?>">#<?php echo esc_html( $order->get_order_number() ); ?></a>
-						<div class="aisooq-dim"><?php echo esc_html( wc_get_order_status_name( $order->get_status() ) ); ?></div>
+					<td>
+						<div class="aisooq-stack">
+							<a class="aisooq-stack__lead" href="<?php echo esc_url( $order->get_edit_order_url() ); ?>">#<?php echo esc_html( $order->get_order_number() ); ?></a>
+							<span class="aisooq-dim"><?php echo esc_html( wc_get_order_status_name( $order->get_status() ) ); ?></span>
+						</div>
 					</td>
-					<td class="aisooq-who" data-label="<?php esc_attr_e( 'Customer', 'aisooq-connector' ); ?>">
-						<div><?php echo esc_html( '' !== $name ? $name : '—' ); ?></div>
-						<?php if ( $order->get_billing_phone() ) : ?><div><code><?php echo esc_html( $order->get_billing_phone() ); ?></code></div><?php endif; ?>
+					<td>
+						<div class="aisooq-stack">
+							<span class="aisooq-stack__lead"><?php echo esc_html( '' !== $name ? $name : '—' ); ?></span>
+							<?php if ( $order->get_billing_phone() ) : ?><span><code><?php echo esc_html( $order->get_billing_phone() ); ?></code></span><?php endif; ?>
+						</div>
 					</td>
-					<td class="aisooq-fo-why" data-label="<?php esc_attr_e( 'Why it stopped', 'aisooq-connector' ); ?>">
-						<div><?php echo esc_html( self::reason( $order ) ); ?></div>
-						<?php if ( '' !== $code ) : ?>
-							<?php // The code, not the prose, is what an operator greps a log or a support thread for. ?>
-							<code class="aisooq-code" title="<?php esc_attr_e( 'The error code this failure was recorded under.', 'aisooq-connector' ); ?>"><?php echo esc_html( $code ); ?></code>
-						<?php endif; ?>
+					<td>
+						<div class="aisooq-stack">
+							<span><?php echo esc_html( self::reason( $order ) ); ?></span>
+							<?php if ( '' !== $code ) : ?>
+								<?php // The code, not the prose, is what an operator greps a log or a support thread for. ?>
+								<span><code title="<?php esc_attr_e( 'The error code this failure was recorded under.', 'aisooq-connector' ); ?>"><?php echo esc_html( $code ); ?></code></span>
+							<?php endif; ?>
+						</div>
 					</td>
-					<td data-label="<?php esc_attr_e( 'Attempts', 'aisooq-connector' ); ?>"><?php echo esc_html( number_format_i18n( (int) $order->get_meta( AISOOQ_META_ATTEMPTS ) ) ); ?></td>
-					<td data-label="<?php esc_attr_e( 'Last tried', 'aisooq-connector' ); ?>">
+					<td class="aisooq-table__num"><?php echo esc_html( number_format_i18n( (int) $order->get_meta( AISOOQ_META_ATTEMPTS ) ) ); ?></td>
+					<td>
 						<?php if ( $tried['ts'] > 0 ) : ?>
 							<?php // Elapsed time to read, exact stamp on hover so the precision is not lost. ?>
-							<span title="<?php echo esc_attr( $tried['exact'] ); ?>"><?php echo esc_html( human_time_diff( $tried['ts'] ) . ' ' . __( 'ago', 'aisooq-connector' ) ); ?></span>
+							<span title="<?php echo esc_attr( $tried['exact'] ); ?>"><?php
+							printf(
+								/* translators: %s: a human-readable interval, e.g. "3 hours". */
+								esc_html__( '%s ago', 'aisooq-connector' ),
+								esc_html( human_time_diff( $tried['ts'] ) )
+							);
+							?></span>
 						<?php else : ?>
 							<span class="aisooq-dim">&mdash;</span>
 						<?php endif; ?>
 					</td>
-					<td class="aisooq-fo-act" data-label="<?php esc_attr_e( 'Actions', 'aisooq-connector' ); ?>">
+					<td class="aisooq-table__actions">
 						<?php if ( '' !== $blocker ) : ?>
 							<span class="aisooq-dim" title="<?php echo esc_attr( $blocker ); ?>"><?php esc_html_e( 'Cannot retry', 'aisooq-connector' ); ?></span>
 						<?php else : ?>
-							<button type="button" class="button aisooq-fo-retry" <?php disabled( ! $active ); ?>><?php esc_html_e( 'Try again', 'aisooq-connector' ); ?></button>
+							<button type="button" class="aisooq-btn aisooq-btn--secondary aisooq-fo-retry" <?php disabled( ! $active ); ?>><?php esc_html_e( 'Try again', 'aisooq-connector' ); ?></button>
 						<?php endif; ?>
 					</td>
 				</tr>
@@ -655,15 +667,20 @@ class AI_Sooq_Failed_Admin {
 	 * it: the pile is still there, this view just does not reach it.
 	 */
 	private function render_no_matches() {
-		echo '<div class="aisooq-empty">' . esc_html__( 'Nothing here matches that filter.', 'aisooq-connector' ) . ' ';
-		echo '<a href="' . esc_url( self::page_url() ) . '">' . esc_html__( 'Clear filters', 'aisooq-connector' ) . '</a></div>';
+		AI_Sooq_Admin_Shell::empty_state(
+			'funnel',
+			__( 'Nothing matches that filter', 'aisooq-connector' ),
+			__( 'The failures are still there — this view just does not reach them.', 'aisooq-connector' )
+		);
+		echo '<p class="aisooq-empty" style="padding-top:0;"><a href="' . esc_url( self::page_url() ) . '">'
+			. esc_html__( 'Clear filters', 'aisooq-connector' ) . '</a></p>';
 	}
 
 	private function render_pagination( $page, $pages, array $filters ) {
 		if ( $pages < 2 ) {
 			return;
 		}
-		echo '<div class="tablenav"><div class="tablenav-pages">';
+		echo '<div class="aisooq-pager tablenav-pages">';
 		echo wp_kses_post(
 			paginate_links(
 				array(
@@ -679,7 +696,20 @@ class AI_Sooq_Failed_Admin {
 				)
 			)
 		);
-		echo '</div></div>';
+		echo '</div>';
+	}
+
+	/** @return WC_Order[]|array */
+	private static function fetch_page( array $filters, $page, $matching ) {
+		if ( ! function_exists( 'wc_get_orders' ) || $matching < 1 ) {
+			return array();
+		}
+		return (array) wc_get_orders(
+			AI_Sooq_Order_Sync::failed_query_args(
+				array( 'limit' => self::PER_PAGE, 'offset' => ( $page - 1 ) * self::PER_PAGE ),
+				$filters
+			)
+		);
 	}
 
 	private function render_script( array $filters, $active ) {
